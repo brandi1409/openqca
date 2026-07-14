@@ -24,11 +24,14 @@ npm run dev --workspace web    # Web-App auf http://localhost:3000
 
 ## Stand
 
-- **Engine** komplett & getestet: Kalibrierung (direkt/linear/crisp/4-Werte), Konsistenz/Coverage/PRI, Truth Table, Quine-McCluskey-Minimierung, komplexe + sparsame Lösung, Notwendigkeitsanalyse.
-- **Web-App** lauffähig: geführte Kalibrierung mit Live-Coach, Truth Table, Lösungen, Notwendigkeit, Protokoll-Export (JSON + R-Skript). Alles rechnet lokal im Browser.
-- **Offen:** intermediäre Lösung/ESA, CSV-Import-UI, Desktop-Wrapper (Tauri), Cloud (Supabase), KI-Routen (Anthropic), Zahlungen (Stripe), Rechtsprüfung, Deployment (Vercel).
+**Live:** https://openqca.vercel.app
 
-Details und der vollständige Bauplan: `prototypes/03-goldplan.html`.
+- **Engine** komplett & getestet (26 Tests): Kalibrierung (direkt/linear/crisp/4-Werte), Konsistenz/Coverage/PRI, Truth Table, Quine-McCluskey-Minimierung, komplexe + **intermediäre** (directional expectations) + sparsame Lösung, Notwendigkeitsanalyse, **Robustheits-Sweep**. Referenz-Suite: `node scripts/reference-check.mjs` (siehe `VALIDATION.md`).
+- **Web-App** (deployt): geführte Kalibrierung mit Live-Coach, Truth Table, alle drei Lösungstypen, Notwendigkeit, **Analyse des negierten Outcomes (~Y)**, Robustheits-Panel, XY-Plot, Deskriptivstatistik, CSV/**XLSX**-Import, Beispieldatensätze, Protokoll-Export (JSON + R-Skript), **druckfähiger Bericht (PDF)**, **DE/EN-Umschalter**. Der kostenlose Kern rechnet vollständig lokal im Browser.
+- **Cloud (optional):** Konto (Supabase Magic Link) + Projekt-Speicherung; KI-Assistenten (Anthropic) und Zahlungen (Stripe) sind im Code fertig und werden rein über Env-Variablen zugeschaltet.
+- **Offen:** Desktop-Build (Tauri, braucht Rust + Signierung), Cross-Validierung gegen fsQCA 4.1 / R-Paket `QCA`, juristische Prüfung der `[PRÜFEN]`-Punkte in `legal/`, öffentliches Repository, eigene Domain.
+
+Details und der vollständige Bauplan: `prototypes/03-goldplan.html` · Übergabe: `docs/handoff-checklist.md`.
 
 ## Lizenz
 

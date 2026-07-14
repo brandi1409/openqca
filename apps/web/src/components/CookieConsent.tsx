@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { useLocale } from "@/i18n/locale";
+import { t } from "@/i18n/dict";
 
 const STORAGE_KEY = "openqca_consent";
 
@@ -22,6 +24,7 @@ type ConsentChoice = "necessary" | "all";
  * vermeiden. localStorage-Zugriffe sind in try/catch gekapselt.
  */
 export function CookieConsent() {
+  const [locale] = useLocale();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -57,14 +60,12 @@ export function CookieConsent() {
       <div style={innerStyle}>
         <div style={textStyle}>
           <p id="cookie-consent-title" style={titleStyle}>
-            Datenschutzeinstellungen
+            {t(locale, "consent.title")}
           </p>
           <p id="cookie-consent-desc" style={descStyle}>
-            openQCA funktioniert local-first: Für den Betrieb nutzen wir nur
-            technisch notwendige lokale Speicherung – Ihre Analysedaten bleiben
-            auf Ihrem Gerät. Details in unserer{" "}
+            {t(locale, "consent.descPre")}
             <a href="/rechtliches/datenschutz" style={linkStyle}>
-              Datenschutzerklärung
+              {t(locale, "consent.descLink")}
             </a>
             .
           </p>
@@ -76,14 +77,14 @@ export function CookieConsent() {
             onClick={() => choose("necessary")}
             style={primaryButtonStyle}
           >
-            Nur notwendige
+            {t(locale, "consent.necessary")}
           </button>
           <button
             type="button"
             onClick={() => choose("all")}
             style={secondaryButtonStyle}
           >
-            Alle akzeptieren
+            {t(locale, "consent.acceptAll")}
           </button>
         </div>
       </div>

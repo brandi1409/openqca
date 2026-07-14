@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { cloudEnabled } from "@/lib/config";
+import { useLocale } from "@/i18n/locale";
+import { t } from "@/i18n/dict";
 
 const mutedBadge: React.CSSProperties = {
   fontSize: 11.5,
@@ -55,18 +57,19 @@ export function useUser(): SessionUser | null {
 
 /** Anmelde-Button (Magic Link). Ohne Cloud-Konfiguration nur ein Hinweis-Badge. */
 export function AccountButton() {
+  const [locale] = useLocale();
   const user = useUser();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [open, setOpen] = useState(false);
 
-  if (!cloudEnabled) return <span style={mutedBadge}>Cloud-Tarif · nicht konfiguriert</span>;
+  if (!cloudEnabled) return <span style={mutedBadge}>{t(locale, "cloud.notConfigured")}</span>;
 
   if (user) {
     return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{user.email}</span>
-        <button style={btn} onClick={() => getSupabase()?.auth.signOut()}>Abmelden</button>
+        <button style={btn} onClick={() => getSupabase()?.auth.signOut()}>{t(locale, "cloud.signOut")}</button>
       </span>
     );
   }
@@ -78,18 +81,19 @@ export function AccountButton() {
     setSent(true);
   }
 
-  if (!open) return <button style={btn} onClick={() => setOpen(true)}>Anmelden</button>;
-  if (sent) return <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>Link an {email} gesendet.</span>;
+  if (!open) return <button style={btn} onClick={() => setOpen(true)}>{t(locale, "cloud.signIn")}</button>;
+  if (sent) return <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{t(locale, "cloud.linkSent", { email })}</span>;
   return (
     <span style={{ display: "inline-flex", gap: 6 }}>
-      <input style={input} type="email" placeholder="E-Mail" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <button style={btn} onClick={sendLink}>Magic Link</button>
+      <input style={input} type="email" placeholder={t(locale, "cloud.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} />
+      <button style={btn} onClick={sendLink}>{t(locale, "cloud.magicLink")}</button>
     </span>
   );
 }
 
 /** Projekt in der Cloud speichern/laden (nur angemeldet + Cloud aktiv). */
 export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; onLoad: (data: unknown) => void }) {
+  const [locale] = useLocale();
   const user = useUser();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [status, setStatus] = useState<string>("");
@@ -107,15 +111,15 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
 
   if (!cloudEnabled) return null;
   if (!user)
-    return <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "8px 0 0" }}>Anmelden, um Projekte in der Cloud zu speichern (Cloud-Tarif).</p>;
+    return <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "8px 0 0" }}>{t(locale, "cloud.saveLoadHint")}</p>;
 
   async function save() {
     const sb = getSupabase();
     if (!sb || !user) return;
-    const name = window.prompt("Projektname:", "Meine QCA-Analyse");
+    const name = window.prompt(t(locale, "cloud.projectNamePrompt"), t(locale, "cloud.projectNameDefault"));
     if (!name) return;
     const { error } = await sb.from("projects").insert({ user_id: user.id, name, data: getState() });
-    setStatus(error ? "Fehler beim Speichern." : "Gespeichert.");
+    setStatus(error ? t(locale, "cloud.saveError") : t(locale, "cloud.saveOk"));
     void refresh();
   }
   async function load(id: string) {
@@ -127,7 +131,7 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 10 }}>
-      <button style={btn} onClick={save}>In Cloud speichern</button>
+      <button style={btn} onClick={save}>{t(locale, "cloud.saveBtn")}</button>
       {projects.length > 0 && (
         <select
           style={input}
@@ -136,7 +140,7 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
             if (e.target.value) void load(e.target.value);
           }}
         >
-          <option value="">Projekt laden…</option>
+          <option value="">{t(locale, "cloud.loadPlaceholder")}</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}

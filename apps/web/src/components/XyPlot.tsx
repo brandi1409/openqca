@@ -1,5 +1,8 @@
 "use client";
 
+import { useLocale } from "@/i18n/locale";
+import { t } from "@/i18n/dict";
+
 interface XyPoint {
   label: string;
   x: number;
@@ -34,6 +37,7 @@ const py = (y: number): number => MT + (1 - y) * (H - MT - MB);
  * beide 0–1. Berechnet Konsistenz Σ min(x,y)/Σ x und Coverage Σ min(x,y)/Σ y.
  */
 export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
+  const [locale] = useLocale();
   let sumMin = 0;
   let sumX = 0;
   let sumY = 0;
@@ -51,13 +55,13 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
   return (
     <div>
       <div style={kpiRowStyle}>
-        <Kpi value={fmt(consistency)} label="Konsistenz (Hinreichendheit)" />
-        <Kpi value={fmt(coverage)} label="Coverage" />
+        <Kpi value={fmt(consistency)} label={t(locale, "xyplot.kpi.consistency")} />
+        <Kpi value={fmt(coverage)} label={t(locale, "xyplot.kpi.coverage")} />
       </div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label={`Fuzzy-Set-XY-Plot: ${xLabel} (X) gegen ${yLabel} (Y), ${points.length} Fälle, Achsen 0 bis 1`}
+        aria-label={t(locale, "xyplot.aria", { x: xLabel, y: yLabel, n: points.length })}
         style={svgStyle}
       >
         {/* Gitternetz */}

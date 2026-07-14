@@ -1,5 +1,8 @@
 "use client";
 
+import { useLocale } from "@/i18n/locale";
+import { t } from "@/i18n/dict";
+
 interface DescriptiveCase {
   label: string;
   values: Record<string, number>;
@@ -37,6 +40,7 @@ function computeStat(values: number[]): ColumnStat {
  * je Variable, überlaufscrollbar und im Tabellenstil der App.
  */
 export function Descriptives({ columns, cases }: DescriptivesProps) {
+  const [locale] = useLocale();
   const stats = columns.map((col) => ({
     col,
     stat: computeStat(cases.map((c) => c.values[col])),
@@ -47,12 +51,12 @@ export function Descriptives({ columns, cases }: DescriptivesProps) {
       <table style={tableStyle}>
         <thead>
           <tr>
-            <th style={thStyle(false)}>Variable</th>
-            <th style={thStyle(true)}>N</th>
-            <th style={thStyle(true)}>Minimum</th>
-            <th style={thStyle(true)}>Median</th>
-            <th style={thStyle(true)}>Mittelwert</th>
-            <th style={thStyle(true)}>Maximum</th>
+            <th style={thStyle(false)}>{t(locale, "desc.col.variable")}</th>
+            <th style={thStyle(true)}>{t(locale, "desc.col.n")}</th>
+            <th style={thStyle(true)}>{t(locale, "desc.col.min")}</th>
+            <th style={thStyle(true)}>{t(locale, "desc.col.median")}</th>
+            <th style={thStyle(true)}>{t(locale, "desc.col.mean")}</th>
+            <th style={thStyle(true)}>{t(locale, "desc.col.max")}</th>
           </tr>
         </thead>
         <tbody>

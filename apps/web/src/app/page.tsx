@@ -14,12 +14,20 @@ import {
 } from "@openqca/engine";
 import { DEMO, type RawDataset } from "@/lib/demo";
 import { parseCsv } from "@/lib/csv";
+import { parseXlsxToDataset } from "@/lib/xlsx";
 import { AiAssist } from "@/components/AiAssist";
 import { AccountButton, CloudSaveLoad } from "@/components/cloud";
 import { XyPlot } from "@/components/XyPlot";
 import { Descriptives } from "@/components/Descriptives";
 import { Onboarding } from "@/components/Onboarding";
 import { ExampleDatasets } from "@/components/ExampleDatasets";
+import { RobustnessPanel } from "@/components/RobustnessPanel";
+import NegatedOutcomePanel from "@/components/NegatedOutcomePanel";
+import { ReportButton } from "@/components/ReportButton";
+import { type ReportInput } from "@/lib/report";
+import { useLocale } from "@/i18n/locale";
+import { t } from "@/i18n/dict";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface SavedState {
   dataset: RawDataset;
@@ -48,6 +56,7 @@ function numericCols(ds: RawDataset): string[] {
 }
 
 export default function Home() {
+  const [locale] = useLocale();
   const [ds, setDs] = useState<RawDataset | null>(null);
   const [anchors, setAnchors] = useState<Anchors>({});
   const [focusVar, setFocusVar] = useState<string>("");
@@ -79,10 +88,26 @@ export default function Home() {
       try {
         applyDataset(parseCsv(String(reader.result), file.name));
       } catch (e) {
-        alert("CSV konnte nicht gelesen werden: " + (e instanceof Error ? e.message : "unbekannt"));
+        alert(t(locale, "alert.csvError", { msg: e instanceof Error ? e.message : t(locale, "alert.unknown") }));
       }
     };
     reader.readAsText(file);
+  }
+
+  async function importXlsx(file: File) {
+    try {
+      applyDataset(await parseXlsxToDataset(file));
+    } catch (e) {
+      alert(t(locale, "alert.xlsxError", { msg: e instanceof Error ? e.message : t(locale, "alert.unknown") }));
+    }
+  }
+
+  function importFile(file: File) {
+    if (/\.(xlsx|xls)$/i.test(file.name)) {
+      importXlsx(file);
+    } else {
+      importCsv(file);
+    }
   }
 
   function currentState(): SavedState {
@@ -145,11 +170,11 @@ export default function Home() {
       <input
         ref={fileRef}
         type="file"
-        accept=".csv,.txt,.tsv"
+        accept=".csv,.txt,.tsv,.xlsx,.xls"
         style={{ display: "none" }}
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) importCsv(f);
+          if (f) importFile(f);
           e.target.value = "";
         }}
       />
@@ -159,30 +184,27 @@ export default function Home() {
         <>
           <div style={{ padding: "10px 2px 22px" }}>
             <h1 style={{ fontSize: 28, fontWeight: 680, letterSpacing: "-0.015em", margin: "0 0 8px", maxWidth: "24ch" }}>
-              Das offene, geführte Werkzeug für Qualitative Comparative Analysis.
+              {t(locale, "hero.title")}
             </h1>
             <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: 0 }}>
-              openQCA führt durch Kalibrierung, Truth Table und Minimierung — mit einem Coach, der
-              typische Fehler abfängt, und einem Protokoll, das jede Analyse reproduzierbar macht.
-              Kostenlos, Open Source (MIT), und Ihre Daten bleiben im Browser.
+              {t(locale, "hero.desc")}
             </p>
           </div>
           <Card>
-            <H2>Daten laden</H2>
+            <H2>{t(locale, "load.title")}</H2>
             <p style={{ color: "var(--ink-2)", maxWidth: "60ch" }}>
-              Lade den Demo-Datensatz, wähle unten ein Beispiel oder importiere eine eigene CSV-Datei.
-              Alles rechnet lokal in diesem Browser; nichts wird übertragen.
+              {t(locale, "load.desc")}
             </p>
             <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Button primary onClick={loadDemo}>Demo-Datensatz laden</Button>
-              <Button onClick={() => fileRef.current?.click()}>CSV importieren…</Button>
+              <Button primary onClick={loadDemo}>{t(locale, "load.demoBtn")}</Button>
+              <Button onClick={() => fileRef.current?.click()}>{t(locale, "load.importBtn")}</Button>
             </div>
             <p className="hint" style={hintStyle}>
-              CSV: Kopfzeile + Fälle, Komma oder Semikolon. Alle Beispieldaten sind synthetisch.
+              {t(locale, "load.hint")}
             </p>
           </Card>
           <Card>
-            <H2>Beispiel-Datensätze</H2>
+            <H2>{t(locale, "examples.title")}</H2>
             <ExampleDatasets onSelect={applyDataset} />
           </Card>
         </>
@@ -190,12 +212,12 @@ export default function Home() {
         <>
           <DataSection ds={ds} fuzzyCols={fuzzyCols} />
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, margin: "-8px 0 18px" }}>
-            <Button onClick={() => fileRef.current?.click()}>Anderen Datensatz (CSV) laden</Button>
+            <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
             <CloudSaveLoad getState={currentState} onLoad={loadState} />
           </div>
           {fuzzyCols.length > 0 && (
             <Card>
-              <H2>Deskriptive Statistik (kalibrierte Sets)</H2>
+              <H2>{t(locale, "descriptives.title")}</H2>
               <Descriptives columns={fuzzyCols} cases={cases} />
             </Card>
           )}
@@ -228,23 +250,58 @@ export default function Home() {
               conditions={conditions}
             />
           )}
+          {sol && tt && (
+            <>
+              <Card>
+                <H2>{t(locale, "robustness.title")}</H2>
+                <RobustnessPanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} currentConsCut={consCut} />
+              </Card>
+              {/* Panel bringt eigene Karte + Überschrift mit — nicht doppelt verpacken. */}
+              <NegatedOutcomePanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
+            </>
+          )}
           {conditions.length > 0 && outcome && (() => {
             const xc = xyCond && conditions.includes(xyCond) ? xyCond : conditions[0];
             const points = cases.map((c) => ({ label: c.label, x: c.values[xc], y: c.values[outcome] }));
             return (
               <Card>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                  <H2>XY-Plot (Suffizienz)</H2>
+                  <H2>{t(locale, "xy.title")}</H2>
                   <select value={xc} onChange={(e) => setXyCond(e.target.value)} style={{ ...inputStyle, marginLeft: "auto" }}>
                     {conditions.map((c) => (<option key={c} value={c}>{c}</option>))}
                   </select>
                 </div>
                 <XyPlot xLabel={xc.replace(/^fs_/, "")} yLabel={outcome.replace(/^fs_/, "")} points={points} />
-                <p className="hint" style={hintStyle}>Punkte oberhalb der Diagonale stützen „X ist hinreichend für Y". Konsistenz &amp; Coverage stehen über dem Plot.</p>
+                <p className="hint" style={hintStyle}>{t(locale, "xy.hint")}</p>
               </Card>
             );
           })()}
           <ProtocolSection ds={ds} anchors={anchors} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
+          <Card>
+            <H2>{t(locale, "report.title")}</H2>
+            <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
+            <ReportButton
+              getInput={(): ReportInput | null => {
+                if (!ds || !tt || !sol) return null;
+                return {
+                  datasetName: ds.name,
+                  caseCount: ds.rows.length,
+                  anchors,
+                  conditions,
+                  outcome,
+                  freqCut,
+                  consCut,
+                  tt,
+                  complex: sol.complex,
+                  intermediate: sol.intermediate,
+                  parsimonious: sol.parsimonious,
+                  necessity: sol.necessity,
+                  expectations: Object.fromEntries(conditions.map((c) => [c, expectations[c] ?? "present"])),
+                  rScript: buildRScript(ds, anchors, conditions, outcome, freqCut, consCut),
+                };
+              }}
+            />
+          </Card>
         </>
       )}
     </div>
@@ -268,6 +325,7 @@ function CalibrationSection({
   setFocusVar: (v: string) => void;
   cases: QcaCase[];
 }) {
+  const [locale] = useLocale();
   const raw = numericCols(ds);
   const v = focusVar || raw[0];
   const a = anchors[v] ?? [0, 0.5, 1];
@@ -289,10 +347,9 @@ function CalibrationSection({
 
   return (
     <Card>
-      <H2>Kalibrierung, die mitdenkt</H2>
+      <H2>{t(locale, "calib.title")}</H2>
       <p style={{ color: "var(--ink-2)", maxWidth: "66ch", marginTop: 0 }}>
-        Rohwerte werden zu Fuzzy-Set-Zugehörigkeit. Der Coach prüft jede Entscheidung live gegen
-        deine Fälle.
+        {t(locale, "calib.desc")}
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
         {raw.map((c) => (
@@ -317,7 +374,7 @@ function CalibrationSection({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 14 }}>
-        {(["Voll draußen → 0,05", "Kreuzung → 0,50", "Voll drinnen → 0,95"] as const).map((lab, i) => (
+        {([t(locale, "calib.anchorOut"), t(locale, "calib.anchorCross"), t(locale, "calib.anchorIn")]).map((lab, i) => (
           <div key={i} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px" }}>
             <div style={{ fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700 }}>
               {lab}
@@ -347,29 +404,29 @@ function CalibrationSection({
       {ordered ? (
         <CalibrationCurve variable={v} anchors={a} values={values} rows={rows} nearCross={nearCross} atHalf={atHalf} />
       ) : (
-        <Diag kind="bad">Anker müssen aufsteigend sein: voll draußen &lt; Kreuzung &lt; voll drinnen.</Diag>
+        <Diag kind="bad">{t(locale, "calib.badOrder")}</Diag>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
         {atHalf.length ? (
           <Diag kind="bad">
-            <b>{atHalf.length} Fall/Fälle liegen genau bei 0,5</b> ({atHalf.map((r) => r.label).join(", ")}) — solche
-            Fälle fallen aus der Truth Table. Verschieb den Kreuzungspunkt leicht.
+            <b>{t(locale, "calib.atHalf.count", { n: atHalf.length })}</b>{" "}
+            {t(locale, "calib.atHalf.rest", { labels: atHalf.map((r) => r.label).join(", ") })}
           </Diag>
         ) : (
-          <Diag kind="ok"><b>Kein Fall liegt exakt auf 0,5.</b> Alle Fälle bleiben in der Analyse.</Diag>
+          <Diag kind="ok"><b>{t(locale, "calib.atHalf.okBold")}</b> {t(locale, "calib.atHalf.okRest")}</Diag>
         )}
         {hi / rows.length >= 0.85 || hi / rows.length <= 0.15 ? (
           <Diag kind="warn">
-            <b>Stark schiefes Set.</b> {hi} von {rows.length} „drinnen“ — das Set unterscheidet kaum.
+            <b>{t(locale, "calib.skew.bold")}</b> {t(locale, "calib.skew.rest", { hi, total: rows.length })}
           </Diag>
         ) : (
-          <Diag kind="ok"><b>Ausgewogene Verteilung.</b> {hi} drinnen / {lo} draußen.</Diag>
+          <Diag kind="ok"><b>{t(locale, "calib.skew.okBold")}</b> {t(locale, "calib.skew.okRest", { hi, lo })}</Diag>
         )}
         {nearCross.length > 0 && (
           <Diag kind="warn">
-            <b>{nearCross.length} Grenzfall/-fälle nahe 0,5:</b>{" "}
-            {nearCross.map((r) => `${r.label} ${fmt(r.f, 2)}`).join(", ")} — hier lohnt eine Robustheitsprüfung.
+            <b>{t(locale, "calib.nearCross.bold", { n: nearCross.length })}</b>{" "}
+            {t(locale, "calib.nearCross.rest", { list: nearCross.map((r) => `${r.label} ${fmt(r.f, 2)}`).join(", ") })}
           </Diag>
         )}
       </div>
@@ -377,24 +434,24 @@ function CalibrationSection({
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line-soft)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#6a4bd6" }}>
-            ✨ KI-Assistent
+            {t(locale, "calib.ai.badge")}
           </span>
-          <span style={{ fontSize: 10.5, color: "var(--muted)" }}>Cloud-Tarif</span>
+          <span style={{ fontSize: 10.5, color: "var(--muted)" }}>{t(locale, "calib.ai.plan")}</span>
         </div>
         <div style={{ display: "grid", gap: 8 }}>
           <AiAssist
             task="anchors"
-            label="Anker aus Beschreibung vorschlagen"
+            label={t(locale, "calib.ai.anchors")}
             needsContext
             getData={() => {
               const sorted = [...values].sort((a2, b2) => a2 - b2);
               return { variable: v, min: sorted[0], median: sorted[Math.floor(sorted.length / 2)], max: sorted[sorted.length - 1] };
             }}
           />
-          <AiAssist task="skew" label="Verteilung erklären" getData={() => ({ total: rows.length, inside: hi, atHalf: atHalf.length })} />
+          <AiAssist task="skew" label={t(locale, "calib.ai.skew")} getData={() => ({ total: rows.length, inside: hi, atHalf: atHalf.length })} />
           <AiAssist
             task="methods"
-            label="Methoden-Absatz entwerfen"
+            label={t(locale, "calib.ai.methods")}
             needsContext
             getData={() => ({ variable: v, anchors: a.map((x) => fmt(x, 0)).join(" / "), total: rows.length, inside: hi })}
           />
@@ -419,6 +476,7 @@ function CalibrationCurve({
   nearCross: { label: string; f: number }[];
   atHalf: { label: string; f: number }[];
 }) {
+  const [locale] = useLocale();
   const [o, c, i] = anchors;
   const lo = Math.min(...values, o);
   const hi = Math.max(...values, i);
@@ -467,7 +525,7 @@ function CalibrationCurve({
         </text>
       ))}
       <text x={(ML + W - MR) / 2} y={H - 2} textAnchor="middle" fill="var(--muted)" fontSize={11}>
-        {variable} (Rohwert) → Zugehörigkeit
+        {t(locale, "calib.curve.axis", { variable })}
       </text>
     </svg>
   );
@@ -476,10 +534,11 @@ function CalibrationCurve({
 /* ---------- Daten ---------- */
 
 function DataSection({ ds, fuzzyCols }: { ds: RawDataset; fuzzyCols: string[] }) {
+  const [locale] = useLocale();
   const fs = new Set(fuzzyCols.map((c) => c.replace(/^fs_/, "")));
   return (
     <Card>
-      <H2>Daten · {ds.rows.length} Fälle</H2>
+      <H2>{t(locale, "data.title", { n: ds.rows.length })}</H2>
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
           <thead>
@@ -520,6 +579,7 @@ function TruthTableSection(props: {
   setConsCut: (n: number) => void;
   tt: TruthTableResult | null;
 }) {
+  const [locale] = useLocale();
   const { fuzzyCols, conditions, setConditions, outcome, setOutcome, freqCut, setFreqCut, consCut, setConsCut, tt } = props;
   const observed = tt
     ? tt.rows
@@ -534,9 +594,9 @@ function TruthTableSection(props: {
 
   return (
     <Card>
-      <H2>Truth Table</H2>
+      <H2>{t(locale, "tt.title")}</H2>
       <div style={{ marginBottom: 12 }}>
-        <Label>Bedingungen</Label>
+        <Label>{t(locale, "tt.conditions")}</Label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 4 }}>
           {fuzzyCols.map((c) => (
             <label key={c} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
@@ -547,15 +607,15 @@ function TruthTableSection(props: {
         </div>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "end" }}>
-        <Field label="Outcome">
+        <Field label={t(locale, "tt.outcome")}>
           <select value={outcome} onChange={(e) => setOutcome(e.target.value)} style={inputStyle}>
             {fuzzyCols.map((c) => (<option key={c} value={c}>{c}</option>))}
           </select>
         </Field>
-        <Field label="Frequenz-Cutoff">
+        <Field label={t(locale, "tt.freqCut")}>
           <input type="number" min={1} value={freqCut} onChange={(e) => setFreqCut(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, width: 90 }} />
         </Field>
-        <Field label="Konsistenz-Cutoff">
+        <Field label={t(locale, "tt.consCut")}>
           <input type="number" min={0} max={1} step={0.01} value={consCut} onChange={(e) => setConsCut(Number(e.target.value) || 0.8)} style={{ ...inputStyle, width: 90 }} />
         </Field>
       </div>
@@ -564,7 +624,7 @@ function TruthTableSection(props: {
         <>
           {tt.assignedCaseCount < tt.totalCaseCount && (
             <p className="hint" style={{ ...hintStyle, color: "var(--bad)" }}>
-              Achtung: {tt.totalCaseCount - tt.assignedCaseCount} Fall/Fälle nicht zugeordnet (Zugehörigkeit 0,5). Kalibrierung anpassen.
+              {t(locale, "tt.unassignedWarn", { n: tt.totalCaseCount - tt.assignedCaseCount })}
             </p>
           )}
           <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8, marginTop: 12 }}>
@@ -572,11 +632,11 @@ function TruthTableSection(props: {
               <thead>
                 <tr>
                   {tt.conditions.map((c) => (<th key={c} style={thStyle(false)}>{c.replace(/^fs_/, "")}</th>))}
-                  <th style={thStyle(false)}>n</th>
-                  <th style={thStyle(false)}>Konsistenz</th>
-                  <th style={thStyle(false)}>PRI</th>
-                  <th style={thStyle(false)}>OUT</th>
-                  <th style={thStyle(false)}>Fälle</th>
+                  <th style={thStyle(false)}>{t(locale, "tt.col.n")}</th>
+                  <th style={thStyle(false)}>{t(locale, "tt.col.consistency")}</th>
+                  <th style={thStyle(false)}>{t(locale, "tt.col.pri")}</th>
+                  <th style={thStyle(false)}>{t(locale, "tt.col.out")}</th>
+                  <th style={thStyle(false)}>{t(locale, "tt.col.cases")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -594,7 +654,7 @@ function TruthTableSection(props: {
             </table>
           </div>
           <p className="hint" style={hintStyle}>
-            {observed.length} beobachtete Konfigurationen, {remainders} Remainder. OUT = 1, wenn n ≥ {freqCut} und Konsistenz ≥ {consCut}.
+            {t(locale, "tt.hint", { observed: observed.length, remainders, freqCut, consCut })}
           </p>
         </>
       )}
@@ -617,6 +677,7 @@ function SolutionSection({
   setExpectations: (e: Record<string, Expectation>) => void;
   conditions: string[];
 }) {
+  const [locale] = useLocale();
   const outLabel = tt.outcome.replace(/^fs_/, "").toUpperCase();
   return (
     <>
@@ -624,15 +685,15 @@ function SolutionSection({
         const s = sol[kind];
         const title =
           kind === "complex"
-            ? "Komplexe (konservative) Lösung"
+            ? t(locale, "sol.complex.title")
             : kind === "intermediate"
-              ? "Intermediäre Lösung"
-              : "Sparsame (parsimonious) Lösung";
+              ? t(locale, "sol.intermediate.title")
+              : t(locale, "sol.parsimonious.title");
         return (
           <Card key={kind}>
             <H2>{title}</H2>
             {s.models.length === 0 ? (
-              <p className="hint" style={hintStyle}>Keine Konfiguration erfüllt die Cutoffs — keine Lösung.</p>
+              <p className="hint" style={hintStyle}>{t(locale, "sol.none")}</p>
             ) : (
               s.models.map((m, mi) => (
                 <div key={mi}>
@@ -640,17 +701,17 @@ function SolutionSection({
                     {m.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → {outLabel}
                   </div>
                   <div style={{ display: "flex", gap: 26, margin: "12px 0" }}>
-                    <Kpi v={fmt(m.solutionConsistency)} l="Lösungs-Konsistenz" />
-                    <Kpi v={fmt(m.solutionCoverage)} l="Lösungs-Coverage" />
+                    <Kpi v={fmt(m.solutionConsistency)} l={t(locale, "sol.kpi.consistency")} />
+                    <Kpi v={fmt(m.solutionCoverage)} l={t(locale, "sol.kpi.coverage")} />
                   </div>
                   <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
                     <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
                       <thead>
                         <tr>
-                          <th style={thStyle(false)}>Pfad</th>
-                          <th style={thStyle(false)}>Raw Cov.</th>
-                          <th style={thStyle(false)}>Unique Cov.</th>
-                          <th style={thStyle(false)}>Konsistenz</th>
+                          <th style={thStyle(false)}>{t(locale, "sol.col.path")}</th>
+                          <th style={thStyle(false)}>{t(locale, "sol.col.rawCov")}</th>
+                          <th style={thStyle(false)}>{t(locale, "sol.col.uniqueCov")}</th>
+                          <th style={thStyle(false)}>{t(locale, "sol.col.consistency")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -670,7 +731,7 @@ function SolutionSection({
             )}
             {kind === "intermediate" && (
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line-soft)" }}>
-                <Label>Richtungserwartungen (nur einfache Counterfactuals)</Label>
+                <Label>{t(locale, "sol.exp.label")}</Label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
                   {conditions.map((c) => (
                     <label key={c} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}>
@@ -680,33 +741,33 @@ function SolutionSection({
                         onChange={(e) => setExpectations({ ...expectations, [c]: e.target.value as Expectation })}
                         style={{ ...inputStyle, padding: "3px 6px", fontSize: 12.5 }}
                       >
-                        <option value="present">anwesend</option>
-                        <option value="absent">abwesend</option>
-                        <option value="either">offen</option>
+                        <option value="present">{t(locale, "sol.exp.present")}</option>
+                        <option value="absent">{t(locale, "sol.exp.absent")}</option>
+                        <option value="either">{t(locale, "sol.exp.either")}</option>
                       </select>
                     </label>
                   ))}
                 </div>
                 <p className="hint" style={hintStyle}>
-                  Zwischen komplexer und sparsamer Lösung: nur theoriekonforme (einfache) Vereinfachungsannahmen.
+                  {t(locale, "sol.exp.hint")}
                 </p>
               </div>
             )}
             {kind === "parsimonious" && (
-              <p className="hint" style={hintStyle}>Remainder werden als Vereinfachungsannahmen zugelassen.</p>
+              <p className="hint" style={hintStyle}>{t(locale, "sol.pars.hint")}</p>
             )}
           </Card>
         );
       })}
       <Card>
-        <H2>Notwendige Bedingungen</H2>
+        <H2>{t(locale, "nec.title")}</H2>
         <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
             <thead>
               <tr>
-                <th style={thStyle(false)}>Bedingung</th>
-                <th style={thStyle(false)}>Konsistenz</th>
-                <th style={thStyle(false)}>Coverage</th>
+                <th style={thStyle(false)}>{t(locale, "nec.col.condition")}</th>
+                <th style={thStyle(false)}>{t(locale, "nec.col.consistency")}</th>
+                <th style={thStyle(false)}>{t(locale, "nec.col.coverage")}</th>
                 <th style={thStyle(false)}></th>
               </tr>
             </thead>
@@ -716,13 +777,13 @@ function SolutionSection({
                   <td style={tdStyle(false, false)} className="mono">{n.condition.replace(/^fs_/, "")}</td>
                   <td style={tdStyle(true, false)}>{fmt(n.consistency)}</td>
                   <td style={tdStyle(true, false)}>{fmt(n.coverage)}</td>
-                  <td style={tdStyle(false, false)}>{n.isCandidate ? <span style={{ color: "var(--good-text)", fontWeight: 600 }}>≥ 0,9 — Kandidat</span> : ""}</td>
+                  <td style={tdStyle(false, false)}>{n.isCandidate ? <span style={{ color: "var(--good-text)", fontWeight: 600 }}>{t(locale, "nec.candidate")}</span> : ""}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="hint" style={hintStyle}>Konvention: Konsistenz ≥ 0,9 als Hinweis auf Notwendigkeit — mit Coverage und Fallkenntnis interpretieren.</p>
+        <p className="hint" style={hintStyle}>{t(locale, "nec.hint")}</p>
       </Card>
     </>
   );
@@ -730,20 +791,26 @@ function SolutionSection({
 
 /* ---------- Protokoll ---------- */
 
+function buildRScript(ds: RawDataset, anchors: Anchors, conditions: string[], outcome: string, freqCut: number, consCut: number): string {
+  const lines = ["library(QCA)", "", `df <- read.csv("${ds.name}.csv")`];
+  for (const [v, a] of Object.entries(anchors)) {
+    lines.push(`df$fs_${v} <- calibrate(df$${v}, type = "fuzzy", thresholds = "e=${a[0]}, c=${a[1]}, i=${a[2]}")`);
+  }
+  if (conditions.length && outcome) {
+    lines.push("", `tt <- truthTable(df, outcome = "${outcome}", conditions = "${conditions.join(", ")}",`);
+    lines.push(`                 incl.cut = ${consCut}, n.cut = ${freqCut}, show.cases = TRUE)`);
+    lines.push(`minimize(tt, details = TRUE)                 # komplexe Lösung`);
+    lines.push(`minimize(tt, include = "?", details = TRUE)  # sparsame Lösung`);
+  }
+  return lines.join("\n");
+}
+
 function ProtocolSection({ ds, anchors, conditions, outcome, freqCut, consCut }: { ds: RawDataset; anchors: Anchors; conditions: string[]; outcome: string; freqCut: number; consCut: number }) {
-  const r = useMemo(() => {
-    const lines = ["library(QCA)", "", `df <- read.csv("${ds.name}.csv")`];
-    for (const [v, a] of Object.entries(anchors)) {
-      lines.push(`df$fs_${v} <- calibrate(df$${v}, type = "fuzzy", thresholds = "e=${a[0]}, c=${a[1]}, i=${a[2]}")`);
-    }
-    if (conditions.length && outcome) {
-      lines.push("", `tt <- truthTable(df, outcome = "${outcome}", conditions = "${conditions.join(", ")}",`);
-      lines.push(`                 incl.cut = ${consCut}, n.cut = ${freqCut}, show.cases = TRUE)`);
-      lines.push(`minimize(tt, details = TRUE)                 # komplexe Lösung`);
-      lines.push(`minimize(tt, include = "?", details = TRUE)  # sparsame Lösung`);
-    }
-    return lines.join("\n");
-  }, [ds, anchors, conditions, outcome, freqCut, consCut]);
+  const [locale] = useLocale();
+  const r = useMemo(
+    () => buildRScript(ds, anchors, conditions, outcome, freqCut, consCut),
+    [ds, anchors, conditions, outcome, freqCut, consCut],
+  );
 
   function download() {
     const payload = { tool: "openQCA", exportiert: new Date().toISOString(), datensatz: ds.name, kalibrierungen: anchors, bedingungen: conditions, outcome, freqCut, consCut };
@@ -757,9 +824,9 @@ function ProtocolSection({ ds, anchors, conditions, outcome, freqCut, consCut }:
 
   return (
     <Card>
-      <H2>Analyseprotokoll</H2>
-      <p style={{ color: "var(--ink-2)", marginTop: 0 }}>Reproduzierbar: exportierbar als JSON und als äquivalentes R-Skript für das QCA-Paket.</p>
-      <Button primary onClick={download}>Protokoll als JSON herunterladen</Button>
+      <H2>{t(locale, "proto.title")}</H2>
+      <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "proto.desc")}</p>
+      <Button primary onClick={download}>{t(locale, "proto.downloadBtn")}</Button>
       <pre className="mono" style={{ fontSize: 12.5, lineHeight: 1.6, background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", marginTop: 14 }}>
         {r}
       </pre>
@@ -770,15 +837,17 @@ function ProtocolSection({ ds, anchors, conditions, outcome, freqCut, consCut }:
 /* ---------- UI-Bausteine ---------- */
 
 function Header() {
+  const [locale] = useLocale();
   return (
     <header style={{ display: "flex", alignItems: "baseline", gap: 13, flexWrap: "wrap", paddingBottom: 16, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
       <span style={{ fontWeight: 650, fontSize: 20, letterSpacing: "-0.01em" }}>
         open<span style={{ color: "var(--brand)" }}>QCA</span>
       </span>
-      <span style={{ fontSize: 13, color: "var(--muted)" }}>Qualitative Comparative Analysis — lokal &amp; reproduzierbar</span>
+      <span style={{ fontSize: 13, color: "var(--muted)" }}>{t(locale, "header.tagline")}</span>
       <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12 }}>
-        <a href="/methodik" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>Methodik</a>
-        <a href="/preise" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>Tarife</a>
+        <a href="/methodik" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.methodik")}</a>
+        <a href="/preise" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.tarife")}</a>
+        <LanguageToggle />
         <AccountButton />
       </span>
     </header>

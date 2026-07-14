@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "@/i18n/locale";
+import { t } from "@/i18n/dict";
 
 type AssistTask = "anchors" | "skew" | "methods";
 
@@ -19,6 +21,7 @@ export function AiAssist({
   getData: () => Record<string, unknown>;
   needsContext?: boolean;
 }) {
+  const [locale] = useLocale();
   const [busy, setBusy] = useState(false);
   const [context, setContext] = useState("");
   const [result, setResult] = useState<string | null>(null);
@@ -36,9 +39,9 @@ export function AiAssist({
       });
       const json = await res.json();
       if (res.ok) setResult(json.text as string);
-      else setNote((json.error as string) ?? "KI nicht verfügbar.");
+      else setNote((json.error as string) ?? t(locale, "ai.unavailable"));
     } catch {
-      setNote("Netzwerkfehler beim KI-Aufruf.");
+      setNote(t(locale, "ai.networkError"));
     } finally {
       setBusy(false);
     }
@@ -50,7 +53,7 @@ export function AiAssist({
         <input
           value={context}
           onChange={(e) => setContext(e.target.value)}
-          placeholder="Inhaltliche Beschreibung (optional) …"
+          placeholder={t(locale, "ai.contextPlaceholder")}
           style={{
             width: "100%",
             font: "inherit",

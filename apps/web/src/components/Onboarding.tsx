@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale, type Locale } from "@/i18n/locale";
+import { t } from "@/i18n/dict";
 
 const STORAGE_KEY = "openqca_onboarding_dismissed";
 
@@ -10,11 +12,13 @@ interface OnboardingStep {
   detail: string;
 }
 
-const STEPS: readonly OnboardingStep[] = [
-  { no: 1, title: "Daten laden", detail: "Beispiel wählen oder eigene CSV importieren." },
-  { no: 2, title: "Kalibrieren", detail: "Rohwerte in Fuzzy-Sets übersetzen – der Coach hilft." },
-  { no: 3, title: "Truth Table & Lösungen", detail: "Konfigurationen minimieren und interpretieren." },
-];
+function steps(locale: Locale): readonly OnboardingStep[] {
+  return [
+    { no: 1, title: t(locale, "onboarding.step1.title"), detail: t(locale, "onboarding.step1.detail") },
+    { no: 2, title: t(locale, "onboarding.step2.title"), detail: t(locale, "onboarding.step2.detail") },
+    { no: 3, title: t(locale, "onboarding.step3.title"), detail: t(locale, "onboarding.step3.detail") },
+  ];
+}
 
 interface OnboardingProps {
   /** Optionaler Callback, sobald die Einführung geschlossen wird. */
@@ -28,7 +32,9 @@ interface OnboardingProps {
  * um Hydration-Flackern zu vermeiden.
  */
 export function Onboarding({ onDismiss }: OnboardingProps) {
+  const [locale] = useLocale();
   const [visible, setVisible] = useState(false);
+  const STEPS = steps(locale);
 
   useEffect(() => {
     try {
@@ -52,19 +58,19 @@ export function Onboarding({ onDismiss }: OnboardingProps) {
   if (!visible) return null;
 
   return (
-    <section aria-label="Kurzeinführung: In drei Schritten zur QCA-Lösung" style={cardStyle}>
+    <section aria-label={t(locale, "onboarding.aria")} style={cardStyle}>
       <button
         type="button"
         onClick={dismiss}
-        aria-label="Kurzeinführung schließen"
+        aria-label={t(locale, "onboarding.closeAria")}
         style={closeStyle}
       >
         <span aria-hidden="true">×</span>
       </button>
 
       <div style={headStyle}>
-        <span style={eyebrowStyle}>Erste Schritte</span>
-        <h2 style={headingStyle}>In drei Schritten zur QCA-Lösung</h2>
+        <span style={eyebrowStyle}>{t(locale, "onboarding.eyebrow")}</span>
+        <h2 style={headingStyle}>{t(locale, "onboarding.heading")}</h2>
       </div>
 
       <ol style={stepsStyle}>

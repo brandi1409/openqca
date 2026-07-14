@@ -1,39 +1,47 @@
+"use client";
+
 import type { CSSProperties } from "react";
+import { useLocale } from "@/i18n/locale";
+import { t, type DictKey } from "@/i18n/dict";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface FooterLink {
   href: string;
-  label: string;
+  labelKey: DictKey;
 }
 
 const LINKS: readonly FooterLink[] = [
-  { href: "/methodik", label: "Methodik" },
-  { href: "/rechtliches/impressum", label: "Impressum" },
-  { href: "/rechtliches/datenschutz", label: "Datenschutz" },
-  { href: "/rechtliches/agb", label: "AGB" },
+  { href: "/methodik", labelKey: "footer.methodik" },
+  { href: "/rechtliches/impressum", labelKey: "footer.impressum" },
+  { href: "/rechtliches/datenschutz", labelKey: "footer.datenschutz" },
+  { href: "/rechtliches/agb", labelKey: "footer.agb" },
 ];
 
 /**
- * Schlichter Seiten-Footer (Server-Komponente, kein Client-State nötig).
- * Verlinkt Methodik und die Rechtstexte und weist auf den Open-Source-Charakter
- * hin. Oben eine Trennlinie (var(--line)); gestylt ausschließlich über die
- * CSS-Variablen aus globals.css.
+ * Schlichter Seiten-Footer (Client-Komponente wegen Sprachumschalter).
+ * Verlinkt Methodik und die Rechtstexte, weist auf den Open-Source-Charakter
+ * hin und trägt einen DE/EN-Umschalter. Die verlinkten Ziele bleiben deutsch;
+ * die EN-Linktexte kennzeichnen das mit „(German)“. Oben eine Trennlinie
+ * (var(--line)); gestylt ausschließlich über die CSS-Variablen aus globals.css.
  */
 export function SiteFooter() {
+  const [locale] = useLocale();
   const year = new Date().getFullYear();
 
   return (
     <footer style={footerStyle}>
       <div style={innerStyle}>
-        <nav aria-label="Rechtliches und Dokumentation" style={navStyle}>
+        <nav aria-label={t(locale, "footer.navAria")} style={navStyle}>
           {LINKS.map((link) => (
             <a key={link.href} href={link.href} style={linkStyle}>
-              {link.label}
+              {t(locale, link.labelKey)}
             </a>
           ))}
         </nav>
-        <p style={noteStyle}>
-          © {year} openQCA · Open Source (MIT)
-        </p>
+        <div style={rightStyle}>
+          <p style={noteStyle}>{t(locale, "footer.note", { year })}</p>
+          <LanguageToggle />
+        </div>
       </div>
     </footer>
   );
@@ -59,6 +67,12 @@ const navStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 18,
+};
+
+const rightStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 14,
 };
 
 const linkStyle: CSSProperties = {

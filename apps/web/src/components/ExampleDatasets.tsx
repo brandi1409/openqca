@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { parseCsv } from "@/lib/csv";
 import type { RawDataset } from "@/lib/demo";
+import { useLocale } from "@/i18n/locale";
+import { t, type DictKey } from "@/i18n/dict";
 
 /**
  * Inline eingebettete Beispiel-Datensätze. Die App-Komponenten können zur
@@ -65,12 +67,12 @@ Start_14,1,0,0,1,0
 interface ExampleEntry {
   /** Dateiname, wird als Datensatz-Name an parseCsv übergeben. */
   file: string;
-  /** Anzeigename der Karte. */
-  title: string;
-  /** Kurz-Etikett für die Set-Art. */
-  badge: string;
-  /** Ein-Zeilen-Beschreibung (aus datasets/README.md destilliert). */
-  description: string;
+  /** dict-Schlüssel für den Anzeigenamen der Karte. */
+  titleKey: DictKey;
+  /** dict-Schlüssel für das Kurz-Etikett der Set-Art. */
+  badgeKey: DictKey;
+  /** dict-Schlüssel für die Ein-Zeilen-Beschreibung. */
+  descKey: DictKey;
   /** Roher CSV-Inhalt. */
   csv: string;
 }
@@ -78,26 +80,23 @@ interface ExampleEntry {
 const EXAMPLES: readonly ExampleEntry[] = [
   {
     file: "rohwerte-demokratie.csv",
-    title: "Rohwerte Demokratie",
-    badge: "Rohwerte",
-    description:
-      "16 erfundene Länder mit Rohwerten (Prozente und Indizes) – zum Selber-Kalibrieren.",
+    titleKey: "ex.rohwerte.title",
+    badgeKey: "ex.rohwerte.badge",
+    descKey: "ex.rohwerte.desc",
     csv: ROHWERTE_CSV,
   },
   {
     file: "fuzzy-sets-beispiel.csv",
-    title: "Fuzzy-Sets Beispiel",
-    badge: "Fuzzy [0,1]",
-    description:
-      "14 Fälle, bereits als Fuzzy-Zugehörigkeit in [0,1] – direkt zu Truth Table und Minimierung.",
+    titleKey: "ex.fuzzy.title",
+    badgeKey: "ex.fuzzy.badge",
+    descKey: "ex.fuzzy.desc",
     csv: FUZZY_CSV,
   },
   {
     file: "crisp-sets-beispiel.csv",
-    title: "Crisp-Sets Beispiel",
-    badge: "Crisp 0/1",
-    description:
-      "14 fiktive Start-ups, alle Werte strikt binär (0/1) – Grundlage für csQCA.",
+    titleKey: "ex.crisp.title",
+    badgeKey: "ex.crisp.badge",
+    descKey: "ex.crisp.desc",
     csv: CRISP_CSV,
   },
 ];
@@ -120,6 +119,7 @@ interface ExampleDatasetsProps {
  * inline hinterlegte CSV-Inhalt mit parseCsv geparst und über onSelect geliefert.
  */
 export function ExampleDatasets({ onSelect }: ExampleDatasetsProps) {
+  const [locale] = useLocale();
   const [hovered, setHovered] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,7 +129,7 @@ export function ExampleDatasets({ onSelect }: ExampleDatasetsProps) {
       onSelect(parseCsv(entry.csv, entry.file));
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Beispiel-Datensatz konnte nicht geladen werden.",
+        e instanceof Error ? e.message : t(locale, "ex.error"),
       );
     }
   }
@@ -152,15 +152,15 @@ export function ExampleDatasets({ onSelect }: ExampleDatasetsProps) {
               style={cardStyle(active)}
             >
               <div style={cardHeadStyle}>
-                <span style={titleStyle}>{entry.title}</span>
-                <span style={badgeStyle}>{entry.badge}</span>
+                <span style={titleStyle}>{t(locale, entry.titleKey)}</span>
+                <span style={badgeStyle}>{t(locale, entry.badgeKey)}</span>
               </div>
-              <p style={descStyle}>{entry.description}</p>
+              <p style={descStyle}>{t(locale, entry.descKey)}</p>
               <div style={metaRowStyle}>
                 <span className="mono" style={metaStyle}>
-                  {cases} Fälle · {conditions} Bedingungen
+                  {t(locale, "ex.meta", { cases, conditions })}
                 </span>
-                <span style={syntheticStyle}>synthetisch</span>
+                <span style={syntheticStyle}>{t(locale, "ex.synthetic")}</span>
               </div>
             </button>
           );
