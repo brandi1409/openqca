@@ -157,6 +157,16 @@ export default function Home() {
       <Onboarding />
       {!ds ? (
         <>
+          <div style={{ padding: "10px 2px 22px" }}>
+            <h1 style={{ fontSize: 28, fontWeight: 680, letterSpacing: "-0.015em", margin: "0 0 8px", maxWidth: "24ch" }}>
+              Das offene, geführte Werkzeug für Qualitative Comparative Analysis.
+            </h1>
+            <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: 0 }}>
+              openQCA führt durch Kalibrierung, Truth Table und Minimierung — mit einem Coach, der
+              typische Fehler abfängt, und einem Protokoll, das jede Analyse reproduzierbar macht.
+              Kostenlos, Open Source (MIT), und Ihre Daten bleiben im Browser.
+            </p>
+          </div>
           <Card>
             <H2>Daten laden</H2>
             <p style={{ color: "var(--ink-2)", maxWidth: "60ch" }}>

@@ -51,17 +51,24 @@ export default function PricingPage() {
           <li>KI entwirft den Methoden-Absatz</li>
           <li>Geteilte Projekte &amp; Kollaboration</li>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
-            <button onClick={() => checkout("monthly")} disabled={busy} style={cta(true)}>Monatlich abonnieren</button>
-            <button onClick={() => checkout("institution")} disabled={busy} style={cta(false)}>Institutions-Lizenz</button>
+            {stripeEnabledClient ? (
+              <>
+                <button onClick={() => checkout("monthly")} disabled={busy} style={cta(true)}>Monatlich abonnieren</button>
+                <button onClick={() => checkout("institution")} disabled={busy} style={cta(false)}>Institutions-Lizenz</button>
+              </>
+            ) : (
+              <>
+                <button disabled style={{ ...cta(true), opacity: 0.55, cursor: "default" }}>Bald verfügbar</button>
+                <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>
+                  Der Cloud-Bezahltarif startet in Kürze. Bis dahin ist der komplette Analysekern kostenlos nutzbar —
+                  inklusive Konto und Cloud-Speicherung.
+                </p>
+              </>
+            )}
           </div>
         </Tier>
       </div>
 
-      {!stripeEnabledClient && (
-        <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 16 }}>
-          Hinweis: Zahlungen sind in dieser Instanz noch nicht konfiguriert (Stripe-Schlüssel fehlt).
-        </p>
-      )}
       {note && <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 12 }}>{note}</p>}
     </div>
   );

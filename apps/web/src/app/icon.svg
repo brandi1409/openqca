@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0f5c54"/>
+  <!-- zwei überlappende Fuzzy-Sets -->
+  <circle cx="26" cy="32" r="15" fill="none" stroke="#8fd8cd" stroke-width="4.5"/>
+  <circle cx="40" cy="32" r="15" fill="none" stroke="#6da7ec" stroke-width="4.5"/>
+  <path d="M33 19.4a15 15 0 0 1 0 25.2 15 15 0 0 1 0-25.2z" fill="#eaf6f4" opacity="0.85"/>
+</svg>
