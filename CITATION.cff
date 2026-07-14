@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+title: "openQCA"
+abstract: >-
+  openQCA is an open-source, reproducible tool for Qualitative Comparative
+  Analysis (QCA) — a modern reimplementation of Ragin's fs/QCA. It runs
+  local-first in the browser and covers calibration, truth table construction,
+  Quine–McCluskey minimization, consistency and coverage measures, and
+  necessity analysis, together with a reproducibility protocol.
+type: software
+version: "0.1.0"
+date-released: "2026-01-01"
+license: MIT
+# TODO: Bitte durch die tatsächliche URL des Repositories ersetzen (Platzhalter).
+repository-code: "https://example.org/PLATZHALTER/openqca"
+# TODO: Optionale Projekt-Website (Platzhalter) — sonst Zeile entfernen.
+url: "https://example.org/PLATZHALTER/openqca"
+keywords:
+  - "qualitative comparative analysis"
+  - "QCA"
+  - "fsQCA"
+  - "fuzzy sets"
+  - "set-theoretic methods"
+  - "social science methods"
+  - "reproducible research"
+authors:
+  # TODO: Platzhalter — durch reale Autor*innen ersetzen. ORCID im Format
+  # https://orcid.org/0000-0000-0000-0000 angeben oder die Zeile entfernen.
+  - given-names: "[Vorname]"
+    family-names: "[Nachname]"
+    # affiliation: "[Institution / Affiliation]"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"

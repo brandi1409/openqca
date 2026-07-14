@@ -1,0 +1,407 @@
+<meta charset="utf-8">
+<title>openQCA — Kalibrierungs-Assistent</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f8f7; --panel: #ffffff; --panel-2: #fbfcfb; --ink: #17211e; --ink-2: #505c58;
+    --muted: #86918c; --line: #e2e7e4; --line-soft: #edf1ef;
+    --accent: #2a78d6; --accent-deep: #1c5cab; --accent-wash: rgba(42,120,214,0.09);
+    --brand: #0f5c54; --brand-wash: rgba(15,92,84,0.08);
+    --good: #0ca30c; --good-text: #006300; --good-wash: rgba(12,163,12,0.09);
+    --warn: #b26a00; --warn-text: #935600; --warn-wash: rgba(224,150,0,0.12);
+    --bad: #d03b3b; --bad-wash: rgba(208,59,59,0.09);
+    --violet: #6a4bd6; --grid: #e1e5e2;
+    --shadow: 0 1px 2px rgba(23,33,30,0.05), 0 4px 16px rgba(23,33,30,0.05);
+  }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #0e1110; --panel: #171b1a; --panel-2: #1c2120; --ink: #eef2f0; --ink-2: #b4beba;
+    --muted: #8b938f; --line: #272d2b; --line-soft: #202624;
+    --accent: #3987e5; --accent-deep: #6da7ec; --accent-wash: rgba(57,135,229,0.16);
+    --brand: #4fb3a6; --brand-wash: rgba(79,179,166,0.13);
+    --good: #35c04e; --good-text: #35c04e; --good-wash: rgba(12,163,12,0.16);
+    --warn: #e2a33a; --warn-text: #e2a33a; --warn-wash: rgba(224,150,0,0.16);
+    --bad: #e66767; --bad-wash: rgba(230,103,103,0.15);
+    --violet: #9085e9; --grid: #262c2a; --shadow: none;
+  }}
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0e1110; --panel: #171b1a; --panel-2: #1c2120; --ink: #eef2f0; --ink-2: #b4beba;
+    --muted: #8b938f; --line: #272d2b; --line-soft: #202624;
+    --accent: #3987e5; --accent-deep: #6da7ec; --accent-wash: rgba(57,135,229,0.16);
+    --brand: #4fb3a6; --brand-wash: rgba(79,179,166,0.13);
+    --good: #35c04e; --good-text: #35c04e; --good-wash: rgba(12,163,12,0.16);
+    --warn: #e2a33a; --warn-text: #e2a33a; --warn-wash: rgba(224,150,0,0.16);
+    --bad: #e66767; --bad-wash: rgba(230,103,103,0.15);
+    --violet: #9085e9; --grid: #262c2a; --shadow: none;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f6f8f7; --panel: #ffffff; --panel-2: #fbfcfb; --ink: #17211e; --ink-2: #505c58;
+    --muted: #86918c; --line: #e2e7e4; --line-soft: #edf1ef;
+    --accent: #2a78d6; --accent-deep: #1c5cab; --accent-wash: rgba(42,120,214,0.09);
+    --brand: #0f5c54; --brand-wash: rgba(15,92,84,0.08);
+    --good: #0ca30c; --good-text: #006300; --good-wash: rgba(12,163,12,0.09);
+    --warn: #b26a00; --warn-text: #935600; --warn-wash: rgba(224,150,0,0.12);
+    --bad: #d03b3b; --bad-wash: rgba(208,59,59,0.09);
+    --violet: #6a4bd6; --grid: #e1e5e2;
+    --shadow: 0 1px 2px rgba(23,33,30,0.05), 0 4px 16px rgba(23,33,30,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 26px 72px; }
+
+  header.top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+  .wordmark { font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, sans-serif; font-weight: 650; font-size: 20px; letter-spacing: -0.01em; }
+  .wordmark b { color: var(--brand); }
+  .crumb { font-size: 13px; color: var(--muted); }
+  .crumb b { color: var(--ink-2); font-weight: 600; }
+  .tierbadge { margin-left: auto; font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em; color: var(--brand); background: var(--brand-wash); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); border-radius: 20px; padding: 3px 11px; }
+
+  h1 { font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, sans-serif; font-size: 25px; font-weight: 650; letter-spacing: -0.015em; margin: 0 0 6px; text-wrap: balance; }
+  .lede { color: var(--ink-2); margin: 0 0 22px; max-width: 66ch; }
+
+  .layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 18px; }
+  .card h2 { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .step { width: 20px; height: 20px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-size: 11px; letter-spacing: 0; }
+
+  .cond-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip-btn { font: inherit; font-size: 13.5px; padding: 6px 13px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-2); cursor: pointer; }
+  .chip-btn:hover { border-color: var(--muted); }
+  .chip-btn.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+
+  .methods { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (max-width: 560px) { .methods { grid-template-columns: 1fr; } }
+  .method { text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; background: var(--panel-2); cursor: pointer; font: inherit; }
+  .method:hover { border-color: var(--accent); }
+  .method.on { border-color: var(--accent); background: var(--accent-wash); box-shadow: inset 0 0 0 1px var(--accent); }
+  .method .mt { font-weight: 650; font-size: 14px; margin-bottom: 2px; }
+  .method .md { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+  .method .tag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+
+  .anchor-src { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+  .anchor-src button { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 12px; background: var(--panel-2); border: none; color: var(--ink-2); cursor: pointer; }
+  .anchor-src button.on { background: var(--accent); color: #fff; }
+  .anchor-src button + button { border-left: 1px solid var(--line); }
+
+  .anchors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 560px) { .anchors { grid-template-columns: 1fr; } }
+  .anchor { border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+  .anchor .lab { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .anchor .target { font-size: 11px; color: var(--accent-deep); font-weight: 700; float: right; }
+  .anchor input { width: 100%; font: inherit; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); background: none; border: none; border-bottom: 2px solid var(--line); padding: 4px 0; margin: 4px 0 8px; }
+  .anchor input:focus { outline: none; border-bottom-color: var(--accent); }
+  .anchor textarea { width: 100%; min-height: 42px; font: inherit; font-size: 12px; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 5px 7px; resize: vertical; }
+  .anchor textarea::placeholder { color: var(--muted); }
+  .anchor textarea:focus-visible, input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  svg text { font-family: system-ui, sans-serif; }
+  .tick { fill: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .axlab { fill: var(--muted); font-size: 11px; }
+
+  .skew { display: flex; height: 30px; border-radius: 7px; overflow: hidden; border: 1px solid var(--line); margin: 4px 0 6px; }
+  .skew > div { display: grid; place-items: center; font-size: 11.5px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; min-width: 0; }
+  .skew .lo { background: var(--muted); }
+  .skew .mid { background: var(--bad); }
+  .skew .hi { background: var(--accent); }
+
+  .coach { position: sticky; top: 16px; }
+  .diag { display: flex; flex-direction: column; gap: 8px; }
+  .d-item { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); }
+  .d-item .ic { width: 17px; height: 17px; border-radius: 50%; flex: none; margin-top: 1px; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; }
+  .d-item.ok .ic { background: var(--good); } .d-item.ok { border-color: color-mix(in srgb,var(--good) 35%,transparent); background: var(--good-wash); }
+  .d-item.warn .ic { background: var(--warn); } .d-item.warn { border-color: color-mix(in srgb,var(--warn) 40%,transparent); background: var(--warn-wash); }
+  .d-item.bad .ic { background: var(--bad); } .d-item.bad { border-color: color-mix(in srgb,var(--bad) 40%,transparent); background: var(--bad-wash); }
+  .d-item b { font-weight: 650; }
+  .d-item .cases { color: var(--ink-2); font-size: 12px; }
+
+  .explain { font-size: 13px; color: var(--ink-2); line-height: 1.5; background: var(--brand-wash); border: 1px solid color-mix(in srgb,var(--brand) 22%,transparent); border-radius: 9px; padding: 11px 13px; }
+  .explain b { color: var(--ink); }
+
+  .ai h2 .step { background: var(--violet); }
+  .ai-btns { display: flex; flex-direction: column; gap: 7px; }
+  .ai-btn { text-align: left; font: inherit; font-size: 13px; padding: 9px 12px; border-radius: 9px; border: 1px solid color-mix(in srgb,var(--violet) 30%,transparent); background: color-mix(in srgb,var(--violet) 7%,transparent); color: var(--ink); cursor: pointer; display: flex; align-items: center; gap: 9px; }
+  .ai-btn:hover { background: color-mix(in srgb,var(--violet) 13%,transparent); }
+  .ai-btn .spark { color: var(--violet); font-size: 15px; }
+  .ai-out { margin-top: 10px; font-size: 13px; line-height: 1.55; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--violet); border-radius: 8px; padding: 11px 13px; }
+  .ai-out .draftlab { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--violet); margin-bottom: 5px; }
+  .ai-out.hidden { display: none; }
+
+  .hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+  .tooltip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 5px 9px; border-radius: 6px; z-index: 50; display: none; white-space: nowrap; }
+  .flag-label { fill: var(--warn-text); font-size: 10px; font-weight: 600; }
+  @media (prefers-reduced-motion: no-preference) { .chip-btn, .method, .ai-btn, .anchor input { transition: all 0.13s ease; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="wordmark">open<b>QCA</b></span>
+    <span class="crumb">Prozess-Assistent · <b>Schritt 2 von 6 — Kalibrierung</b></span>
+    <span class="tierbadge">läuft lokal · gratis</span>
+  </header>
+
+  <h1>Kalibrierung, die mitdenkt</h1>
+  <p class="lede">Der Schritt, an dem QCA steht oder fällt: Rohwerte werden zu Set-Zugehörigkeit. Der Assistent erklärt jede Entscheidung, prüft sie live gegen deine Fälle und hält fest, <em>warum</em> du sie getroffen hast — die Grundlage für einen nachvollziehbaren Methodenteil.</p>
+
+  <div class="layout">
+    <div class="main">
+      <div class="card">
+        <h2><span class="step">A</span> Welche Bedingung kalibrierst du?</h2>
+        <div class="cond-chips" id="conds"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">B</span> Kalibrierungsart wählen</h2>
+        <div class="methods" id="methods"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">C</span> Anker setzen &amp; begründen</h2>
+        <div class="anchor-src" id="srcToggle">
+          <button data-src="theory" class="on">Aus Theorie / Fachwissen</button>
+          <button data-src="data">Datengestützter Vorschlag</button>
+        </div>
+        <div id="srcNote"></div>
+        <div class="anchors" id="anchors"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="step">D</span> So bildet das auf deine Fälle ab</h2>
+        <div id="curve"></div>
+        <div style="margin-top:16px">
+          <div style="font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px">Verteilung der Zugehörigkeit</div>
+          <div class="skew" id="skew"></div>
+          <p class="hint">Links = eher „draußen" (&lt; 0,5), rechts = eher „drinnen" (&gt; 0,5). Ein extrem einseitiges Bild bedeutet: das Set trennt die Fälle kaum.</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="main">
+      <div class="card coach">
+        <h2><span class="step" style="background:var(--accent)">✦</span> Coach</h2>
+        <div id="explain" class="explain"></div>
+        <div class="diag" id="diag" style="margin-top:14px"></div>
+      </div>
+
+      <div class="card ai">
+        <h2><span class="step">✨</span> KI-Assistent <span style="margin-left:auto;font-size:10px;color:var(--violet);letter-spacing:0.03em">Cloud-Tarif</span></h2>
+        <div class="ai-btns">
+          <button class="ai-btn" onclick="aiAssist('anchors')"><span class="spark">✦</span> Anker aus einer Theoriebeschreibung vorschlagen</button>
+          <button class="ai-btn" onclick="aiAssist('skew')"><span class="spark">✦</span> Was bedeutet diese Verteilung für meine Analyse?</button>
+          <button class="ai-btn" onclick="aiAssist('methods')"><span class="spark">✦</span> Methoden-Absatz entwerfen</button>
+        </div>
+        <div class="ai-out hidden" id="aiOut"></div>
+        <p class="hint">KI-Funktionen senden Ausschnitte an ein Modell in der Cloud — daher nur im Cloud-Tarif. Die Führung oben funktioniert komplett offline.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+const el = id => document.getElementById(id);
+const fmt = (v, d=2) => (v==null||isNaN(v)) ? "—" : (+v).toFixed(d).replace(".", ",");
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---- Demo-Daten (synthetisch, Zwischenkriegszeit) ---- */
+const CASES = [
+  ["Belgien",1098,60,94],["Niederlande",1008,57,95],["Grossbritannien",1038,74,99],
+  ["Frankreich",983,51,96],["Schweden",897,34,99],["Tschechoslowakei",586,42,95],
+  ["Finnland",590,22,99],["Irland",662,25,95],["Deutschland",795,56,98],
+  ["Oesterreich",720,33,98],["Spanien",367,37,50],["Italien",517,31,72],
+  ["Polen",350,25,77],["Ungarn",424,36,91],["Portugal",320,15,38],
+  ["Griechenland",390,31,59],["Estland",468,28,95],["Rumaenien",331,21,62]
+];
+const CONDS = {
+  bildung:   { idx: 3, label: "Bildung", unit: "Alphabetisierungsrate %", theory: [60, 85, 98],
+    meaning: "Anteil der Bevölkerung, der lesen und schreiben kann." },
+  wohlstand: { idx: 1, label: "Wohlstand", unit: "BIP pro Kopf (Index)", theory: [400, 550, 900],
+    meaning: "Wirtschaftliche Entwicklung als Ressourcenbasis." },
+  urban:     { idx: 2, label: "Urbanisierung", unit: "% städtische Bevölkerung", theory: [25, 45, 65],
+    meaning: "Grad der Verstädterung." }
+};
+
+const METHODS = {
+  fuzzy:  { name: "Direkte Methode (fuzzy)", tag: "kontinuierlich · Standard",
+    desc: "Drei Anker, logistische Kurve. Für stetige Maße wie Prozente oder Indizes — der Regelfall.", anchors: 3,
+    explain: "Die <b>direkte Methode</b> (Ragin 2008) übersetzt Rohwerte über eine logistische Funktion in Zugehörigkeit. Du setzt drei theoretisch begründete Schwellen; die Kurve dazwischen ergibt sich. Der <b>Kreuzungspunkt (0,50)</b> ist die folgenreichste Entscheidung — er trennt „eher drinnen“ von „eher draußen“." },
+  linear: { name: "Direkte Methode (linear)", tag: "kontinuierlich · einfach",
+    desc: "Wie oben, aber geradlinige Zunahme zwischen den Ankern. Transparenter, weniger verbreitet.", anchors: 3,
+    explain: "Die <b>lineare Variante</b> verbindet die Anker mit Geraden statt einer S-Kurve. Vorteil: leicht nachvollziehbar. Nachteil: der Übergang an voll-drinnen/voll-draußen wirkt abrupter als bei der logistischen Form." },
+  crisp:  { name: "Crisp Set (binär)", tag: "dichotom · 1 Schwelle",
+    desc: "Eine Schwelle: Bedingung vorhanden (1) oder nicht (0). Für natürlich zweiwertige Merkmale.", anchors: 1,
+    explain: "Ein <b>Crisp Set</b> kennt nur 1 oder 0. Sinnvoll, wenn ein Merkmal von Natur aus dichotom ist (EU-Mitglied ja/nein) oder die Theorie eine scharfe Grenze vorgibt. Du verlierst Abstufungen — die Stärke der Fuzzy-Logik." },
+  fourval:{ name: "Vier-Werte-Fuzzy", tag: "ordinal · 4 Stufen",
+    desc: "Zugehörigkeit in 0 / 0,33 / 0,67 / 1. Für ordinale Daten mit wenigen Kategorien.", anchors: 3,
+    explain: "Das <b>Vier-Werte-Schema</b> ordnet jeden Fall einer von vier Stufen zu. Guter Kompromiss, wenn die Rohdaten ordinal und grob sind (z. B. Expertenratings) — feiner als crisp, ehrlicher als eine Scheinpräzision mit vielen Nachkommastellen." }
+};
+
+const ANCHOR_META = {
+  3: [["Voll draußen","0,05"],["Kreuzungspunkt","0,50"],["Voll drinnen","0,95"]],
+  1: [["Schwelle","0/1"]]
+};
+
+const state = { cond: "bildung", method: "fuzzy", src: "theory", anchors: [], rationale: ["","",""] };
+
+/* ---- Zugehörigkeitsfunktionen ---- */
+function calibrate(x, a, method) {
+  if (method === "crisp") return x >= a[0] ? 1 : 0;
+  if (method === "fourval") {
+    if (x <= a[0]) return 0; if (x < a[1]) return 0.33; if (x < a[2]) return 0.67; return 1;
+  }
+  const [o,c,i] = a;
+  if (method === "linear") {
+    if (x <= o) return 0; if (x >= i) return 1;
+    return x < c ? 0.5*(x-o)/(c-o) : 0.5 + 0.5*(x-c)/(i-c);
+  }
+  const d = x - c;
+  const lo = d >= 0 ? d*(3/(i-c)) : d*(3/(c-o));
+  return 1/(1+Math.exp(-lo));
+}
+const rawVals = () => CASES.map(r => r[CONDS[state.cond].idx]);
+const percentile = (p) => { const v=[...rawVals()].sort((a,b)=>a-b); return v[Math.min(v.length-1, Math.round(p*(v.length-1)))]; };
+
+function defaultAnchors() {
+  const C = CONDS[state.cond], m = state.method;
+  if (state.src === "data") {
+    if (m === "crisp") return [percentile(0.5)];
+    return [percentile(0.1), percentile(0.5), percentile(0.9)];
+  }
+  if (m === "crisp") return [C.theory[1]];
+  return [...C.theory];
+}
+
+/* ---- Diagnostik ---- */
+function diagnostics() {
+  const a = state.anchors, m = state.method;
+  const rows = CASES.map(r => ({ name: r[0], x: r[CONDS[state.cond].idx], f: calibrate(r[CONDS[state.cond].idx], a, m) }));
+  const total = rows.length;
+  const hi = rows.filter(r => r.f > 0.5), lo = rows.filter(r => r.f < 0.5);
+  const atHalf = rows.filter(r => Math.abs(r.f - 0.5) < 1e-6);
+  const nearCross = rows.filter(r => r.f > 0.4 && r.f < 0.6 && Math.abs(r.f-0.5) >= 1e-6);
+  const ordered = a.every((v,i)=> i===0 || v > a[i-1]);
+  return { rows, total, hi, lo, atHalf, nearCross, ordered };
+}
+
+/* ---- Render ---- */
+function renderConds() {
+  el("conds").innerHTML = Object.entries(CONDS).map(([k,c]) =>
+    `<button class="chip-btn ${k===state.cond?"on":""}" onclick="pickCond('${k}')">${esc(c.label)} <span style="opacity:.7;font-weight:400">· ${esc(c.unit)}</span></button>`).join("");
+}
+function renderMethods() {
+  el("methods").innerHTML = Object.entries(METHODS).map(([k,m]) =>
+    `<button class="method ${k===state.method?"on":""}" onclick="pickMethod('${k}')">
+      <div class="mt">${esc(m.name)}</div><div class="md">${esc(m.desc)}</div><div class="tag">${esc(m.tag)}</div>
+    </button>`).join("");
+}
+function renderSrc() {
+  document.querySelectorAll("#srcToggle button").forEach(b => b.classList.toggle("on", b.dataset.src === state.src));
+  el("srcNote").innerHTML = state.src === "data"
+    ? `<div class="d-item warn" style="margin-bottom:12px"><span class="ic">!</span><div><b>Vorsicht bei rein datengestützten Ankern.</b> Perzentile aus der Stichprobe sind ein <em>Startpunkt</em>, keine Begründung. Ragins Kernkritik: Anker sollen aus Theorie oder externen Standards kommen, nicht aus der Verteilung der eigenen Fälle. Überschreib die Vorschläge, wo dein Fachwissen etwas anderes sagt.</div></div>`
+    : `<p class="hint" style="margin:0 0 12px">Ideal: jeder Anker hat eine inhaltliche Begründung — ein theoretischer Schwellenwert, ein Rechtsstandard, ein Wert aus der Literatur. Trag ihn unten ein; er wandert direkt in dein Protokoll.</p>`;
+}
+function renderAnchors() {
+  const meta = ANCHOR_META[METHODS[state.method].anchors];
+  el("anchors").style.gridTemplateColumns = meta.length === 1 ? "1fr" : "repeat(3,1fr)";
+  el("anchors").innerHTML = meta.map((mt,i) =>
+    `<div class="anchor">
+      <span class="lab">${esc(mt[0])}</span><span class="target">→ ${esc(mt[1])}</span>
+      <input type="number" step="any" value="${state.anchors[i] ?? ""}" oninput="setAnchor(${i}, this.value)" aria-label="${esc(mt[0])}">
+      <textarea placeholder="Begründung… (z. B. Schwelle laut Bildungsstatistik der Liga)" oninput="state.rationale[${i}]=this.value" aria-label="Begründung ${esc(mt[0])}">${esc(state.rationale[i]||"")}</textarea>
+    </div>`).join("");
+}
+
+function renderCurve() {
+  const box = el("curve"), C = CONDS[state.cond], m = state.method, a = state.anchors;
+  const d = diagnostics();
+  if (!d.ordered && m !== "crisp") { box.innerHTML = `<div class="d-item bad"><span class="ic">!</span><div><b>Anker müssen aufsteigend sein.</b> Setze voll-draußen &lt; Kreuzung &lt; voll-drinnen.</div></div>`; return; }
+  const vals = rawVals();
+  const lo = Math.min(...vals, ...a), hi = Math.max(...vals, ...a), pad = (hi-lo)*0.07 || 1;
+  const W=620,H=280,ML=44,MR=16,MT=12,MB=42;
+  const px = v => ML + (v-(lo-pad))/((hi+pad)-(lo-pad))*(W-ML-MR);
+  const py = v => MT + (1-v)*(H-MT-MB);
+  let curve=""; for(let i=0;i<=140;i++){ const x=(lo-pad)+i/140*((hi+pad)-(lo-pad)); curve += (i?"L":"M")+px(x).toFixed(1)+","+py(calibrate(x,a,m)).toFixed(1); }
+  const anchorLines = (m==="crisp"? [[a[0],"0/1"]] : m==="fourval"? a.map((v,i)=>[v,["→0,33","→0,67","→1"][i]]) : [[a[0],"0,05"],[a[1],"0,50"],[a[2],"0,95"]]);
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kalibrierungskurve ${esc(C.label)}" style="width:100%;max-width:${W}px;height:auto">
+    ${[0,.25,.5,.75,1].map(v=>`<line x1="${ML}" x2="${W-MR}" y1="${py(v)}" y2="${py(v)}" stroke="var(--grid)"/><text class="tick" x="${ML-6}" y="${py(v)+3.5}" text-anchor="end">${fmt(v)}</text>`).join("")}
+    <line x1="${ML}" x2="${W-MR}" y1="${py(.5)}" y2="${py(.5)}" stroke="var(--muted)" stroke-dasharray="2 3" opacity=".7"/>
+    ${anchorLines.map(([v,l])=>`<line x1="${px(v)}" x2="${px(v)}" y1="${MT}" y2="${H-MB}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 4" opacity=".8"/>
+      <text class="tick" x="${px(v)}" y="${H-MB+15}" text-anchor="middle" style="fill:var(--accent-deep);font-weight:600">${fmt(v,0)}</text>
+      <text class="tick" x="${px(v)}" y="${H-MB+27}" text-anchor="middle">${esc(l)}</text>`).join("")}
+    <path d="${curve}" fill="none" stroke="var(--accent)" stroke-width="2.25"/>
+    ${d.rows.map(r=>{ const flag = (r.f>0.4&&r.f<0.6); return `<circle cx="${px(r.x)}" cy="${py(r.f)}" r="5" fill="${flag?'var(--warn)':'var(--accent)'}" stroke="var(--panel)" stroke-width="2" data-tip="${esc(r.name)}: ${fmt(r.x,0)} → ${fmt(r.f,3)}" onmousemove="tip(event)" onmouseleave="tipHide()"/>`; }).join("")}
+    ${d.nearCross.concat(d.atHalf).slice(0,4).map(r=>`<text class="flag-label" x="${px(r.x)+7}" y="${py(r.f)-6}">${esc(r.name)}</text>`).join("")}
+    <text class="axlab" x="${(ML+W-MR)/2}" y="${H-3}" text-anchor="middle">${esc(C.label)} — ${esc(C.unit)}</text>
+    <text class="axlab" transform="translate(11,${(MT+H-MB)/2}) rotate(-90)" text-anchor="middle">Zugehörigkeit</text>
+  </svg>`;
+}
+
+function renderSkew() {
+  const d = diagnostics();
+  const pct = n => (n/d.total*100);
+  const seg = (n,cls,lab) => n ? `<div class="${cls}" style="flex:${n}" title="${lab}">${n}</div>` : "";
+  el("skew").innerHTML = seg(d.lo.length,"lo","draußen") + seg(d.atHalf.length,"mid","genau 0,5") + seg(d.hi.length,"hi","drinnen");
+}
+
+function renderCoach() {
+  el("explain").innerHTML = METHODS[state.method].explain;
+  const d = diagnostics();
+  const items = [];
+  // 0,5-Problem
+  if (d.atHalf.length) items.push(["bad","!", `<b>${d.atHalf.length} Fall/Fälle liegen genau bei 0,5.</b> <span class="cases">${d.atHalf.map(r=>esc(r.name)).join(", ")}</span> — solche Fälle fallen aus der Truth Table heraus. Verschieb den Kreuzungspunkt leicht, sodass kein Fall exakt auf der Grenze sitzt.`]);
+  else items.push(["ok","✓","<b>Kein Fall liegt exakt auf 0,5.</b> Alle Fälle bleiben in der Analyse."]);
+  // Schiefe
+  const share = d.hi.length/d.total;
+  if (share >= 0.85 || share <= 0.15) items.push(["warn","!", `<b>Stark schiefes Set.</b> ${d.hi.length} von ${d.total} Fällen sind „drinnen". Das Set unterscheidet kaum — prüfe, ob die Anker zur Fragestellung passen oder ob die Bedingung so wenig trägt.`]);
+  else items.push(["ok","✓", `<b>Ausgewogene Verteilung.</b> ${d.hi.length} drinnen / ${d.lo.length} draußen — das Set trennt die Fälle.`]);
+  // Grenzfälle
+  if (d.nearCross.length) items.push(["warn","~", `<b>${d.nearCross.length} Grenzfall/-fälle nahe 0,5</b> (0,4–0,6): <span class="cases">${d.nearCross.map(r=>esc(r.name)+" "+fmt(r.f,2)).join(", ")}</span>. Ihre Zuordnung ist am fragilsten — hier lohnt eine Robustheitsprüfung und ein zweiter Blick mit Fallkenntnis.`]);
+  el("diag").innerHTML = items.map(([cls,ic,txt])=>`<div class="d-item ${cls}"><span class="ic">${ic}</span><div>${txt}</div></div>`).join("");
+}
+
+function renderAll(){ renderCurve(); renderSkew(); renderCoach(); el("aiOut").classList.add("hidden"); }
+
+/* ---- Interaktion ---- */
+function pickCond(k){ state.cond=k; state.anchors=defaultAnchors(); state.rationale=["","",""]; renderConds(); renderAnchors(); renderAll(); }
+function pickMethod(k){ state.method=k; state.anchors=defaultAnchors(); renderMethods(); renderAnchors(); renderAll(); }
+function setAnchor(i,v){ state.anchors[i]=+v; renderAll(); }
+document.getElementById("srcToggle").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b)return; state.src=b.dataset.src; state.anchors=defaultAnchors(); renderSrc(); renderAnchors(); renderAll(); });
+
+/* ---- KI-Assistent (illustrativ, deterministisch aus echten Werten) ---- */
+function aiAssist(kind){
+  const out = el("aiOut"), C = CONDS[state.cond], a = state.anchors, d = diagnostics();
+  let label = "KI-Entwurf — Beispiel", body = "";
+  if (kind === "anchors") {
+    label = "KI-Vorschlag aus deiner Beschreibung";
+    body = `Beschreib die Bedingung „${esc(C.label)}" in ein, zwei Sätzen inhaltlich — dann schlägt die KI Anker <em>mit Begründung</em> vor, die du annehmen oder ändern kannst.<br><br><em>Beispiel-Antwort:</em> „Für ${esc(C.label.toLowerCase())} als Ressource stabiler Demokratien setzt die Literatur volle Zugehörigkeit oft bei nahezu universeller Ausprägung an (${fmt(a[2]||0,0)}), den Kreuzungspunkt dort, wo eine Gesellschaft mehrheitlich versorgt ist (${fmt(a[1]||0,0)}), und volles Nicht-Enthaltensein bei klar defizitären Werten (${fmt(a[0]||0,0)})."`;
+  } else if (kind === "skew") {
+    label = "KI-Erläuterung";
+    const share = Math.round(d.hi.length/d.total*100);
+    body = `${share} % deiner Fälle fallen in dieses Set. ${share>=85||share<=15
+      ? "Das ist stark einseitig — ein solches Set liefert später kaum unterscheidende Truth-Table-Zeilen. Die KI würde vorschlagen, den Kreuzungspunkt zu prüfen oder die Bedingung theoretisch zu schärfen."
+      : "Das ist eine brauchbare Streuung: genug Fälle auf beiden Seiten, damit die Bedingung im Vergleich etwas erklärt."}${d.atHalf.length? " Achtung: "+d.atHalf.length+" Fall/Fälle sitzen genau auf 0,5 und würden ausgeschlossen." : ""}`;
+  } else {
+    label = "KI-Entwurf · Methoden-Absatz (bereit zum Anpassen)";
+    const names = {fuzzy:"direkten Methode (Ragin 2008)", linear:"direkten Methode mit linearer Zugehörigkeitsfunktion", crisp:"Dichotomisierung", fourval:"Vier-Werte-Fuzzy-Kalibrierung"}[state.method];
+    const anchTxt = state.method==="crisp" ? `einer Schwelle von ${fmt(a[0],0)}` : `den Ankern ${fmt(a[0],0)} (voll draußen, 0,05), ${fmt(a[1],0)} (Kreuzungspunkt, 0,50) und ${fmt(a[2],0)} (voll drinnen, 0,95)`;
+    const rat = state.rationale.filter(Boolean);
+    body = `Die Bedingung <em>${esc(C.label)}</em> (${esc(C.unit)}) wurde mit der ${names} kalibriert, basierend auf ${anchTxt}.${rat.length? " Begründung der Schwellen: "+rat.map(esc).join("; ")+"." : ""} Von ${d.total} Fällen weisen ${d.hi.length} eine Zugehörigkeit &gt; 0,5 auf.${d.atHalf.length? " Die Anker wurden so gewählt, dass kein Fall exakt auf dem Kreuzungspunkt liegt." : ""}`;
+  }
+  out.innerHTML = `<div class="draftlab">✦ ${esc(label)}</div>${body}`;
+  out.classList.remove("hidden");
+}
+
+/* ---- Tooltip ---- */
+function tip(ev){ const t=el("tooltip"); t.textContent=ev.target.dataset.tip; t.style.display="block"; t.style.left=Math.min(innerWidth-200,ev.clientX+14)+"px"; t.style.top=(ev.clientY+14)+"px"; }
+function tipHide(){ el("tooltip").style.display="none"; }
+
+/* ---- init ---- */
+state.anchors = defaultAnchors();
+renderConds(); renderMethods(); renderSrc(); renderAnchors(); renderAll();
+</script>

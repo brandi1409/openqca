@@ -1,0 +1,14 @@
+{
+  "name": "openqca",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Open-Access QCA (Qualitative Comparative Analysis) — Neubau von Ragins fs/QCA als moderne, reproduzierbare Web- und Desktop-App.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@openqca/engine",
+  "version": "0.0.0",
+  "description": "Reiner QCA-Rechenkern: Kalibrierung, Truth Table, Quine-McCluskey-Minimierung, Konsistenz- und Coverage-Maße. Ohne Abhängigkeiten, läuft in Browser, Node und Desktop.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}

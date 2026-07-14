@@ -1,0 +1,810 @@
+<meta charset="utf-8">
+<title>openQCA — Prototyp</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f8f7;
+    --panel: #ffffff;
+    --panel-2: #fbfcfb;
+    --ink: #17211e;
+    --ink-2: #505c58;
+    --muted: #86918c;
+    --line: #e2e7e4;
+    --line-soft: #edf1ef;
+    --accent: #2a78d6;
+    --accent-deep: #1c5cab;
+    --accent-wash: rgba(42,120,214,0.09);
+    --brand: #0f5c54;
+    --good: #0ca30c;
+    --good-text: #006300;
+    --bad: #d03b3b;
+    --chip-r: #6b7672;
+    --grid: #e1e5e2;
+    --shadow: 0 1px 2px rgba(23,33,30,0.05), 0 4px 16px rgba(23,33,30,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #0e1110;
+      --panel: #171b1a;
+      --panel-2: #1c2120;
+      --ink: #eef2f0;
+      --ink-2: #b4bebA;
+      --muted: #8b938f;
+      --line: #272d2b;
+      --line-soft: #202624;
+      --accent: #3987e5;
+      --accent-deep: #6da7ec;
+      --accent-wash: rgba(57,135,229,0.14);
+      --brand: #4fb3a6;
+      --good: #0ca30c;
+      --good-text: #35c04e;
+      --bad: #e66767;
+      --chip-r: #8b938f;
+      --grid: #262c2a;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0e1110;
+    --panel: #171b1a;
+    --panel-2: #1c2120;
+    --ink: #eef2f0;
+    --ink-2: #b4bebA;
+    --muted: #8b938f;
+    --line: #272d2b;
+    --line-soft: #202624;
+    --accent: #3987e5;
+    --accent-deep: #6da7ec;
+    --accent-wash: rgba(57,135,229,0.14);
+    --brand: #4fb3a6;
+    --good: #0ca30c;
+    --good-text: #35c04e;
+    --bad: #e66767;
+    --chip-r: #8b938f;
+    --grid: #262c2a;
+    --shadow: none;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f6f8f7;
+    --panel: #ffffff;
+    --panel-2: #fbfcfb;
+    --ink: #17211e;
+    --ink-2: #505c58;
+    --muted: #86918c;
+    --line: #e2e7e4;
+    --line-soft: #edf1ef;
+    --accent: #2a78d6;
+    --accent-deep: #1c5cab;
+    --accent-wash: rgba(42,120,214,0.09);
+    --brand: #0f5c54;
+    --good: #0ca30c;
+    --good-text: #006300;
+    --bad: #d03b3b;
+    --chip-r: #6b7672;
+    --grid: #e1e5e2;
+    --shadow: 0 1px 2px rgba(23,33,30,0.05), 0 4px 16px rgba(23,33,30,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+  .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; } .rail { position: static; border-right: none; border-bottom: 1px solid var(--line); } }
+
+  .rail { border-right: 1px solid var(--line); padding: 22px 16px; position: sticky; top: 0; align-self: start; max-height: 100vh; }
+  .wordmark { font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, sans-serif; font-weight: 650; font-size: 19px; letter-spacing: -0.01em; color: var(--ink); }
+  .wordmark b { color: var(--brand); font-weight: 650; }
+  .wordmark-sub { font-size: 11.5px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin: 2px 0 22px; }
+
+  .steps { display: flex; flex-direction: column; gap: 2px; }
+  .step { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; border: none; background: none; color: var(--ink-2); font: inherit; font-size: 14px; text-align: left; cursor: pointer; width: 100%; }
+  .step:hover { background: var(--line-soft); }
+  .step.active { background: var(--accent-wash); color: var(--ink); font-weight: 600; }
+  .step .num { width: 21px; height: 21px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); flex: none; }
+  .step.active .num { border-color: var(--accent); color: var(--accent-deep); }
+  .step.done .num { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  .rail-note { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  main { padding: 26px 32px 60px; max-width: 1060px; }
+  h1 { font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, sans-serif; font-size: 23px; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 4px; text-wrap: balance; }
+  .lede { color: var(--ink-2); margin: 0 0 22px; max-width: 62ch; }
+  h2 { font-size: 16px; font-weight: 650; margin: 26px 0 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 18px; }
+  .panel h2:first-child { margin-top: 0; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; margin-bottom: 4px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  input[type=text], input[type=number], select, textarea { font: inherit; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; }
+  input[type=number] { width: 92px; font-variant-numeric: tabular-nums; }
+  select { min-width: 130px; }
+  textarea { width: 100%; min-height: 90px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  button.btn { font: inherit; font-weight: 600; font-size: 14px; border-radius: 7px; padding: 7px 15px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button.btn:hover { background: var(--line-soft); }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+  button.btn.small { font-size: 12.5px; padding: 4px 10px; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { text-align: left; font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-2); white-space: nowrap; }
+  td { padding: 6px 12px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.case { font-weight: 600; }
+  .fscol { color: var(--accent-deep); }
+
+  .chip { display: inline-block; padding: 1px 9px; border-radius: 20px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chip.one { background: var(--accent-wash); color: var(--accent-deep); }
+  .chip.zero { background: var(--line-soft); color: var(--ink-2); }
+  .chip.rem { color: var(--chip-r); border: 1px dashed var(--line); background: none; }
+  .ok { color: var(--good-text); font-weight: 600; }
+  .warn { color: var(--bad); font-weight: 600; }
+
+  .formula { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; overflow-x: auto; }
+  .formula .op { color: var(--muted); }
+  .formula .neg { color: var(--bad); }
+
+  .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; max-width: 70ch; }
+  .empty { color: var(--muted); font-size: 14px; padding: 26px 0; text-align: center; }
+
+  .viz-root { background: var(--panel); }
+  svg text { font-family: system-ui, -apple-system, sans-serif; }
+  .axis-label { fill: var(--muted); font-size: 11px; }
+  .tick-label { fill: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+
+  .tooltip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 5px 9px; border-radius: 6px; z-index: 50; display: none; max-width: 260px; white-space: normal; line-height: 1.4; }
+
+  .kpis { display: flex; gap: 26px; flex-wrap: wrap; margin: 6px 0 14px; }
+  .kpi .v { font-size: 21px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  .log { list-style: none; margin: 0; padding: 0; }
+  .log li { display: grid; grid-template-columns: 74px 1fr; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; }
+  .log .t { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  .log .what b { font-weight: 650; }
+  .log .what .p { color: var(--ink-2); }
+
+  .banner { font-size: 12.5px; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 20px; }
+  .checkgrid { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .checkgrid label { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+  pre.rcode { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.6; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 0; }
+  @media (prefers-reduced-motion: no-preference) { .step, button.btn { transition: background 0.12s ease; } }
+</style>
+
+<div class="app">
+  <nav class="rail">
+    <div class="wordmark">open<b>QCA</b></div>
+    <div class="wordmark-sub">Prototyp · fs/QCA im Browser</div>
+    <div class="steps" id="steps"></div>
+    <div class="rail-note">
+      Alle Berechnungen laufen lokal in diesem Browser-Tab. Es werden keine Daten übertragen.
+      Jeder Schritt wird im <em>Protokoll</em> aufgezeichnet und ist als JSON &amp; R-Skript exportierbar.
+    </div>
+  </nav>
+
+  <main id="main"></main>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ---------------- state ---------------- */
+const S = {
+  step: 0,
+  data: null,            // {name, caseCol, cols:[], rows:[{}]}
+  calib: {},             // fsName -> {source, fullOut, cross, fullIn}
+  calDraft: { source: null, fullOut: null, cross: null, fullIn: null },
+  tt: null,              // {conds, outcome, freqCut, consCut, rows:[...]} rows: {bits, n, cases, incl, pri, out}
+  sol: null,             // {complex:[covers], parsimonious:[covers], conds, outcome, nec:[]}
+  xy: { x: null, y: null },
+  log: []
+};
+
+const STEPS = ["Daten", "Kalibrierung", "Truth Table", "Minimierung", "XY-Plot", "Protokoll"];
+
+function logAction(action, params, rcode) {
+  S.log.push({ t: new Date(), action, params, rcode });
+}
+
+/* ---------------- demo data (synthetisch) ---------------- */
+const DEMO = {
+  name: "demo_zwischenkriegszeit (synthetisch)",
+  caseCol: "Fall",
+  header: ["Fall","wohlstand","urban","bildung","stabil","demo_ueberleben"],
+  rows: [
+    ["Belgien",1098,60,94,10,9],["Niederlande",1008,57,95,9,10],["Grossbritannien",1038,74,99,10,10],
+    ["Frankreich",983,51,96,7,8],["Schweden",897,34,99,9,9],["Tschechoslowakei",586,42,95,8,7],
+    ["Finnland",590,22,99,7,6],["Irland",662,25,95,8,7],["Deutschland",795,56,98,4,2],
+    ["Oesterreich",720,33,98,3,2],["Spanien",367,37,50,4,1],["Italien",517,31,72,5,1],
+    ["Polen",350,25,77,3,2],["Ungarn",424,36,91,4,2],["Portugal",320,15,38,5,1],
+    ["Griechenland",390,31,59,4,1],["Estland",468,28,95,6,3],["Rumaenien",331,21,62,4,1]
+  ],
+  anchors: {
+    wohlstand:[400,550,900], urban:[25,45,65], bildung:[60,85,98], stabil:[4,6.5,10], demo_ueberleben:[2,5,9]
+  }
+};
+
+/* ---------------- helpers ---------------- */
+const fmt3 = v => (v == null || isNaN(v)) ? "—" : v.toFixed(3);
+const fmtN = v => (typeof v === "number" && !Number.isInteger(v)) ? +v.toFixed(3) : v;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const el = id => document.getElementById(id);
+
+function numericCols() {
+  if (!S.data) return [];
+  return S.data.cols.filter(c => c !== S.data.caseCol && S.data.rows.every(r => typeof r[c] === "number" && !isNaN(r[c])));
+}
+function fuzzyCols() { // Spalten mit Werten in [0,1] — kalibriert oder bereits fuzzy
+  return numericCols().filter(c => S.data.rows.every(r => r[c] >= 0 && r[c] <= 1));
+}
+
+/* ---------------- calibration (direkte Methode, Ragin) ---------------- */
+function calibrate(x, fullOut, cross, fullIn) {
+  const d = x - cross;
+  const lo = d >= 0 ? d * (3 / (fullIn - cross)) : d * (3 / (cross - fullOut));
+  return 1 / (1 + Math.exp(-lo));
+}
+
+/* ---------------- truth table ---------------- */
+function buildTruthTable(conds, outcome, freqCut, consCut) {
+  const k = conds.length, rowsN = 1 << k, cases = S.data.rows;
+  const Y = cases.map(r => r[outcome]);
+  const sumY = Y.reduce((a,b)=>a+b,0);
+  const out = [];
+  for (let m = 0; m < rowsN; m++) {
+    const bits = m.toString(2).padStart(k, "0");
+    let sumM = 0, sumMinMY = 0, sumMinMYnY = 0;
+    const members = [];
+    cases.forEach((r, i) => {
+      let mem = 1, corner = true;
+      conds.forEach((c, j) => {
+        const x = r[c];
+        const lit = bits[j] === "1" ? x : 1 - x;
+        mem = Math.min(mem, lit);
+        if (!(bits[j] === "1" ? x > 0.5 : x <= 0.5)) corner = false;
+      });
+      sumM += mem;
+      sumMinMY += Math.min(mem, Y[i]);
+      sumMinMYnY += Math.min(mem, Y[i], 1 - Y[i]);
+      if (corner && mem > 0.5) members.push(r[S.data.caseCol]);
+    });
+    const incl = sumM > 0 ? sumMinMY / sumM : NaN;
+    const priD = sumM - sumMinMYnY;
+    const pri = priD > 0 ? (sumMinMY - sumMinMYnY) / priD : NaN;
+    const n = members.length;
+    const outVal = n >= freqCut ? (incl >= consCut ? 1 : 0) : "?";
+    out.push({ m, bits, n, cases: members, incl, pri, out: outVal });
+  }
+  return { conds, outcome, freqCut, consCut, rows: out, sumY };
+}
+
+/* ---------------- Quine-McCluskey ---------------- */
+function combineTerms(a, b) {
+  let diff = -1;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) continue;
+    if (a[i] === "-" || b[i] === "-") return null;
+    if (diff >= 0) return null;
+    diff = i;
+  }
+  if (diff < 0) return null;
+  return a.slice(0, diff) + "-" + a.slice(diff + 1);
+}
+function primeImplicants(mintermStrs, dontcareStrs) {
+  let current = [...new Set([...mintermStrs, ...dontcareStrs])];
+  const primes = new Set();
+  while (current.length) {
+    const used = new Array(current.length).fill(false);
+    const next = new Set();
+    for (let i = 0; i < current.length; i++)
+      for (let j = i + 1; j < current.length; j++) {
+        const c = combineTerms(current[i], current[j]);
+        if (c) { used[i] = used[j] = true; next.add(c); }
+      }
+    current.forEach((t, i) => { if (!used[i]) primes.add(t); });
+    current = [...next];
+  }
+  return [...primes];
+}
+const termCovers = (term, mt) => [...term].every((ch, i) => ch === "-" || ch === mt[i]);
+
+function minimalCovers(pis, minterms) {
+  if (!minterms.length) return [];
+  // essenzielle PIs zuerst
+  const essential = new Set();
+  minterms.forEach(mt => {
+    const covering = pis.filter(p => termCovers(p, mt));
+    if (covering.length === 1) essential.add(covering[0]);
+  });
+  let remaining = minterms.filter(mt => ![...essential].some(p => termCovers(p, mt)));
+  const rest = pis.filter(p => !essential.has(p) && remaining.some(mt => termCovers(p, mt)));
+  if (!remaining.length) return [[...essential]];
+  // erschöpfende Suche nach minimalen Abdeckungen (Prototyp: kleine Instanzen)
+  const results = [];
+  const maxCombos = 200000;
+  for (let size = 1; size <= rest.length && !results.length; size++) {
+    let count = 0;
+    const idx = Array.from({ length: size }, (_, i) => i);
+    const tryCombo = combo => {
+      if (remaining.every(mt => combo.some(p => termCovers(p, mt)))) results.push([...essential, ...combo]);
+    };
+    while (true) {
+      if (++count > maxCombos) break;
+      tryCombo(idx.map(i => rest[i]));
+      let i = size - 1;
+      while (i >= 0 && idx[i] === rest.length - size + i) i--;
+      if (i < 0) break;
+      idx[i]++;
+      for (let j = i + 1; j < size; j++) idx[j] = idx[j - 1] + 1;
+    }
+  }
+  return results.length ? results : [[...essential, ...rest]]; // Fallback: greedy-artig
+}
+
+function termNotation(term, conds) {
+  const parts = [];
+  [...term].forEach((ch, i) => {
+    if (ch === "1") parts.push(esc(conds[i]));
+    else if (ch === "0") parts.push('<span class="neg">~</span>' + esc(conds[i]));
+  });
+  return parts.length ? parts.join('<span class="op">*</span>') : "1 (leer)";
+}
+function termNotationPlain(term, conds) {
+  const parts = [];
+  [...term].forEach((ch, i) => {
+    if (ch === "1") parts.push(conds[i]);
+    else if (ch === "0") parts.push("~" + conds[i]);
+  });
+  return parts.length ? parts.join("*") : "1";
+}
+function termMembership(term, conds, row) {
+  let mem = 1;
+  [...term].forEach((ch, i) => {
+    if (ch === "1") mem = Math.min(mem, row[conds[i]]);
+    else if (ch === "0") mem = Math.min(mem, 1 - row[conds[i]]);
+  });
+  return mem;
+}
+
+/* ---------------- Lösungsparameter ---------------- */
+function solutionParams(cover, conds, outcome) {
+  const rows = S.data.rows, Y = rows.map(r => r[outcome]);
+  const sumY = Y.reduce((a,b)=>a+b,0);
+  const memOf = terms => rows.map(r => Math.max(...terms.map(t => termMembership(t, conds, r)), 0));
+  const solMem = memOf(cover);
+  const sumS = solMem.reduce((a,b)=>a+b,0);
+  const sumMinSY = solMem.reduce((a, s, i) => a + Math.min(s, Y[i]), 0);
+  const terms = cover.map(t => {
+    const tm = rows.map(r => termMembership(t, conds, r));
+    const sumT = tm.reduce((a,b)=>a+b,0);
+    const sumMinTY = tm.reduce((a, v, i) => a + Math.min(v, Y[i]), 0);
+    const others = cover.filter(o => o !== t);
+    const otherMem = others.length ? memOf(others) : rows.map(() => 0);
+    const sumMinOY = otherMem.reduce((a, v, i) => a + Math.min(v, Y[i]), 0);
+    return {
+      term: t,
+      rawCov: sumY ? sumMinTY / sumY : NaN,
+      uniqCov: sumY ? (sumMinSY - sumMinOY) / sumY : NaN,
+      cons: sumT ? sumMinTY / sumT : NaN
+    };
+  });
+  return { terms, solCov: sumY ? sumMinSY / sumY : NaN, solCons: sumS ? sumMinSY / sumS : NaN, solMem };
+}
+
+function necessityTable(conds, outcome) {
+  const rows = S.data.rows, Y = rows.map(r => r[outcome]);
+  const sumY = Y.reduce((a,b)=>a+b,0);
+  const entries = [];
+  conds.forEach(c => {
+    [[c, r => r[c]], ["~" + c, r => 1 - r[c]]].forEach(([label, f]) => {
+      const X = rows.map(f);
+      const sumX = X.reduce((a,b)=>a+b,0);
+      const sumMin = X.reduce((a, x, i) => a + Math.min(x, Y[i]), 0);
+      entries.push({ label, cons: sumY ? sumMin / sumY : NaN, cov: sumX ? sumMin / sumX : NaN });
+    });
+  });
+  return entries;
+}
+
+/* ---------------- CSV ---------------- */
+function parseCSV(text, name) {
+  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) throw new Error("Zu wenige Zeilen.");
+  const delim = (lines[0].match(/;/g) || []).length > (lines[0].match(/,/g) || []).length ? ";" : ",";
+  const split = l => l.split(delim).map(s => s.trim().replace(/^"|"$/g, ""));
+  const header = split(lines[0]);
+  const rows = lines.slice(1).map(l => {
+    const vals = split(l), o = {};
+    header.forEach((h, i) => {
+      const raw = vals[i] ?? "";
+      const n = Number(delim === ";" ? raw.replace(",", ".") : raw);
+      o[h] = raw !== "" && !isNaN(n) ? n : raw;
+    });
+    return o;
+  });
+  const caseCol = header.find(h => rows.some(r => typeof r[h] === "string")) || header[0];
+  return { name: name || "import.csv", caseCol, cols: header, rows };
+}
+
+/* ---------------- render: shell ---------------- */
+function render() {
+  el("steps").innerHTML = STEPS.map((s, i) => {
+    const done = (i === 0 && S.data) || (i === 1 && Object.keys(S.calib).length) || (i === 2 && S.tt) || (i === 3 && S.sol);
+    return `<button class="step ${i === S.step ? "active" : ""} ${done ? "done" : ""}" onclick="go(${i})">
+      <span class="num">${done ? "✓" : i + 1}</span>${s}</button>`;
+  }).join("");
+  const views = [viewData, viewCalib, viewTT, viewMin, viewXY, viewLog];
+  el("main").innerHTML = views[S.step]();
+  const after = [null, drawCalibChart, null, null, drawXYChart, null][S.step];
+  if (after) after();
+}
+function go(i) { S.step = i; render(); }
+
+/* ---------------- view 1: Daten ---------------- */
+function viewData() {
+  let body = "";
+  if (!S.data) {
+    body = `<div class="empty">Noch keine Daten geladen.</div>`;
+  } else {
+    const fs = new Set(Object.keys(S.calib));
+    body = `<div class="tablewrap"><table>
+      <tr>${S.data.cols.map(c => `<th class="${typeof S.data.rows[0][c] === "number" ? "num" : ""} ${fs.has(c) ? "fscol" : ""}">${esc(c)}</th>`).join("")}</tr>
+      ${S.data.rows.map(r => `<tr>${S.data.cols.map(c => {
+        const v = r[c];
+        const isN = typeof v === "number";
+        return `<td class="${isN ? "num" : "case"} ${fs.has(c) ? "fscol" : ""}">${isN ? fmtN(v) : esc(v)}</td>`;
+      }).join("")}</tr>`).join("")}
+    </table></div>
+    <p class="hint">${S.data.rows.length} Fälle · ${S.data.cols.length - 1} Variablen · Fall-Spalte: <b>${esc(S.data.caseCol)}</b>${fs.size ? ` · <span class="fscol">blau</span> = kalibrierte Fuzzy-Sets` : ""}</p>`;
+  }
+  return `
+    <h1>Daten</h1>
+    <p class="lede">Rohdaten laden — als Demo-Datensatz oder per CSV. Danach werden die Variablen im nächsten Schritt zu Fuzzy-Sets kalibriert.</p>
+    <div class="banner">Prototyp — der Demo-Datensatz ist <b>synthetisch</b> (angelehnt an die klassische Lipset-Fragestellung: Überleben der Demokratie in der Zwischenkriegszeit), zur Illustration des Workflows.</div>
+    <div class="panel">
+      <div class="controls">
+        <button class="btn primary" onclick="loadDemo()">Demo-Datensatz laden</button>
+        <button class="btn" onclick="el('csvfile').click()">CSV-Datei öffnen…</button>
+        <input type="file" id="csvfile" accept=".csv,.txt" style="display:none" onchange="loadCSVFile(this)">
+      </div>
+      <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--ink-2);font-size:13.5px">CSV einfügen (Kopfzeile + Werte, Komma oder Semikolon)</summary>
+        <textarea id="csvpaste" placeholder="Fall,bedingung1,bedingung2,outcome&#10;A,0.8,0.2,0.9"></textarea>
+        <div style="margin-top:8px"><button class="btn small" onclick="loadCSVPaste()">Einfügen übernehmen</button></div>
+      </details>
+    </div>
+    <div class="panel">${body}</div>`;
+}
+function loadDemo() {
+  const rows = DEMO.rows.map(r => { const o = {}; DEMO.header.forEach((h, i) => o[h] = r[i]); return o; });
+  S.data = { name: DEMO.name, caseCol: DEMO.caseCol, cols: [...DEMO.header], rows };
+  S.calib = {}; S.tt = null; S.sol = null;
+  logAction("Daten geladen", { quelle: DEMO.name, faelle: rows.length }, `df <- read.csv("demo_zwischenkriegszeit.csv")`);
+  render();
+}
+function loadCSVFile(input) {
+  const f = input.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { try {
+    S.data = parseCSV(rd.result, f.name); S.calib = {}; S.tt = null; S.sol = null;
+    logAction("Daten geladen", { quelle: f.name, faelle: S.data.rows.length }, `df <- read.csv("${f.name}")`);
+    render();
+  } catch (e) { alert("CSV konnte nicht gelesen werden: " + e.message); } };
+  rd.readAsText(f);
+}
+function loadCSVPaste() {
+  try {
+    S.data = parseCSV(el("csvpaste").value, "eingefuegt.csv"); S.calib = {}; S.tt = null; S.sol = null;
+    logAction("Daten geladen", { quelle: "Zwischenablage", faelle: S.data.rows.length }, `df <- read.csv("daten.csv")`);
+    render();
+  } catch (e) { alert("CSV konnte nicht gelesen werden: " + e.message); }
+}
+
+/* ---------------- view 2: Kalibrierung ---------------- */
+function viewCalib() {
+  if (!S.data) return `<h1>Kalibrierung</h1><div class="panel"><div class="empty">Bitte zuerst Daten laden (Schritt 1).</div></div>`;
+  const src = numericCols().filter(c => !(c in S.calib));
+  const d = S.calDraft;
+  if (!d.source || !src.includes(d.source)) { d.source = src[0] || null; presetAnchors(); }
+  const done = Object.keys(S.calib);
+  return `
+    <h1>Kalibrierung</h1>
+    <p class="lede">Direkte Methode (Ragin): drei Anker übersetzen Rohwerte in Set-Zugehörigkeit — Ausschluss-Schwelle (0,05), Kreuzungspunkt (0,50), Einschluss-Schwelle (0,95). Die Kurve zeigt live, wie die Anker die Fälle abbilden.</p>
+    <div class="panel">
+      <div class="controls">
+        <div class="field"><label>Rohvariable</label>
+          <select id="cal-src" onchange="S.calDraft.source=this.value;presetAnchors();render()">
+            ${src.map(c => `<option ${c === d.source ? "selected" : ""}>${esc(c)}</option>`).join("")}
+          </select></div>
+        <div class="field"><label>Voll draußen (0,05)</label><input type="number" step="any" id="cal-out" value="${d.fullOut ?? ""}" onchange="updAnchor()"></div>
+        <div class="field"><label>Kreuzung (0,50)</label><input type="number" step="any" id="cal-cross" value="${d.cross ?? ""}" onchange="updAnchor()"></div>
+        <div class="field"><label>Voll drinnen (0,95)</label><input type="number" step="any" id="cal-in" value="${d.fullIn ?? ""}" onchange="updAnchor()"></div>
+        <button class="btn primary" onclick="applyCalib()" ${!d.source ? "disabled" : ""}>Als fs_${esc(d.source || "…")} übernehmen</button>
+      </div>
+      <div id="calchart" style="margin-top:14px"></div>
+      <p class="hint">Jeder Punkt ist ein Fall: Rohwert (x) → Fuzzy-Zugehörigkeit (y). Gestrichelte Linien = Anker. Mit der Maus über Punkte fahren für Fallnamen.</p>
+    </div>
+    ${done.length ? `<div class="panel"><h2>Bereits kalibriert</h2><div class="tablewrap"><table>
+      <tr><th>Fuzzy-Set</th><th>Quelle</th><th class="num">voll draußen</th><th class="num">Kreuzung</th><th class="num">voll drinnen</th></tr>
+      ${done.map(n => { const c = S.calib[n]; return `<tr><td class="mono fscol">${esc(n)}</td><td>${esc(c.source)}</td><td class="num">${fmtN(c.fullOut)}</td><td class="num">${fmtN(c.cross)}</td><td class="num">${fmtN(c.fullIn)}</td></tr>`; }).join("")}
+    </table></div></div>` : ""}`;
+}
+function presetAnchors() {
+  const d = S.calDraft;
+  if (!d.source) return;
+  if (S.data.name.startsWith("demo") && DEMO.anchors[d.source]) {
+    [d.fullOut, d.cross, d.fullIn] = DEMO.anchors[d.source];
+  } else {
+    const vals = S.data.rows.map(r => r[d.source]).sort((a, b) => a - b);
+    const q = p => vals[Math.min(vals.length - 1, Math.floor(p * (vals.length - 1)))];
+    d.fullOut = fmtN(q(0.1)); d.cross = fmtN(q(0.5)); d.fullIn = fmtN(q(0.9));
+  }
+}
+function updAnchor() {
+  const d = S.calDraft;
+  d.fullOut = +el("cal-out").value; d.cross = +el("cal-cross").value; d.fullIn = +el("cal-in").value;
+  drawCalibChart();
+}
+function applyCalib() {
+  const d = S.calDraft;
+  if (!(d.fullOut < d.cross && d.cross < d.fullIn)) { alert("Anker müssen aufsteigend sein: voll draußen < Kreuzung < voll drinnen."); return; }
+  const name = "fs_" + d.source;
+  S.data.rows.forEach(r => r[name] = +calibrate(r[d.source], d.fullOut, d.cross, d.fullIn).toFixed(4));
+  if (!S.data.cols.includes(name)) S.data.cols.push(name);
+  S.calib[name] = { source: d.source, fullOut: d.fullOut, cross: d.cross, fullIn: d.fullIn };
+  logAction("Kalibriert", { variable: d.source, ziel: name, anker: [d.fullOut, d.cross, d.fullIn] },
+    `df$${name} <- calibrate(df$${d.source}, type = "fuzzy", thresholds = "e=${d.fullOut}, c=${d.cross}, i=${d.fullIn}")`);
+  S.calDraft = { source: null, fullOut: null, cross: null, fullIn: null };
+  render();
+}
+function drawCalibChart() {
+  const box = el("calchart");
+  if (!box) return;
+  const d = S.calDraft;
+  if (!d.source || !(d.fullOut < d.cross && d.cross < d.fullIn)) { box.innerHTML = `<div class="empty">Anker aufsteigend setzen, um die Kurve zu sehen.</div>`; return; }
+  const vals = S.data.rows.map(r => r[d.source]);
+  const lo = Math.min(...vals, d.fullOut), hi = Math.max(...vals, d.fullIn);
+  const pad = (hi - lo) * 0.06 || 1;
+  const W = 640, H = 300, ML = 46, MR = 14, MT = 12, MB = 34;
+  const px = v => ML + (v - (lo - pad)) / ((hi + pad) - (lo - pad)) * (W - ML - MR);
+  const py = v => MT + (1 - v) * (H - MT - MB);
+  let curve = "";
+  for (let i = 0; i <= 120; i++) {
+    const x = (lo - pad) + i / 120 * ((hi + pad) - (lo - pad));
+    curve += (i ? "L" : "M") + px(x).toFixed(1) + "," + py(calibrate(x, d.fullOut, d.cross, d.fullIn)).toFixed(1);
+  }
+  const anchors = [[d.fullOut, "0,05"], [d.cross, "0,50"], [d.fullIn, "0,95"]];
+  box.innerHTML = `<svg class="viz-root" viewBox="0 0 ${W} ${H}" role="img" aria-label="Kalibrierungskurve ${esc(d.source)}" style="width:100%;max-width:${W}px;height:auto">
+    ${[0, 0.25, 0.5, 0.75, 1].map(v => `<line x1="${ML}" x2="${W - MR}" y1="${py(v)}" y2="${py(v)}" stroke="var(--grid)" stroke-width="1"/>
+      <text class="tick-label" x="${ML - 6}" y="${py(v) + 3.5}" text-anchor="end">${v.toFixed(2).replace(".", ",")}</text>`).join("")}
+    ${anchors.map(([v, l]) => `<line x1="${px(v)}" x2="${px(v)}" y1="${MT}" y2="${H - MB}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 4"/>
+      <text class="tick-label" x="${px(v)}" y="${H - MB + 14}" text-anchor="middle">${fmtN(v)}</text>
+      <text class="tick-label" x="${px(v)}" y="${H - MB + 26}" text-anchor="middle">→ ${l}</text>`).join("")}
+    <path d="${curve}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    ${S.data.rows.map(r => { const x = r[d.source], y = calibrate(x, d.fullOut, d.cross, d.fullIn);
+      return `<circle cx="${px(x)}" cy="${py(y)}" r="4.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"
+        data-tip="${esc(r[S.data.caseCol])}: ${fmtN(x)} → ${y.toFixed(3)}" onmousemove="tip(event)" onmouseleave="tipHide()"/>`; }).join("")}
+    <text class="axis-label" x="${(ML + W - MR) / 2}" y="${H - 2}" text-anchor="middle">${esc(d.source)} (Rohwert)</text>
+    <text class="axis-label" transform="translate(11,${(MT + H - MB) / 2}) rotate(-90)" text-anchor="middle">Zugehörigkeit</text>
+  </svg>`;
+}
+
+/* ---------------- view 3: Truth Table ---------------- */
+function viewTT() {
+  if (!S.data) return `<h1>Truth Table</h1><div class="panel"><div class="empty">Bitte zuerst Daten laden.</div></div>`;
+  const fz = fuzzyCols();
+  if (fz.length < 2) return `<h1>Truth Table</h1><div class="panel"><div class="empty">Mindestens zwei Fuzzy-Variablen (Werte in [0,1]) nötig — bitte zuerst kalibrieren (Schritt 2).</div></div>`;
+  const sel = S.tt ? S.tt.conds : fz.filter(c => c !== fz[fz.length - 1]).slice(0, 4);
+  const out = S.tt ? S.tt.outcome : fz[fz.length - 1];
+  let tbl = "";
+  if (S.tt) {
+    const observed = S.tt.rows.filter(r => r.n > 0).sort((a, b) => (b.out === 1) - (a.out === 1) || b.incl - a.incl);
+    const remainders = S.tt.rows.length - observed.length;
+    tbl = `<div class="panel"><h2>Truth Table — ${observed.length} beobachtete Konfigurationen, ${remainders} Remainder</h2>
+    <div class="tablewrap"><table>
+      <tr>${S.tt.conds.map(c => `<th class="num mono">${esc(c.replace(/^fs_/, ""))}</th>`).join("")}
+      <th class="num">n</th><th class="num">Konsistenz</th><th class="num">PRI</th><th>OUT</th><th>Fälle</th></tr>
+      ${observed.map(r => `<tr>
+        ${[...r.bits].map(b => `<td class="num mono">${b}</td>`).join("")}
+        <td class="num">${r.n}</td>
+        <td class="num ${r.incl >= S.tt.consCut ? "ok" : ""}">${fmt3(r.incl)}</td>
+        <td class="num">${fmt3(r.pri)}</td>
+        <td>${r.out === 1 ? '<span class="chip one">1</span>' : r.out === 0 ? '<span class="chip zero">0</span>' : '<span class="chip rem">?</span>'}</td>
+        <td style="white-space:normal;max-width:280px;font-size:12.5px;color:var(--ink-2)">${r.cases.map(esc).join(", ")}</td>
+      </tr>`).join("")}
+    </table></div>
+    ${(() => { const assigned = observed.reduce((a, r) => a + r.n, 0), total = S.data.rows.length;
+      return assigned < total ? `<p class="hint warn" style="color:var(--bad)">Achtung: ${total - assigned} Fall/Fälle konnten keiner Konfiguration zugeordnet werden (Zugehörigkeit von exakt 0,5 in mindestens einer Bedingung). Kalibrierungsanker so wählen, dass kein Fall genau auf dem Kreuzungspunkt liegt.</p>` : ""; })()}
+    <p class="hint">OUT = 1, wenn n ≥ ${S.tt.freqCut} und Konsistenz ≥ ${S.tt.consCut}. Remainder (?) sind logisch mögliche, aber unbeobachtete Konfigurationen — sie werden nur in der sparsamen Lösung als Vereinfachungsannahmen genutzt.</p></div>`;
+  }
+  return `
+    <h1>Truth Table</h1>
+    <p class="lede">Die Fälle werden den 2<sup>k</sup> logisch möglichen Konfigurationen zugeordnet. Konsistenz und PRI zeigen, wie verlässlich eine Konfiguration mit dem Outcome verbunden ist.</p>
+    <div class="panel">
+      <div class="field" style="margin-bottom:12px"><label>Bedingungen</label>
+        <div class="checkgrid">${fz.map(c => `<label><input type="checkbox" name="ttc" value="${esc(c)}" ${sel.includes(c) && c !== out ? "checked" : ""}> <span class="mono">${esc(c)}</span></label>`).join("")}</div>
+      </div>
+      <div class="controls">
+        <div class="field"><label>Outcome</label><select id="tt-out">${fz.map(c => `<option ${c === out ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+        <div class="field"><label>Frequenz-Cutoff</label><input type="number" id="tt-freq" value="${S.tt ? S.tt.freqCut : 1}" min="1" step="1"></div>
+        <div class="field"><label>Konsistenz-Cutoff</label><input type="number" id="tt-cons" value="${S.tt ? S.tt.consCut : 0.8}" min="0" max="1" step="0.01"></div>
+        <button class="btn primary" onclick="runTT()">Truth Table erstellen</button>
+      </div>
+    </div>
+    ${tbl}`;
+}
+function runTT() {
+  const conds = [...document.querySelectorAll('input[name=ttc]:checked')].map(i => i.value);
+  const outcome = el("tt-out").value;
+  const freqCut = Math.max(1, +el("tt-freq").value || 1);
+  const consCut = Math.min(1, Math.max(0, +el("tt-cons").value || 0.8));
+  if (conds.includes(outcome)) { alert("Das Outcome kann nicht zugleich Bedingung sein."); return; }
+  if (conds.length < 1 || conds.length > 8) { alert("Bitte 1–8 Bedingungen wählen (Prototyp-Limit)."); return; }
+  S.tt = buildTruthTable(conds, outcome, freqCut, consCut);
+  S.sol = null;
+  logAction("Truth Table", { bedingungen: conds, outcome, freqCut, consCut },
+    `tt <- truthTable(df, outcome = "${outcome}", conditions = "${conds.join(", ")}",\n                 incl.cut = ${consCut}, n.cut = ${freqCut}, show.cases = TRUE)`);
+  render();
+}
+
+/* ---------------- view 4: Minimierung ---------------- */
+function viewMin() {
+  if (!S.tt) return `<h1>Minimierung</h1><div class="panel"><div class="empty">Bitte zuerst eine Truth Table erstellen (Schritt 3).</div></div>`;
+  let res = "";
+  if (S.sol) {
+    const block = (title, covers, note) => {
+      if (!covers.length) return `<div class="panel"><h2>${title}</h2><div class="empty">Keine Konfiguration erfüllt die Cutoffs — keine Lösung.</div></div>`;
+      return covers.map((cv, mi) => {
+        const p = solutionParams(cv, S.sol.conds, S.sol.outcome);
+        return `<div class="panel"><h2>${title}${covers.length > 1 ? ` — Modell ${mi + 1}/${covers.length}` : ""}</h2>
+        <div class="formula">${cv.map(t => termNotation(t, S.sol.conds.map(c => c.replace(/^fs_/, "").toUpperCase()))).join(' <span class="op">+</span> ')} <span class="op">→</span> ${esc(S.sol.outcome.replace(/^fs_/, "").toUpperCase())}</div>
+        <div class="kpis" style="margin-top:12px">
+          <div class="kpi"><div class="v">${fmt3(p.solCons)}</div><div class="l">Lösungs-Konsistenz</div></div>
+          <div class="kpi"><div class="v">${fmt3(p.solCov)}</div><div class="l">Lösungs-Coverage</div></div>
+        </div>
+        <div class="tablewrap"><table>
+          <tr><th>Pfad</th><th class="num">Raw Coverage</th><th class="num">Unique Coverage</th><th class="num">Konsistenz</th></tr>
+          ${p.terms.map(t => `<tr><td class="mono">${termNotation(t.term, S.sol.conds.map(c => c.replace(/^fs_/, "").toUpperCase()))}</td>
+            <td class="num">${fmt3(t.rawCov)}</td><td class="num">${fmt3(t.uniqCov)}</td><td class="num ${t.cons >= S.tt.consCut ? "ok" : "warn"}">${fmt3(t.cons)}</td></tr>`).join("")}
+        </table></div>
+        ${note ? `<p class="hint">${note}</p>` : ""}</div>`;
+      }).join("");
+    };
+    res = `
+      ${block("Komplexe (konservative) Lösung", S.sol.complex, "Nur beobachtete Konfigurationen, keine Annahmen über Remainder.")}
+      ${block("Sparsame (parsimonious) Lösung", S.sol.parsimonious, "Remainder werden als Vereinfachungsannahmen zugelassen. Die intermediäre Lösung (mit directional expectations) ist für die nächste Ausbaustufe vorgesehen.")}
+      <div class="panel"><h2>Notwendige Bedingungen (Outcome: <span class="mono">${esc(S.sol.outcome)}</span>)</h2>
+        <div class="tablewrap"><table>
+          <tr><th>Bedingung</th><th class="num">Konsistenz (Notwendigkeit)</th><th class="num">Coverage</th><th></th></tr>
+          ${S.sol.nec.map(n => `<tr><td class="mono">${esc(n.label)}</td><td class="num">${fmt3(n.cons)}</td><td class="num">${fmt3(n.cov)}</td>
+            <td>${n.cons >= 0.9 ? '<span class="ok">≥ 0,9 — Kandidat</span>' : ""}</td></tr>`).join("")}
+        </table></div>
+        <p class="hint">Konvention: Konsistenz ≥ 0,9 gilt als Hinweis auf eine notwendige Bedingung — immer zusammen mit Coverage und Fallkenntnis interpretieren.</p>
+      </div>`;
+  }
+  return `
+    <h1>Minimierung</h1>
+    <p class="lede">Quine-McCluskey-Minimierung der positiven Konfigurationen — einmal streng (komplex), einmal mit Remainders als Vereinfachungsannahmen (sparsam), dazu die Analyse notwendiger Bedingungen.</p>
+    <div class="panel"><div class="controls">
+      <button class="btn primary" onclick="runMin()">Standard Analysis ausführen</button>
+      <span class="hint" style="margin:0">Basis: Truth Table mit ${S.tt.conds.length} Bedingungen, Outcome <span class="mono">${esc(S.tt.outcome)}</span>, Cutoffs n ≥ ${S.tt.freqCut} / Konsistenz ≥ ${S.tt.consCut}</span>
+    </div></div>
+    ${res}`;
+}
+function runMin() {
+  const k = S.tt.conds.length;
+  const pos = S.tt.rows.filter(r => r.out === 1).map(r => r.bits);
+  const rem = S.tt.rows.filter(r => r.out === "?").map(r => r.bits);
+  const complex = pos.length ? minimalCovers(primeImplicants(pos, []), pos) : [];
+  const parsim = pos.length ? minimalCovers(primeImplicants(pos, rem), pos) : [];
+  S.sol = { conds: S.tt.conds, outcome: S.tt.outcome, complex, parsimonious: parsim, nec: necessityTable(S.tt.conds, S.tt.outcome) };
+  logAction("Minimierung", {
+    komplex: complex.map(cv => cv.map(t => termNotationPlain(t, S.tt.conds)).join(" + ")),
+    sparsam: parsim.map(cv => cv.map(t => termNotationPlain(t, S.tt.conds)).join(" + "))
+  }, `minimize(tt, details = TRUE)                 # komplexe Lösung\nminimize(tt, include = "?", details = TRUE)  # sparsame Lösung\nsuperSubset(df, outcome = "${S.tt.outcome}", conditions = "${S.tt.conds.join(", ")}")  # Notwendigkeit`);
+  render();
+}
+
+/* ---------------- view 5: XY-Plot ---------------- */
+function viewXY() {
+  if (!S.data) return `<h1>XY-Plot</h1><div class="panel"><div class="empty">Bitte zuerst Daten laden.</div></div>`;
+  const fz = fuzzyCols();
+  if (fz.length < 2) return `<h1>XY-Plot</h1><div class="panel"><div class="empty">Mindestens zwei Fuzzy-Variablen nötig — bitte kalibrieren.</div></div>`;
+  if (!S.xy.x || !fz.includes(S.xy.x)) S.xy.x = fz[0];
+  if (!S.xy.y || !fz.includes(S.xy.y)) S.xy.y = S.tt ? S.tt.outcome : fz[fz.length - 1];
+  return `
+    <h1>XY-Plot</h1>
+    <p class="lede">Der klassische Suffizienz-Plot: Punkte oberhalb der Diagonale stützen „X ist hinreichend für Y“. Konsistenz und Coverage werden direkt berechnet.</p>
+    <div class="panel">
+      <div class="controls">
+        <div class="field"><label>X (Bedingung)</label><select id="xy-x" onchange="S.xy.x=this.value;render()">${fz.map(c => `<option ${c === S.xy.x ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+        <div class="field"><label>Y (Outcome)</label><select id="xy-y" onchange="S.xy.y=this.value;render()">${fz.map(c => `<option ${c === S.xy.y ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+      </div>
+      <div id="xykpi"></div>
+      <div id="xychart" style="margin-top:6px"></div>
+    </div>`;
+}
+function drawXYChart() {
+  const box = el("xychart");
+  if (!box) return;
+  const X = S.data.rows.map(r => r[S.xy.x]), Y = S.data.rows.map(r => r[S.xy.y]);
+  const sumX = X.reduce((a,b)=>a+b,0), sumY = Y.reduce((a,b)=>a+b,0);
+  const sumMin = X.reduce((a, x, i) => a + Math.min(x, Y[i]), 0);
+  el("xykpi").innerHTML = `<div class="kpis">
+    <div class="kpi"><div class="v">${fmt3(sumX ? sumMin / sumX : NaN)}</div><div class="l">Konsistenz (Suffizienz)</div></div>
+    <div class="kpi"><div class="v">${fmt3(sumY ? sumMin / sumY : NaN)}</div><div class="l">Coverage</div></div>
+  </div>`;
+  const W = 480, H = 480, M = 46;
+  const p = v => M + v * (W - 2 * M);
+  const q = v => H - M - v * (H - 2 * M);
+  box.innerHTML = `<svg class="viz-root" viewBox="0 0 ${W} ${H}" role="img" aria-label="XY-Plot ${esc(S.xy.x)} gegen ${esc(S.xy.y)}" style="width:100%;max-width:${W}px;height:auto">
+    ${[0, 0.25, 0.5, 0.75, 1].map(v => `
+      <line x1="${p(0)}" x2="${p(1)}" y1="${q(v)}" y2="${q(v)}" stroke="var(--grid)"/>
+      <line y1="${q(0)}" y2="${q(1)}" x1="${p(v)}" x2="${p(v)}" stroke="var(--grid)"/>
+      <text class="tick-label" x="${p(v)}" y="${H - M + 16}" text-anchor="middle">${v.toFixed(2).replace(".", ",")}</text>
+      <text class="tick-label" x="${M - 7}" y="${q(v) + 3.5}" text-anchor="end">${v.toFixed(2).replace(".", ",")}</text>`).join("")}
+    <line x1="${p(0)}" y1="${q(0)}" x2="${p(1)}" y2="${q(1)}" stroke="var(--muted)" stroke-width="1.25" stroke-dasharray="4 4"/>
+    ${S.data.rows.map((r, i) => `<circle cx="${p(X[i])}" cy="${q(Y[i])}" r="5.5" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"
+      data-tip="${esc(r[S.data.caseCol])}: X=${fmt3(X[i])}, Y=${fmt3(Y[i])}" onmousemove="tip(event)" onmouseleave="tipHide()"/>`).join("")}
+    <text class="axis-label" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(S.xy.x)}</text>
+    <text class="axis-label" transform="translate(12,${H / 2}) rotate(-90)" text-anchor="middle">${esc(S.xy.y)}</text>
+  </svg>`;
+}
+
+/* ---------------- view 6: Protokoll ---------------- */
+function viewLog() {
+  const items = S.log.length ? `<ul class="log">${S.log.map(e => `<li>
+      <span class="t">${e.t.toTimeString().slice(0, 8)}</span>
+      <span class="what"><b>${esc(e.action)}</b> <span class="p">${esc(JSON.stringify(e.params))}</span></span>
+    </li>`).join("")}</ul>` : `<div class="empty">Noch keine Aktionen protokolliert.</div>`;
+  const r = ["library(QCA)", "", ...S.log.filter(e => e.rcode).map(e => e.rcode)].join("\n");
+  return `
+    <h1>Analyseprotokoll</h1>
+    <p class="lede">Jeder Schritt dieser Sitzung, chronologisch und maschinenlesbar — die Grundlage für Reproduzierbarkeit. Exportierbar als JSON (Archiv/Anhang) und als äquivalentes R-Skript für das QCA-Paket von Dușa.</p>
+    <div class="panel">
+      <div class="controls">
+        <button class="btn primary" onclick="dlJSON()">Protokoll als JSON herunterladen</button>
+      </div>
+      ${items}
+    </div>
+    <div class="panel">
+      <h2>Äquivalentes R-Skript (QCA-Paket)</h2>
+      <pre class="rcode">${esc(r)}</pre>
+      <p class="hint">Damit lässt sich dieselbe Analyse in R nachrechnen — und gegen die etablierte Implementierung validieren.</p>
+    </div>`;
+}
+function dlJSON() {
+  const payload = {
+    tool: "openQCA-Prototyp", exportiert: new Date().toISOString(),
+    datensatz: S.data ? { name: S.data.name, faelle: S.data.rows.length } : null,
+    kalibrierungen: S.calib,
+    schritte: S.log.map(e => ({ zeit: e.t.toISOString(), aktion: e.action, parameter: e.params }))
+  };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+  a.download = "openqca-protokoll.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------------- tooltip ---------------- */
+function tip(ev) {
+  const t = el("tooltip");
+  t.textContent = ev.target.dataset.tip;
+  t.style.display = "block";
+  t.style.left = Math.min(window.innerWidth - 280, ev.clientX + 14) + "px";
+  t.style.top = (ev.clientY + 14) + "px";
+}
+function tipHide() { el("tooltip").style.display = "none"; }
+
+render();
+</script>

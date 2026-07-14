@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f6f8f7;
+  --panel: #ffffff;
+  --panel-2: #fbfcfb;
+  --ink: #17211e;
+  --ink-2: #505c58;
+  --muted: #86918c;
+  --line: #e2e7e4;
+  --line-soft: #edf1ef;
+  --accent: #2a78d6;
+  --accent-deep: #1c5cab;
+  --accent-wash: rgba(42, 120, 214, 0.09);
+  --brand: #0f5c54;
+  --brand-wash: rgba(15, 92, 84, 0.08);
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warn-text: #935600;
+  --warn-wash: rgba(224, 150, 0, 0.12);
+  --bad: #d03b3b;
+  --bad-wash: rgba(208, 59, 59, 0.09);
+  --grid: #e1e5e2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1110;
+    --panel: #171b1a;
+    --panel-2: #1c2120;
+    --ink: #eef2f0;
+    --ink-2: #b4beba;
+    --muted: #8b938f;
+    --line: #272d2b;
+    --line-soft: #202624;
+    --accent: #3987e5;
+    --accent-deep: #6da7ec;
+    --accent-wash: rgba(57, 135, 229, 0.16);
+    --brand: #4fb3a6;
+    --brand-wash: rgba(79, 179, 166, 0.13);
+    --good: #35c04e;
+    --good-text: #35c04e;
+    --warn-text: #e2a33a;
+    --warn-wash: rgba(224, 150, 0, 0.16);
+    --bad: #e66767;
+    --bad-wash: rgba(230, 103, 103, 0.15);
+    --grid: #262c2a;
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}

@@ -1,0 +1,310 @@
+<meta charset="utf-8">
+<title>openQCA — Gold-Plan</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f7f6; --panel: #ffffff; --panel-2: #fafbfa; --ink: #16201d; --ink-2: #4d5955;
+    --muted: #85908b; --line: #e1e6e3; --line-soft: #eceff0;
+    --accent: #2a78d6; --accent-deep: #1c5cab; --accent-wash: rgba(42,120,214,0.08);
+    --brand: #0f5c54; --brand-2: #0b463f; --brand-wash: rgba(15,92,84,0.07);
+    --gold: #a67c00; --gold-wash: rgba(198,150,0,0.11);
+    --good: #0ca30c; --good-text: #006300; --good-wash: rgba(12,163,12,0.09);
+    --you: #b45309; --you-wash: rgba(180,83,9,0.10);
+    --grid: #e0e4e1;
+    --shadow: 0 1px 2px rgba(22,32,29,0.05), 0 6px 22px rgba(22,32,29,0.055);
+  }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #0d100f; --panel: #161a19; --panel-2: #1b201e; --ink: #edf1ef; --ink-2: #b2bcb8;
+    --muted: #8a938f; --line: #262c2a; --line-soft: #1f2523;
+    --accent: #3987e5; --accent-deep: #74a9ee; --accent-wash: rgba(57,135,229,0.15);
+    --brand: #4fb3a6; --brand-2: #6ec8bb; --brand-wash: rgba(79,179,166,0.12);
+    --gold: #e0b24a; --gold-wash: rgba(224,178,74,0.13);
+    --good: #35c04e; --good-text: #46cf5d; --good-wash: rgba(12,163,12,0.15);
+    --you: #e8934a; --you-wash: rgba(232,147,74,0.15);
+    --grid: #252b29; --shadow: none;
+  }}
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d100f; --panel: #161a19; --panel-2: #1b201e; --ink: #edf1ef; --ink-2: #b2bcb8;
+    --muted: #8a938f; --line: #262c2a; --line-soft: #1f2523;
+    --accent: #3987e5; --accent-deep: #74a9ee; --accent-wash: rgba(57,135,229,0.15);
+    --brand: #4fb3a6; --brand-2: #6ec8bb; --brand-wash: rgba(79,179,166,0.12);
+    --gold: #e0b24a; --gold-wash: rgba(224,178,74,0.13);
+    --good: #35c04e; --good-text: #46cf5d; --good-wash: rgba(12,163,12,0.15);
+    --you: #e8934a; --you-wash: rgba(232,147,74,0.15);
+    --grid: #252b29; --shadow: none;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f5f7f6; --panel: #ffffff; --panel-2: #fafbfa; --ink: #16201d; --ink-2: #4d5955;
+    --muted: #85908b; --line: #e1e6e3; --line-soft: #eceff0;
+    --accent: #2a78d6; --accent-deep: #1c5cab; --accent-wash: rgba(42,120,214,0.08);
+    --brand: #0f5c54; --brand-2: #0b463f; --brand-wash: rgba(15,92,84,0.07);
+    --gold: #a67c00; --gold-wash: rgba(198,150,0,0.11);
+    --good: #0ca30c; --good-text: #006300; --good-wash: rgba(12,163,12,0.09);
+    --you: #b45309; --you-wash: rgba(180,83,9,0.10);
+    --grid: #e0e4e1;
+    --shadow: 0 1px 2px rgba(22,32,29,0.05), 0 6px 22px rgba(22,32,29,0.055);
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 30px 26px 90px; }
+
+  header.top { display: flex; align-items: baseline; gap: 13px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .wordmark { font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, sans-serif; font-weight: 650; font-size: 20px; letter-spacing: -0.01em; }
+  .wordmark b { color: var(--brand); }
+  .doclabel { font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+  .doclabel::before { content: "◆ "; }
+  .rev { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .hero { padding: 34px 0 8px; }
+  h1 { font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, sans-serif; font-size: 34px; line-height: 1.1; font-weight: 680; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; }
+  h1 .g { background: linear-gradient(103deg, var(--brand), var(--accent-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .goal { font-size: 17px; color: var(--ink-2); max-width: 60ch; margin: 0; line-height: 1.55; }
+  .goal b { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: 40px; }
+  .eyebrow { display: flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 16px; }
+  .eyebrow .n { font-family: ui-monospace, Menlo, monospace; color: var(--brand); background: var(--brand-wash); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: 5px; padding: 1px 7px; font-size: 11px; letter-spacing: 0; }
+  .eyebrow::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  h2 { font-size: 20px; font-weight: 660; letter-spacing: -0.01em; margin: 0 0 10px; }
+  p.lead { color: var(--ink-2); margin: 0 0 18px; max-width: 66ch; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); padding: 20px 22px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 27px; } }
+
+  ul.check { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  ul.check li { display: flex; gap: 11px; align-items: flex-start; font-size: 14.5px; }
+  ul.check li .b { color: var(--brand); flex: none; margin-top: 1px; font-weight: 800; }
+  ul.check li b { font-weight: 650; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
+  th { text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 10px 14px; background: var(--panel-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td b { font-weight: 640; }
+  .free { color: var(--good-text); font-weight: 700; }
+  .cloud { color: var(--accent-deep); font-weight: 700; }
+
+  .tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .tiers { grid-template-columns: 1fr; } }
+  .tier { border: 1px solid var(--line); border-radius: 13px; padding: 18px 20px; background: var(--panel); }
+  .tier.paid { border-color: color-mix(in srgb, var(--accent) 35%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb,var(--accent) 20%, transparent); }
+  .tier .tag { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+  .tier.free .tag { color: var(--good-text); } .tier.paid .tag { color: var(--accent-deep); }
+  .tier h3 { font-size: 17px; margin: 4px 0 3px; font-weight: 650; }
+  .tier .price { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .tier ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; font-size: 13.5px; }
+  .tier ul li { display: flex; gap: 8px; } .tier ul li::before { content: "→"; color: var(--muted); }
+
+  /* roadmap */
+  .phases { display: grid; gap: 12px; }
+  .phase { display: grid; grid-template-columns: 54px 1fr; gap: 16px; border: 1px solid var(--line); border-radius: 13px; background: var(--panel); padding: 16px 18px; box-shadow: var(--shadow); }
+  .phase .code { font-family: ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 700; color: #fff; background: var(--brand); border-radius: 8px; height: 40px; display: grid; place-items: center; }
+  .phase.you .code { background: var(--you); }
+  .phase h3 { margin: 1px 0 5px; font-size: 15.5px; font-weight: 650; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .phase p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+  .phase .deliver { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .phase .deliver b { color: var(--ink-2); font-weight: 600; }
+  .pill { font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 9px; border-radius: 20px; }
+  .pill.auto { color: var(--brand); background: var(--brand-wash); border: 1px solid color-mix(in srgb,var(--brand) 26%,transparent); }
+  .pill.you { color: var(--you); background: var(--you-wash); border: 1px solid color-mix(in srgb,var(--you) 32%,transparent); }
+
+  .callout { border-radius: 13px; padding: 18px 20px; border: 1px solid; }
+  .callout.you { background: var(--you-wash); border-color: color-mix(in srgb,var(--you) 32%,transparent); }
+  .callout.gold { background: var(--gold-wash); border-color: color-mix(in srgb,var(--gold) 34%,transparent); }
+  .callout h3 { margin: 0 0 10px; font-size: 15px; font-weight: 660; display: flex; align-items: center; gap: 8px; }
+  .callout ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+  .callout ul li b { color: var(--ink); font-weight: 620; }
+
+  .foot { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+  code.k { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--ink-2); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="wordmark">open<b>QCA</b></span>
+    <span class="doclabel">Gold-Plan</span>
+    <span class="rev">Rev. 2026-07-14 · Entwurf zur Freigabe</span>
+  </header>
+
+  <div class="hero">
+    <h1>Vom Prototyp zum <span class="g">fertigen Produkt</span>.</h1>
+    <p class="goal">Ein quelloffenes QCA-Werkzeug, das nichts offen lässt: eine <b>kostenlose lokale App</b> zum Download und eine <b>Cloud-Version mit Datenbank und KI</b>, produktionsreif auf Vercel — inklusive Impressum, Datenschutz und wissenschaftlicher Validierung. Ein Produkt, das führt statt nur rechnet.</p>
+  </div>
+
+  <section>
+    <div class="eyebrow"><span class="n">00</span> Was „fertig" heißt</div>
+    <div class="card">
+      <ul class="check">
+        <li><span class="b">✓</span><div><b>Rechenkern</b> — eigene TypeScript-Engine (Kalibrierung, Truth Table, Quine-McCluskey, Konsistenz/Coverage, notwendige Bedingungen, intermediäre Lösung), <b>testvalidiert gegen fsQCA 4.1 und das R-Paket <span class="mono">QCA</span></b>.</div></li>
+        <li><span class="b">✓</span><div><b>Geführter Prozess</b> — jeder Schritt selbsterklärend, mit Live-Diagnostik (Schiefe, 0,5-Problem, Grenzfälle) und begründeten Entscheidungen.</div></li>
+        <li><span class="b">✓</span><div><b>Reproduzierbarkeit</b> — jedes Projekt exportiert Protokoll als JSON, als R-Skript und als Publikations-Report (PDF/HTML).</div></li>
+        <li><span class="b">✓</span><div><b>Zwei Auslieferungen aus einer Codebase</b> — Web/Cloud auf Vercel + Desktop-Download (macOS & Windows), lokal & offline.</div></li>
+        <li><span class="b">✓</span><div><b>Konten & Cloud</b> — Anmeldung, sichere Projekt-Datenbank, geräteübergreifende Synchronisation.</div></li>
+        <li><span class="b">✓</span><div><b>Recht</b> — Impressum, DSGVO-Datenschutzerklärung, Cookie-/Consent-Handling, Nutzungsbedingungen.</div></li>
+        <li><span class="b">✓</span><div><b>Öffnung</b> — GitHub-Repo (Open Core), Lizenz, Zenodo-DOI zur Zitierbarkeit, JOSS-Paper eingereicht.</div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow"><span class="n">01</span> Produktgestalt & Tarife</div>
+    <p class="lead">Eine Codebase, zwei Auslieferungen. Der <b>Analysekern und die Prozess-Führung sind überall gratis</b> — das ist der Beitrag für die Community. Bezahlt wird nur, was echte Kosten verursacht: Cloud-Speicher und KI (die zwingend Daten an ein Modell in der Cloud sendet).</p>
+    <div class="tiers">
+      <div class="tier free">
+        <div class="tag">Gratis · Web + Download</div>
+        <h3>openQCA Local</h3>
+        <div class="price">Für immer kostenlos · Open Source · offline</div>
+        <ul>
+          <li>Voller Analysekern & geführte Kalibrierung</li>
+          <li>Truth Table, Minimierung, XY-Plots, Reports</li>
+          <li>Reproduzierbarkeits-Protokoll & R-Export</li>
+          <li>Daten bleiben zu 100 % auf dem Gerät</li>
+          <li>Als Website <em>und</em> als Desktop-App</li>
+        </ul>
+      </div>
+      <div class="tier paid">
+        <div class="tag">Cloud-Tarif · Konto nötig</div>
+        <h3>openQCA Cloud</h3>
+        <div class="price">Abo für Einzelne · Site-Lizenz für Institutionen</div>
+        <ul>
+          <li>Sichere Projekt-Datenbank & Sync über Geräte</li>
+          <li>KI-Assistent: Anker vorschlagen, interpretieren</li>
+          <li>KI entwirft den Methoden-Absatz</li>
+          <li>Geteilte Projekte & Kollaboration</li>
+          <li>Robustheits-Analysen serverseitig</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow"><span class="n">02</span> Architektur & Tech-Stack</div>
+    <p class="lead">Bewusst schlank und Vercel-nativ, damit das Produkt wartungsarm „final" bleibt. Empfehlung mit Begründung — änderbar, bevor gebaut wird.</p>
+    <div class="tablewrap">
+      <table>
+        <tr><th>Baustein</th><th>Wahl</th><th>Warum</th></tr>
+        <tr><td><b>Rechenkern</b></td><td class="mono">@openqca/engine (TypeScript)</td><td>Ein Kern für Web <em>und</em> Desktop, kein 20-MB-Ballast, offline. Vertrauen über Validierungs-Suite gegen fsQCA + R.</td></tr>
+        <tr><td><b>Web-App</b></td><td class="mono">Next.js · React · TypeScript</td><td>Vercel-nativ, schnelles Deployment, ein Framework für UI + Server-Routen.</td></tr>
+        <tr><td><b>Design</b></td><td class="mono">Tailwind + Design-Tokens</td><td>Konsistentes System, wartbar, das Look-and-feel der Prototypen.</td></tr>
+        <tr><td><b>Datenbank & Auth</b></td><td class="mono">Supabase (Postgres)</td><td>Postgres + Anmeldung + Speicher + Zugriffsschutz (RLS) in einem — weniger Teile bis „fertig".</td></tr>
+        <tr><td><b>KI</b></td><td class="mono">Anthropic API (Claude)</td><td>Serverseitig, Schlüssel sicher; nur im Cloud-Tarif. Neueste Claude-Modelle.</td></tr>
+        <tr><td><b>Zahlungen</b></td><td class="mono">Stripe</td><td>Abos + institutionelle Lizenzen, Standard, prüfsicher.</td></tr>
+        <tr><td><b>Desktop</b></td><td class="mono">Tauri (Rust-Wrapper)</td><td>~5 MB statt 189 MB (Original), dieselbe UI, voll lokal. macOS + Windows.</td></tr>
+        <tr><td><b>Lokale Daten</b></td><td class="mono">IndexedDB / Dateisystem</td><td>Projekte offline speichern; Cloud-Tarif synchronisiert zusätzlich.</td></tr>
+        <tr><td><b>Monorepo</b></td><td class="mono">pnpm workspaces</td><td><code class="k">engine</code>, <code class="k">web</code>, <code class="k">desktop</code> teilen einen Kern.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow"><span class="n">03</span> Der Bauplan — 7 Phasen</div>
+    <p class="lead"><span class="pill auto">baue ich</span> = ohne deine Konten machbar. <span class="pill you">braucht dich</span> = ein Konto, ein Schlüssel oder eine Rechts-/Inhaltsentscheidung von dir. Ich baue jede solche Phase bis zum „nur noch Einsetzen &amp; Klicken" vor.</p>
+    <div class="phases">
+      <div class="phase"><div class="code">P0</div><div>
+        <h3>Fundament <span class="pill auto">baue ich</span></h3>
+        <p>Monorepo, Design-System, CI/Tests, Engine-Paket-Gerüst. Die validierten Algorithmen aus den Prototypen werden zu getestetem Code.</p>
+        <div class="deliver"><b>Ergebnis:</b> lauffähiges Repo, grüne Tests, deploybares Skelett.</div>
+      </div></div>
+      <div class="phase"><div class="code">P1</div><div>
+        <h3>Kern-Analyse (gratis, lokal) <span class="pill auto">baue ich</span></h3>
+        <p>Datenimport, geführte Kalibrierung, Truth Table, Minimierung (inkl. intermediärer Lösung), XY-Plots, Reports, Reproduzierbarkeits-Protokoll. Läuft komplett im Browser, offline.</p>
+        <div class="deliver"><b>Ergebnis:</b> das vollständige kostenlose Produkt, im Browser nutzbar.</div>
+      </div></div>
+      <div class="phase you"><div class="code">P2</div><div>
+        <h3>Desktop-App (Download) <span class="pill auto">baue ich</span> <span class="pill you">Signatur braucht dich</span></h3>
+        <p>Tauri-Verpackung derselben UI, lokale Dateispeicherung, Installer für macOS &amp; Windows.</p>
+        <div class="deliver"><b>Ergebnis:</b> installierbare Apps. <b>Signierung/Notarisierung</b> braucht dein Apple- bzw. Microsoft-Entwicklerkonto.</div>
+      </div></div>
+      <div class="phase you"><div class="code">P3</div><div>
+        <h3>Konten &amp; Cloud-Datenbank <span class="pill you">braucht dich</span></h3>
+        <p>Anmeldung, Projekt-Speicher, Sync, Datenbank-Schema, Zugriffsschutz.</p>
+        <div class="deliver"><b>Ergebnis:</b> Cloud-Speicherung. Braucht <b>Supabase-/Vercel-Konto + Schlüssel</b> (ich richte Schema &amp; Code ein).</div>
+      </div></div>
+      <div class="phase you"><div class="code">P4</div><div>
+        <h3>KI-Schicht (Cloud-Tarif) <span class="pill you">braucht dich</span></h3>
+        <p>Kalibrier-Assistent, Interpretationshilfe, Methoden-Absatz-Entwurf — serverseitig über die Anthropic-API.</p>
+        <div class="deliver"><b>Ergebnis:</b> KI-Features live. Braucht deinen <b>Anthropic-API-Schlüssel</b> (Kosten laufen über dein Konto).</div>
+      </div></div>
+      <div class="phase you"><div class="code">P5</div><div>
+        <h3>Zahlungen &amp; Tarife <span class="pill you">braucht dich</span></h3>
+        <p>Stripe-Abos, institutionelle Lizenzen, Freischaltung der Cloud-Features.</p>
+        <div class="deliver"><b>Ergebnis:</b> funktionierender Verkauf. Braucht <b>Stripe-Konto</b>; Beträge/Preise entscheidest du.</div>
+      </div></div>
+      <div class="phase you"><div class="code">P6</div><div>
+        <h3>Recht, Compliance &amp; Feinschliff <span class="pill you">braucht dich</span></h3>
+        <p>Impressum, DSGVO-Datenschutzerklärung, Cookie-/Consent-Banner, AGB/Nutzungsbedingungen, Barrierefreiheit, Deutsch/Englisch, Onboarding, Beispieldatensätze.</p>
+        <div class="deliver"><b>Ergebnis:</b> rechtlich ausgestattete Seite. Ich liefere <b>vollständige Entwürfe</b>; du steuerst echte Daten (Name/Anschrift) bei und lässt Datenschutz/AGB <b>einmal juristisch prüfen</b>.</div>
+      </div></div>
+      <div class="phase you"><div class="code">P7</div><div>
+        <h3>Validierung &amp; Launch <span class="pill auto">baue ich</span> <span class="pill you">Deploy braucht dich</span></h3>
+        <p>Validierungs-Suite gegen fsQCA 4.1 + R-Paket, Dokumentation, JOSS-Paper, Zenodo-DOI, Release.</p>
+        <div class="deliver"><b>Ergebnis:</b> öffentlich, zitierbar, belegt korrekt. <b>Deploy-Klick &amp; Domain</b> sowie die JOSS/DOI-Einreichung laufen über dein Konto.</div>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow"><span class="n">04</span> Recht &amp; Compliance — ehrlich</div>
+    <div class="callout you">
+      <h3>⚠ Was ich hier tue — und was nicht</h3>
+      <ul>
+        <li>Ich schreibe <b>vollständige, DSGVO-orientierte Entwürfe</b> für Impressum, Datenschutzerklärung, Cookie-Consent und AGB — abgestimmt auf die tatsächlichen Datenflüsse (Supabase, Stripe, Anthropic, Vercel, ggf. Analytics).</li>
+        <li>Eine Datenschutzerklärung muss <b>deine echten Angaben</b> (Verantwortlicher, Anschrift, Kontakt, Auftragsverarbeiter) enthalten — die trägst du bei.</li>
+        <li>Ich stelle die Texte <b>nicht als rechtssicher hin</b>. Vor dem Live-Gang gehört Datenschutz/AGB einmal von einer qualifizierten Person geprüft — besonders bei EU-Betrieb mit Konten, Zahlungen und KI. Das ist der eine Punkt, den ich dir nicht abnehmen kann und auch nicht vortäuschen werde.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow"><span class="n">05</span> Aufgabenteilung</div>
+    <div class="grid2">
+      <div class="card">
+        <h2 style="font-size:16px;color:var(--brand)">Ich, autonom über Sessions</h2>
+        <ul class="check">
+          <li><span class="b">→</span>Engine + Tests + Validierung schreiben</li>
+          <li><span class="b">→</span>Komplette Web-App (gratis Kern)</li>
+          <li><span class="b">→</span>Desktop-App bauen &amp; verpacken</li>
+          <li><span class="b">→</span>Datenbank-Schema &amp; Cloud-Code</li>
+          <li><span class="b">→</span>KI-Integration im Code</li>
+          <li><span class="b">→</span>Zahlungs-Logik einbauen</li>
+          <li><span class="b">→</span>Rechtstexte entwerfen, i18n, Docs</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:color-mix(in srgb,var(--you) 30%,transparent)">
+        <h2 style="font-size:16px;color:var(--you)">Nur du (einmalig)</h2>
+        <ul class="check">
+          <li><span class="b" style="color:var(--you)">→</span>Konten anlegen: Vercel, Supabase, Stripe, Anthropic, GitHub</li>
+          <li><span class="b" style="color:var(--you)">→</span>API-Schlüssel einsetzen (ich zeige exakt wo)</li>
+          <li><span class="b" style="color:var(--you)">→</span>Preise/Lizenzmodell festlegen</li>
+          <li><span class="b" style="color:var(--you)">→</span>Echte Angaben fürs Impressum</li>
+          <li><span class="b" style="color:var(--you)">→</span>Datenschutz/AGB prüfen lassen</li>
+          <li><span class="b" style="color:var(--you)">→</span>Apple-/MS-Konto für signierte Apps</li>
+          <li><span class="b" style="color:var(--you)">→</span>Deploy-Klick &amp; Domain</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow"><span class="n">06</span> Nächster Schritt</div>
+    <div class="callout gold">
+      <h3>◆ Los geht's mit dem kontofreien Teil</h3>
+      <ul>
+        <li>Ich starte sofort mit <b>P0 + P1</b> — Repo, Engine mit Tests, und dem vollständigen kostenlosen Kern. Dafür brauche ich <b>keine</b> deiner Konten.</li>
+        <li>Parallel sammle ich, was du für die späteren Phasen anlegen musst, in einer knappen Checkliste — damit du nur an einem Nachmittag alle Konten machst statt verstreut.</li>
+        <li>Sobald du für eine <span class="pill you">braucht dich</span>-Phase bereit bist, liefere ich Schritt-für-Schritt-Anleitungen (Schlüssel einsetzen, Klicks).</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="foot">
+    openQCA Gold-Plan · Neubau von Ragins fs/QCA als Open-Access-Produkt · Rechenkern testvalidiert gegen fsQCA 4.1 und das R-Paket <span class="mono">QCA</span> · Prototypen: geführte Kalibrierung &amp; vollständige Analyse-Pipeline bereits lauffähig.
+  </div>
+</div>
