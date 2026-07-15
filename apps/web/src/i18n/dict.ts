@@ -20,6 +20,105 @@ const de = {
   "header.tagline": "Qualitative Comparative Analysis — lokal & reproduzierbar",
   "header.methodik": "Methodik",
   "header.tarife": "Tarife",
+  "header.download": "Download",
+
+  // -- Landing (Startseite) ---------------------------------------------------
+  "landing.nav.funktionen": "Funktionen",
+  "landing.nav.methodik": "Methodik",
+  "landing.nav.tarife": "Tarife",
+  "landing.nav.download": "Download",
+  "landing.nav.startApp": "App starten",
+  "landing.nav.ariaPrimary": "Hauptnavigation",
+
+  "landing.hero.badge": "Open Source (MIT) · Local-first · Reproduzierbar",
+  "landing.hero.title": "Das offene, geführte Werkzeug für Qualitative Comparative Analysis.",
+  "landing.hero.subline":
+    "Geführte Kalibrierung mit einem Coach, der typische Fehler abfängt, und ein reproduzierbares Protokoll für jede Analyse. Ihre Forschungsdaten bleiben im Browser.",
+  "landing.hero.ctaPrimary": "Kostenlos analysieren",
+  "landing.hero.ctaSecondary": "Beispiel ansehen",
+  "landing.hero.facts": "Validierte Engine · 26 Tests · R-Skript-Export · PDF-Bericht",
+
+  "landing.features.title": "Funktionen",
+  "landing.features.calib.title": "Geführte Kalibrierung",
+  "landing.features.calib.desc":
+    "Live-Coach prüft Schiefe, das 0,5-Problem und Grenzfälle direkt an Ihren Fällen.",
+  "landing.features.truth.title": "Truth Table & drei Lösungstypen",
+  "landing.features.truth.desc":
+    "Komplexe, intermediäre (mit Richtungserwartungen) und sparsame Lösung — sauber getrennt.",
+  "landing.features.robust.title": "Robustheit & negiertes Outcome",
+  "landing.features.robust.desc":
+    "Konsistenz-Cutoff-Sweep und eine separate Analyse für das Ausbleiben des Outcomes (~Y).",
+  "landing.features.repro.title": "Reproduzierbarkeit",
+  "landing.features.repro.desc":
+    "Jede Analyse als Protokoll (JSON) und als äquivalentes R-Skript für das QCA-Paket.",
+  "landing.features.report.title": "Bericht als PDF",
+  "landing.features.report.desc":
+    "Ein druckfähiger Analysebericht mit allen Kennzahlen — direkt aus dem Browser.",
+  "landing.features.local.title": "Local-first & Open Source",
+  "landing.features.local.desc":
+    "Daten bleiben im Browser, kein Upload im Gratis-Kern. Quelloffen unter MIT-Lizenz.",
+
+  "landing.steps.title": "In drei Schritten",
+  "landing.steps.step1.title": "Daten laden",
+  "landing.steps.step1.desc": "CSV/XLSX importieren oder einen Beispiel-Datensatz wählen.",
+  "landing.steps.step2.title": "Kalibrieren",
+  "landing.steps.step2.desc": "Rohwerte in Fuzzy-Sets übersetzen — der Coach hilft.",
+  "landing.steps.step3.title": "Lösungen & Bericht",
+  "landing.steps.step3.desc": "Truth Table minimieren, interpretieren und exportieren.",
+
+  "landing.privacy.title": "Ihre Forschungsdaten bleiben Ihre",
+  "landing.privacy.body":
+    "Der Gratis-Kern rechnet vollständig lokal in Ihrem Browser — kein Upload, keine Übertragung. Nur wer möchte, nutzt den optionalen Cloud-Tarif mit eigenem Konto für Speicherung und Sync.",
+  "landing.privacy.li1": "Kein Tracking",
+  "landing.privacy.li2": "DSGVO-orientiert",
+  "landing.privacy.li3.pre": "Rechtliches: ",
+  "landing.privacy.li3.impressum": "Impressum",
+  "landing.privacy.li3.datenschutz": "Datenschutz",
+
+  "landing.pricing.title": "Tarife",
+  "landing.pricing.free.name": "Gratis",
+  "landing.pricing.free.desc": "Alles fürs Publizieren: Analysekern, Protokoll, R-Export, PDF-Bericht.",
+  "landing.pricing.cloud.name": "Cloud",
+  "landing.pricing.cloud.desc": "Konto, Sync und KI-Assistenten (bald) — für alle, die mehr brauchen.",
+  "landing.pricing.allDetails": "Alle Details",
+
+  "landing.download.title": "openQCA lokal nutzen",
+  "landing.download.body":
+    "Als installierbare Web-App — nach dem ersten Besuch offline nutzbar. Eigenständige Desktop-Apps sind in Vorbereitung.",
+  "landing.download.cta": "Zum Download",
+
+  "landing.cta.title": "Starten Sie Ihre erste reproduzierbare QCA-Analyse.",
+  "landing.cta.button": "App starten",
+
+  // -- Download-Seite -----------------------------------------------------------
+  "download.back": "← zurück",
+  "download.title": "openQCA lokal nutzen",
+  "download.intro":
+    "Der Gratis-Kern rechnet vollständig in Ihrem Browser (local-first). Installiert als App ist openQCA nach dem ersten Besuch auch ohne Internetverbindung nutzbar — Ihre Daten bleiben auf Ihrem Gerät.",
+
+  "download.install.title": "Als App installieren (empfohlen)",
+  "download.install.button": "openQCA installieren",
+  "download.install.offlineNote":
+    "Nach dem ersten Besuch offline nutzbar — Ihre Daten bleiben auf dem Gerät.",
+  "download.install.guidesIntro": "Kein Installations-Button zu sehen? So geht's manuell:",
+  "download.install.chrome.title": "Chrome / Edge (Desktop)",
+  "download.install.chrome.desc":
+    "Installieren-Symbol in der Adressleiste anklicken — oder Menü → „openQCA installieren“.",
+  "download.install.safari.title": "Safari (macOS)",
+  "download.install.safari.desc": "Ablage → „Zum Dock hinzufügen…“.",
+  "download.install.ios.title": "iOS (Safari)",
+  "download.install.ios.desc": "Teilen-Symbol → „Zum Home-Bildschirm“.",
+  "download.install.android.title": "Android (Chrome)",
+  "download.install.android.desc": "Menü (⋮) → „App installieren“.",
+
+  "download.desktop.title": "Desktop-Apps (macOS/Windows)",
+  "download.desktop.status": "In Vorbereitung",
+  "download.desktop.body":
+    "Signierte, eigenständige Installer (auf Basis von Tauri) sind in Vorbereitung. Bis dahin deckt die installierte Web-App den lokalen, offline-fähigen Einsatz vollständig ab.",
+
+  "download.source.title": "Quellcode",
+  "download.source.body":
+    "openQCA ist Open Source (MIT-Lizenz). Die Veröffentlichung des Repositories ist in Vorbereitung.",
 
   // -- Startzustand / Hero ----------------------------------------------------
   "hero.title": "Das offene, geführte Werkzeug für Qualitative Comparative Analysis.",
@@ -286,6 +385,105 @@ const en: Record<DictKey, string> = {
   "header.tagline": "Qualitative Comparative Analysis — local & reproducible",
   "header.methodik": "Methodology",
   "header.tarife": "Pricing",
+  "header.download": "Download",
+
+  // -- Landing (home page) ----------------------------------------------------
+  "landing.nav.funktionen": "Features",
+  "landing.nav.methodik": "Methodology",
+  "landing.nav.tarife": "Pricing",
+  "landing.nav.download": "Download",
+  "landing.nav.startApp": "Launch app",
+  "landing.nav.ariaPrimary": "Primary navigation",
+
+  "landing.hero.badge": "Open source (MIT) · Local-first · Reproducible",
+  "landing.hero.title": "The open, guided tool for Qualitative Comparative Analysis.",
+  "landing.hero.subline":
+    "Guided calibration with a coach that catches common mistakes, and a reproducible protocol for every analysis. Your research data stays in the browser.",
+  "landing.hero.ctaPrimary": "Analyze for free",
+  "landing.hero.ctaSecondary": "See an example",
+  "landing.hero.facts": "Validated engine · 26 tests · R-script export · PDF report",
+
+  "landing.features.title": "Features",
+  "landing.features.calib.title": "Guided calibration",
+  "landing.features.calib.desc":
+    "A live coach checks skew, the 0.5 problem and borderline cases directly against your cases.",
+  "landing.features.truth.title": "Truth table & three solution types",
+  "landing.features.truth.desc":
+    "Complex, intermediate (with directional expectations) and parsimonious solution — cleanly separated.",
+  "landing.features.robust.title": "Robustness & negated outcome",
+  "landing.features.robust.desc":
+    "Consistency cutoff sweep and a separate analysis for the absence of the outcome (~Y).",
+  "landing.features.repro.title": "Reproducibility",
+  "landing.features.repro.desc":
+    "Every analysis as a protocol (JSON) and as an equivalent R script for the QCA package.",
+  "landing.features.report.title": "PDF report",
+  "landing.features.report.desc":
+    "A print-ready analysis report with all metrics — straight from the browser.",
+  "landing.features.local.title": "Local-first & open source",
+  "landing.features.local.desc":
+    "Data stays in the browser, no upload in the free core. Open source under the MIT license.",
+
+  "landing.steps.title": "In three steps",
+  "landing.steps.step1.title": "Load data",
+  "landing.steps.step1.desc": "Import CSV/XLSX or pick an example dataset.",
+  "landing.steps.step2.title": "Calibrate",
+  "landing.steps.step2.desc": "Translate raw values into fuzzy sets — the coach helps.",
+  "landing.steps.step3.title": "Solutions & report",
+  "landing.steps.step3.desc": "Minimize the truth table, interpret and export.",
+
+  "landing.privacy.title": "Your research data stays yours",
+  "landing.privacy.body":
+    "The free core computes entirely locally in your browser — no upload, no transmission. Only if you want to, you can use the optional cloud plan with your own account for storage and sync.",
+  "landing.privacy.li1": "No tracking",
+  "landing.privacy.li2": "GDPR-oriented",
+  "landing.privacy.li3.pre": "Legal: ",
+  "landing.privacy.li3.impressum": "Imprint",
+  "landing.privacy.li3.datenschutz": "Privacy policy",
+
+  "landing.pricing.title": "Pricing",
+  "landing.pricing.free.name": "Free",
+  "landing.pricing.free.desc": "Everything for publishing: analysis core, protocol, R export, PDF report.",
+  "landing.pricing.cloud.name": "Cloud",
+  "landing.pricing.cloud.desc": "Account, sync and AI assistants (soon) — for those who need more.",
+  "landing.pricing.allDetails": "All details",
+
+  "landing.download.title": "Use openQCA locally",
+  "landing.download.body":
+    "As an installable web app — usable offline after the first visit. Standalone desktop apps are in preparation.",
+  "landing.download.cta": "Go to download",
+
+  "landing.cta.title": "Start your first reproducible QCA analysis.",
+  "landing.cta.button": "Launch app",
+
+  // -- Download page ------------------------------------------------------------
+  "download.back": "← back",
+  "download.title": "Use openQCA locally",
+  "download.intro":
+    "The free core runs entirely in your browser (local-first). Installed as an app, openQCA also works offline after your first visit — your data stays on your device.",
+
+  "download.install.title": "Install as an app (recommended)",
+  "download.install.button": "Install openQCA",
+  "download.install.offlineNote":
+    "Works offline after your first visit — your data stays on your device.",
+  "download.install.guidesIntro": "No install button showing? Here's how to do it manually:",
+  "download.install.chrome.title": "Chrome / Edge (desktop)",
+  "download.install.chrome.desc":
+    "Click the install icon in the address bar — or menu → \"Install openQCA\".",
+  "download.install.safari.title": "Safari (macOS)",
+  "download.install.safari.desc": "File → \"Add to Dock…\".",
+  "download.install.ios.title": "iOS (Safari)",
+  "download.install.ios.desc": "Share icon → \"Add to Home Screen\".",
+  "download.install.android.title": "Android (Chrome)",
+  "download.install.android.desc": "Menu (⋮) → \"Install app\".",
+
+  "download.desktop.title": "Desktop apps (macOS/Windows)",
+  "download.desktop.status": "In preparation",
+  "download.desktop.body":
+    "Signed, standalone installers (built on Tauri) are in preparation. Until then, the installed web app fully covers local, offline-capable use.",
+
+  "download.source.title": "Source code",
+  "download.source.body":
+    "openQCA is open source (MIT license). Publishing the repository is in preparation.",
 
   // -- Landing / hero ---------------------------------------------------------
   "hero.title": "The open, guided tool for Qualitative Comparative Analysis.",

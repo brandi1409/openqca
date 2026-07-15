@@ -30,7 +30,7 @@ export default function DatenschutzPage() {
 
   return (
     <div style={pageStyle}>
-      <a href="/" style={backLinkStyle}>
+      <a href="/app" style={backLinkStyle}>
         ← zurück zur App
       </a>
 

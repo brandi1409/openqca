@@ -33,7 +33,7 @@ export default function PricingPage() {
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "32px 26px 80px" }}>
-      <a href="/" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "common.backToApp")}</a>
+      <a href="/app" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "common.backToApp")}</a>
       <h1 style={{ fontSize: 26, fontWeight: 680, letterSpacing: "-0.01em", margin: "14px 0 6px" }}>{t(locale, "pricing.title")}</h1>
       <p style={{ color: "var(--ink-2)", maxWidth: "60ch", marginTop: 0 }}>
         {t(locale, "pricing.intro")}

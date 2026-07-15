@@ -6,6 +6,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   return [
     "",
+    "/app",
+    "/download",
     "/methodik",
     "/preise",
     "/konto",
