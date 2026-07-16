@@ -89,14 +89,15 @@ function placeLabels(points: XyPoint[], shown: number[]): PlacedLabel[] {
     };
   });
   items.sort((a, b) => a.anchorY - b.anchorY);
-  for (let k = 1; k < items.length; k++) {
-    const cur = items[k];
-    const prev = items[k - 1];
-    if (
-      cur.anchorY - prev.anchorY < 12 &&
-      Math.abs(cur.pointX - prev.pointX) < 60
-    ) {
-      cur.anchorY = prev.anchorY + 12;
+  // Zwei Durchläufe: benachbarte Labels in derselben Spalte (< 90px x-Abstand)
+  // vertikal auf mindestens 13px Abstand drücken.
+  for (let pass = 0; pass < 2; pass++) {
+    for (let k = 1; k < items.length; k++) {
+      const cur = items[k];
+      const prev = items[k - 1];
+      if (cur.anchorY - prev.anchorY < 13 && Math.abs(cur.pointX - prev.pointX) < 90) {
+        cur.anchorY = prev.anchorY + 13;
+      }
     }
   }
   return items.map(({ i, text, anchorX, anchorY, textAnchor }) => ({
@@ -236,20 +237,20 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
             opacity={0.75}
           />
 
-          {/* Diagonalen-Beschriftung, entlang der Linie rotiert */}
+          {/* Zonen-Beschriftung oben links, mit heller Kontur zur Lesbarkeit.
+              (Die Diagonalen-Beschriftung „X = Y“ steht in der Legende unter dem
+              Plot — im Plot selbst kollidierte sie mit dem Punkt-Cluster.) */}
           <text
-            x={px(0.9)}
-            y={py(0.9) - 5}
-            textAnchor="middle"
-            fill="var(--muted)"
+            x={ML + 6}
+            y={MT + 13}
+            textAnchor="start"
+            fill="var(--accent-deep)"
             fontSize={10}
-            transform={`rotate(-45 ${px(0.9)} ${py(0.9) - 5})`}
+            stroke="var(--panel)"
+            strokeWidth={3}
+            paintOrder="stroke"
+            strokeLinejoin="round"
           >
-            {t(locale, "xy.diagonalLabel")}
-          </text>
-
-          {/* Zonen-Beschriftung in der oberen linken Ecke */}
-          <text x={ML + 6} y={MT + 13} textAnchor="start" fill="var(--accent-deep)" fontSize={10}>
             {t(locale, "xy.consistentZone")}
           </text>
 
@@ -283,7 +284,8 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
             );
           })}
 
-          {/* Fall-Labels */}
+          {/* Fall-Labels — helle Kontur (paint-order: stroke) hält sie über
+              Punkten und benachbarten Labels lesbar. */}
           {labels.map((l) => (
             <text
               key={`lbl-${l.i}`}
@@ -292,6 +294,10 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
               textAnchor={l.textAnchor}
               fill="var(--ink-2)"
               fontSize={10}
+              stroke="var(--panel)"
+              strokeWidth={3}
+              paintOrder="stroke"
+              strokeLinejoin="round"
               style={{ pointerEvents: "none" }}
             >
               {l.text}
@@ -323,6 +329,12 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
         <span style={legendItemStyle}>
           <span style={legendDotStyle("var(--bad)")} />
           {t(locale, "xy.legend.inconsistent")}
+        </span>
+        <span style={legendItemStyle}>
+          <svg width={22} height={8} aria-hidden style={{ flex: "none" }}>
+            <line x1={0} y1={4} x2={22} y2={4} stroke="var(--muted)" strokeWidth={1} strokeDasharray="4 4" />
+          </svg>
+          {t(locale, "xy.diagonalLabel")}
         </span>
       </div>
     </div>

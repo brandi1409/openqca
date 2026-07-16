@@ -978,11 +978,13 @@ function CalibrationCurve({
     };
   });
   placed.sort((a2, b2) => a2.anchorY - b2.anchorY);
-  for (let k = 1; k < placed.length; k++) {
-    const cur = placed[k];
-    const prev = placed[k - 1];
-    if (cur.anchorY - prev.anchorY < 12 && Math.abs(cur.pointX - prev.pointX) < 70) {
-      cur.anchorY = prev.anchorY + 12;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let k = 1; k < placed.length; k++) {
+      const cur = placed[k];
+      const prev = placed[k - 1];
+      if (cur.anchorY - prev.anchorY < 13 && Math.abs(cur.pointX - prev.pointX) < 90) {
+        cur.anchorY = prev.anchorY + 13;
+      }
     }
   }
 
@@ -1024,7 +1026,7 @@ function CalibrationCurve({
         })}
 
         {placed.map((l, idx) => (
-          <text key={`lbl-${idx}`} x={l.anchorX} y={l.anchorY} textAnchor={l.textAnchor} fill="var(--warn-text)" fontSize={10} fontWeight={600} style={{ pointerEvents: "none" }}>
+          <text key={`lbl-${idx}`} x={l.anchorX} y={l.anchorY} textAnchor={l.textAnchor} fill="var(--warn-text)" fontSize={10} fontWeight={600} stroke="var(--panel)" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round" style={{ pointerEvents: "none" }}>
             {l.label}
           </text>
         ))}
