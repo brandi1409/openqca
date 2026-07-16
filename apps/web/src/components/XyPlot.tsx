@@ -91,12 +91,14 @@ function placeLabels(points: XyPoint[], shown: number[]): PlacedLabel[] {
   items.sort((a, b) => a.anchorY - b.anchorY);
   // Zwei Durchläufe: benachbarte Labels in derselben Spalte (< 90px x-Abstand)
   // vertikal auf mindestens 13px Abstand drücken.
+  // 16px Mindestabstand: berücksichtigt die 3px-Kontur (paint-order:stroke),
+  // die die Label-Boxhöhe gegenüber der reinen Glyphenhöhe vergrößert.
   for (let pass = 0; pass < 2; pass++) {
     for (let k = 1; k < items.length; k++) {
       const cur = items[k];
       const prev = items[k - 1];
-      if (cur.anchorY - prev.anchorY < 13 && Math.abs(cur.pointX - prev.pointX) < 90) {
-        cur.anchorY = prev.anchorY + 13;
+      if (cur.anchorY - prev.anchorY < 16 && Math.abs(cur.pointX - prev.pointX) < 90) {
+        cur.anchorY = prev.anchorY + 16;
       }
     }
   }

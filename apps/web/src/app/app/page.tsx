@@ -982,8 +982,8 @@ function CalibrationCurve({
     for (let k = 1; k < placed.length; k++) {
       const cur = placed[k];
       const prev = placed[k - 1];
-      if (cur.anchorY - prev.anchorY < 13 && Math.abs(cur.pointX - prev.pointX) < 90) {
-        cur.anchorY = prev.anchorY + 13;
+      if (cur.anchorY - prev.anchorY < 16 && Math.abs(cur.pointX - prev.pointX) < 90) {
+        cur.anchorY = prev.anchorY + 16;
       }
     }
   }
