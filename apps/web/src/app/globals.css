@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* ----------------------------------------------------------------------------
+   Design-Skala (verbindlich für die App-UI)
+
+   Schriftgrößen (px):  11 · 12 · 13.5 · 15 (Body) · 16.5 · 20 · 28
+   Gewichte:            400 (Standard) · 600 (Hervorhebung) · 700 (Titel)
+   Radien:              8 (interaktive Controls) · 12 (Karten) · 999 (Chips/Pills)
+   Hierarchie:          Step-Titel 20/700  >  Karten-Überschrift 16.5/600
+   Ausnahme:            SVG-chartinterne Tick-/Label-Größen (≈10–11) bleiben frei.
+
+   Farbrollen:          --accent = Interaktion/Links · --brand = Marke/Fortschritt
+                        --ai = KI-Funktionen · --muted = neutrale Beschriftung
+---------------------------------------------------------------------------- */
+
 :root {
   --bg: #f6f8f7;
   --panel: #ffffff;
@@ -14,6 +27,7 @@
   --accent-wash: rgba(42, 120, 214, 0.09);
   --brand: #0f5c54;
   --brand-wash: rgba(15, 92, 84, 0.08);
+  --ai: #6a4bd6;
   --good: #0ca30c;
   --good-text: #006300;
   --warn-text: #935600;
@@ -38,6 +52,7 @@
     --accent-wash: rgba(57, 135, 229, 0.16);
     --brand: #4fb3a6;
     --brand-wash: rgba(79, 179, 166, 0.13);
+    --ai: #9085e9;
     --good: #35c04e;
     --good-text: #35c04e;
     --warn-text: #e2a33a;
@@ -58,4 +73,50 @@ body {
 
 .mono {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Ein Control-System: semantische Button-Klassen. Sondermaße nur noch inline. */
+.oq-btn {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 15px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.12s;
+}
+.oq-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.oq-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.oq-btn--primary:hover:not(:disabled) {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
+.oq-btn--secondary {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.oq-btn--secondary:hover:not(:disabled) {
+  background: var(--line-soft);
+}
+.oq-btn--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.oq-btn--quiet:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+/* Global, konsistent sichtbarer Fokus — ersetzt alle lokalen outline:none. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

@@ -182,33 +182,19 @@ export function ChartFrame({ children, filename, caption }: ChartFrameProps) {
       <div style={toolbarStyle}>
         <button
           type="button"
+          className="oq-btn oq-btn--secondary"
           onClick={exportSvg}
           style={exportButtonStyle}
           aria-label={t(locale, "chart.exportAria", { fmt: t(locale, "chart.exportSvg") })}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--accent-deep)";
-            e.currentTarget.style.borderColor = "var(--accent-deep)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--muted)";
-            e.currentTarget.style.borderColor = "var(--line)";
-          }}
         >
           {t(locale, "chart.exportSvg")}
         </button>
         <button
           type="button"
+          className="oq-btn oq-btn--secondary"
           onClick={exportPng}
           style={exportButtonStyle}
           aria-label={t(locale, "chart.exportAria", { fmt: t(locale, "chart.exportPng") })}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--accent-deep)";
-            e.currentTarget.style.borderColor = "var(--accent-deep)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--muted)";
-            e.currentTarget.style.borderColor = "var(--line)";
-          }}
         >
           {t(locale, "chart.exportPng")}
         </button>
@@ -232,17 +218,12 @@ const toolbarStyle: React.CSSProperties = {
   zIndex: 2,
 };
 
+// Sondermaße für die kompakten Toolbar-Buttons; Basisstil kommt aus .oq-btn.
 const exportButtonStyle: React.CSSProperties = {
-  fontSize: 11.5,
+  fontSize: 11,
   color: "var(--muted)",
-  background: "var(--panel)",
-  border: "1px solid var(--line)",
-  borderRadius: 6,
   padding: "2px 8px",
-  cursor: "pointer",
   lineHeight: 1.4,
-  font: "inherit",
-  fontWeight: 600,
 };
 
 const captionStyle: React.CSSProperties = {

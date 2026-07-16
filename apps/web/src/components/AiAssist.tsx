@@ -57,9 +57,9 @@ export function AiAssist({
           style={{
             width: "100%",
             font: "inherit",
-            fontSize: 13,
+            fontSize: 13.5,
             border: "1px solid var(--line)",
-            borderRadius: 7,
+            borderRadius: 8,
             padding: "6px 9px",
             background: "var(--panel-2)",
             color: "var(--ink)",
@@ -70,33 +70,29 @@ export function AiAssist({
       <button
         onClick={run}
         disabled={busy}
+        className="oq-btn"
         style={{
-          font: "inherit",
-          fontSize: 13,
-          fontWeight: 600,
-          borderRadius: 8,
+          fontSize: 13.5,
           padding: "7px 12px",
-          cursor: busy ? "default" : "pointer",
-          border: "1px solid color-mix(in srgb, #6a4bd6 30%, transparent)",
-          background: "color-mix(in srgb, #6a4bd6 8%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--ai) 30%, transparent)",
+          background: "color-mix(in srgb, var(--ai) 8%, transparent)",
           color: "var(--ink)",
         }}
       >
         ✦ {busy ? "…" : label}
       </button>
       {note && (
-        <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "8px 0 0" }}>{note}</p>
+        <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "8px 0 0" }}>{note}</p>
       )}
       {result && (
         <div
           style={{
             marginTop: 10,
-            fontSize: 13,
+            fontSize: 13.5,
             lineHeight: 1.55,
             color: "var(--ink-2)",
             background: "var(--panel-2)",
-            border: "1px solid var(--line)",
-            borderLeft: "3px solid #6a4bd6",
+            borderLeft: "3px solid var(--ai)",
             borderRadius: 8,
             padding: "11px 13px",
             whiteSpace: "pre-wrap",

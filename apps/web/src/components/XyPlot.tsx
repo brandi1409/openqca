@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useLocale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
 import { ChartFrame } from "@/components/ChartFrame";
+import { Kpi } from "@/components/ui";
 
 interface XyPoint {
   label: string;
@@ -268,7 +269,7 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
                 tabIndex={0}
                 aria-label={p.label}
                 aria-pressed={pinned.has(i)}
-                style={{ cursor: "pointer", outline: "none" }}
+                style={{ cursor: "pointer" }}
                 onClick={() => togglePinned(i)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -328,28 +329,11 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
   );
 }
 
-function Kpi({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <div style={kpiValueStyle}>{value}</div>
-      <div style={kpiLabelStyle}>{label}</div>
-    </div>
-  );
-}
-
 const kpiRowStyle: React.CSSProperties = {
   display: "flex",
   gap: 26,
   flexWrap: "wrap",
   margin: "0 0 12px",
-};
-const kpiValueStyle: React.CSSProperties = { fontSize: 21, fontWeight: 650, fontVariantNumeric: "tabular-nums" };
-const kpiLabelStyle: React.CSSProperties = {
-  fontSize: 11.5,
-  letterSpacing: "0.05em",
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  fontWeight: 600,
 };
 const svgStyle: React.CSSProperties = {
   display: "block",
@@ -367,7 +351,7 @@ const toggleRowStyle: React.CSSProperties = {
   margin: "0 0 10px",
 };
 const toggleLabelStyle: React.CSSProperties = {
-  fontSize: 11.5,
+  fontSize: 12,
   letterSpacing: "0.05em",
   textTransform: "uppercase",
   color: "var(--muted)",

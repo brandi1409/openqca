@@ -19,7 +19,8 @@ import { AiAssist } from "@/components/AiAssist";
 import { AccountButton, CloudSaveLoad } from "@/components/cloud";
 import { XyPlot } from "@/components/XyPlot";
 import { Descriptives } from "@/components/Descriptives";
-import { Onboarding } from "@/components/Onboarding";
+// Onboarding-Karte entfernt: Der 6-Schritte-Stepper + Tour + Glossar ersetzen sie
+// (die alte Karte sprach widersprüchlich von „drei Schritten").
 import { Glossary } from "@/components/Glossary";
 import { GuidedTour, type GuidedTourStep } from "@/components/GuidedTour";
 import { ExampleDatasets } from "@/components/ExampleDatasets";
@@ -32,6 +33,7 @@ import { t, type DictKey } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { InfoHint } from "@/components/InfoHint";
 import { ChartFrame } from "@/components/ChartFrame";
+import { Kpi as UiKpi, SectionHeading } from "@/components/ui";
 
 /** Datenart je numerischer Spalte: Rohwert (muss kalibriert werden), bereits Fuzzy, oder Crisp. */
 type VarType = "raw" | "fuzzy" | "crisp";
@@ -407,10 +409,9 @@ export default function Home() {
       <Header />
       <SectionNav steps={navSteps} activeStepId={activeStepId} />
       {ds && <Glossary />}
-      <Onboarding />
       {!ds && (
         <div style={{ padding: "10px 2px 22px" }}>
-          <h1 style={{ fontSize: 28, fontWeight: 680, letterSpacing: "-0.015em", margin: "0 0 8px", maxWidth: "24ch" }}>
+          <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.015em", margin: "0 0 8px", maxWidth: "24ch" }}>
             {t(locale, "hero.title")}
           </h1>
           <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: 0 }}>
@@ -447,7 +448,7 @@ export default function Home() {
           </>
         ) : (
           <>
-            <DataSection ds={ds} setCols={setCols} />
+            <DataSection ds={ds} />
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, margin: "-8px 0 18px" }}>
               <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
               <CloudSaveLoad getState={currentState} onLoad={loadState} />
@@ -520,7 +521,7 @@ export default function Home() {
           <>
             <Card>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "robustness.title")}</h2>
+                <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{t(locale, "robustness.title")}</h2>
                 <InfoHint
                   title={t(locale, "info.robustness.title")}
                   body={t(locale, "info.robustness.body")}
@@ -539,7 +540,7 @@ export default function Home() {
                 <Card id="xyplot">
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "xy.title")}</h2>
+                      <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{t(locale, "xy.title")}</h2>
                       <InfoHint title={t(locale, "info.xyPlot.title")} body={t(locale, "info.xyPlot.body")} />
                     </div>
                     <select value={xc} onChange={(e) => setXyCond(e.target.value)} style={{ ...inputStyle, marginLeft: "auto" }}>
@@ -620,7 +621,7 @@ function Step({
         ? { label: t(locale, "step.status.active"), color: "var(--accent-deep)", bg: "var(--accent-wash)" }
         : { label: t(locale, "step.status.locked"), color: "var(--muted)", bg: "var(--line-soft)" };
   return (
-    <section id={id} style={{ scrollMarginTop: 56, marginBottom: 18 }}>
+    <section id={id} style={{ scrollMarginTop: 56, marginBottom: 32 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: locked ? 6 : 14 }}>
         <span
           aria-hidden
@@ -631,7 +632,7 @@ function Step({
             flex: "none",
             display: "grid",
             placeItems: "center",
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: 700,
             color: "#fff",
             background: locked ? "var(--muted)" : "var(--brand)",
@@ -639,12 +640,15 @@ function Step({
         >
           {done ? "✓" : n}
         </span>
-        <h2 style={{ fontSize: 16.5, fontWeight: 650, margin: 0, flex: 1, color: locked ? "var(--muted)" : "var(--ink)" }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, flex: 1, color: locked ? "var(--muted)" : "var(--ink)" }}>
           {title}
         </h2>
-        <span style={{ fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap", color: chip.color, background: chip.bg }}>
-          {chip.label}
-        </span>
+        {/* Bei „erledigt" reicht das ✓ im Nummern-Kreis — kein doppeltes Signal. */}
+        {!done && (
+          <span style={{ fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap", color: chip.color, background: chip.bg }}>
+            {chip.label}
+          </span>
+        )}
       </div>
       {intro && (
         <p
@@ -674,17 +678,13 @@ function ContinueButton({ targetN, targetTitle, targetId }: { targetN: number; t
   return (
     <div style={{ margin: "-4px 0 22px", paddingLeft: 40 }}>
       <button
+        className="oq-btn"
         onClick={() => document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
         style={{
-          font: "inherit",
           fontSize: 13.5,
-          fontWeight: 600,
           color: "var(--accent-deep)",
           background: "var(--accent-wash)",
-          border: "1px solid var(--accent)",
-          borderRadius: 8,
-          padding: "7px 14px",
-          cursor: "pointer",
+          borderColor: "var(--accent)",
         }}
       >
         {t(locale, "step.next", { n: targetN, title: targetTitle })}
@@ -760,13 +760,11 @@ function CalibrationSection({
         {raw.map((c) => (
           <button
             key={c}
+            className="oq-btn"
             onClick={() => setFocusVar(c)}
             style={{
-              font: "inherit",
               fontSize: 13.5,
               padding: "6px 12px",
-              borderRadius: 8,
-              cursor: "pointer",
               border: "1px solid var(--line)",
               background: c === v ? "var(--brand)" : "var(--panel-2)",
               color: c === v ? "#fff" : "var(--ink-2)",
@@ -780,7 +778,7 @@ function CalibrationSection({
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
         {([t(locale, "calib.anchorOut"), t(locale, "calib.anchorCross"), t(locale, "calib.anchorIn")]).map((lab, i) => (
-          <div key={i} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px" }}>
+          <div key={i} style={{ background: "var(--panel-2)", borderRadius: 8, padding: "10px 12px" }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700 }}>
               {lab}
               {i === 1 && (
@@ -799,7 +797,7 @@ function CalibrationSection({
               style={{
                 width: "100%",
                 font: "inherit",
-                fontSize: 18,
+                fontSize: 16.5,
                 fontWeight: 600,
                 color: "var(--ink)",
                 background: "none",
@@ -815,18 +813,9 @@ function CalibrationSection({
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4, marginBottom: 12 }}>
         <button
+          className="oq-btn oq-btn--secondary"
           onClick={resetAnchors}
-          style={{
-            font: "inherit",
-            fontSize: 12.5,
-            padding: "4px 11px",
-            borderRadius: 7,
-            cursor: "pointer",
-            border: "1px solid var(--line)",
-            background: "var(--panel)",
-            color: "var(--ink-2)",
-            fontWeight: 600,
-          }}
+          style={{ fontSize: 13.5, padding: "4px 11px", color: "var(--ink-2)" }}
         >
           {t(locale, "calib.reset")}
         </button>
@@ -864,10 +853,10 @@ function CalibrationSection({
 
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line-soft)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#6a4bd6" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--ai)" }}>
             {t(locale, "calib.ai.badge")}
           </span>
-          <span style={{ fontSize: 10.5, color: "var(--muted)" }}>{t(locale, "calib.ai.plan")}</span>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>{t(locale, "calib.ai.plan")}</span>
         </div>
         <div style={{ display: "grid", gap: 8 }}>
           <AiAssist
@@ -1079,7 +1068,7 @@ function CalibrationCurve({
                 width={24}
                 height={H - MB - MT}
                 fill="transparent"
-                style={{ cursor: "ew-resize", touchAction: "none", outline: "none" }}
+                style={{ cursor: "ew-resize", touchAction: "none" }}
                 tabIndex={0}
                 role="slider"
                 aria-label={t(locale, "calib.handle.aria", { name, value: String(value).replace(".", ",") })}
@@ -1106,18 +1095,17 @@ function CalibrationCurve({
 
 /* ---------- Daten ---------- */
 
-function DataSection({ ds, setCols }: { ds: RawDataset; setCols: string[] }) {
+function DataSection({ ds }: { ds: RawDataset }) {
   const [locale] = useLocale();
-  const fs = new Set(setCols);
   return (
     <Card>
       <H2>{t(locale, "data.title", { n: ds.rows.length })}</H2>
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
           <thead>
             <tr>
               {ds.columns.map((c) => (
-                <th key={c} style={thStyle(fs.has(c))}>{c}</th>
+                <th key={c} style={thStyle()}>{c}</th>
               ))}
             </tr>
           </thead>
@@ -1184,12 +1172,12 @@ function VariablesSection({
     <Card>
       {/* Titel + Intro liefert der Step-Wrapper (step.intro.2) — hier nicht doppeln. */}
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
           <thead>
             <tr>
-              <th style={thStyle(false)}>{t(locale, "vars.col.name")}</th>
-              <th style={thStyle(false)}>{t(locale, "vars.col.type")}</th>
-              <th style={thStyle(false)}>{t(locale, "vars.col.role")}</th>
+              <th style={thStyle()}>{t(locale, "vars.col.name")}</th>
+              <th style={thStyle()}>{t(locale, "vars.col.type")}</th>
+              <th style={thStyle()}>{t(locale, "vars.col.role")}</th>
             </tr>
           </thead>
           <tbody>
@@ -1214,7 +1202,7 @@ function VariablesSection({
                         <select
                           value={meta.type}
                           onChange={(e) => setType(col, e.target.value as VarType)}
-                          style={{ ...inputStyle, padding: "4px 7px", fontSize: 13 }}
+                          style={{ ...inputStyle, padding: "4px 7px", fontSize: 13.5 }}
                         >
                           {typeOptions.map((o) => (
                             <option key={o.id} value={o.id}>{t(locale, o.key)}</option>
@@ -1230,7 +1218,7 @@ function VariablesSection({
                       <select
                         value={meta.role}
                         onChange={(e) => setRole(col, e.target.value as VarRole)}
-                        style={{ ...inputStyle, padding: "4px 7px", fontSize: 13 }}
+                        style={{ ...inputStyle, padding: "4px 7px", fontSize: 13.5 }}
                       >
                         {roleOptions.map((o) => (
                           <option key={o.id} value={o.id}>{t(locale, o.key)}</option>
@@ -1241,7 +1229,7 @@ function VariablesSection({
                   {!usable && (
                     <tr>
                       <td colSpan={3} style={{ padding: "0 12px 8px", borderBottom: "1px solid var(--line-soft)" }}>
-                        <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{t(locale, warnKey)}</span>
+                        <span style={{ color: "var(--bad)", fontSize: 13.5 }}>{t(locale, warnKey)}</span>
                       </td>
                     </tr>
                   )}
@@ -1256,7 +1244,7 @@ function VariablesSection({
 }
 
 const autoBadgeStyle: React.CSSProperties = {
-  fontSize: 10.5,
+  fontSize: 11,
   fontWeight: 600,
   letterSpacing: "0.03em",
   color: "var(--muted)",
@@ -1269,7 +1257,7 @@ const autoBadgeStyle: React.CSSProperties = {
 function typeBadgeStyle(type: VarType): React.CSSProperties {
   const raw = type === "raw";
   return {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: 700,
     letterSpacing: "0.03em",
     textTransform: "uppercase",
@@ -1351,30 +1339,30 @@ function TruthTableSection(props: {
             </p>
           )}
           <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8, marginTop: 12 }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
               <thead>
                 <tr>
-                  {tt.conditions.map((c) => (<th key={c} style={thStyle(false)}>{c.replace(/^fs_/, "")}</th>))}
-                  <th style={thStyle(false)}>{t(locale, "tt.col.n")}</th>
-                  <th style={thStyle(false)}>
+                  {tt.conditions.map((c) => (<th key={c} style={thStyle()}>{c.replace(/^fs_/, "")}</th>))}
+                  <th style={thStyle()}>{t(locale, "tt.col.n")}</th>
+                  <th style={thStyle()}>
                     <span style={thHintStyle}>
                       {t(locale, "tt.col.consistency")}
                       <InfoHint title={t(locale, "info.consistency.title")} body={t(locale, "info.consistency.body")} formula={t(locale, "info.consistency.formula")} />
                     </span>
                   </th>
-                  <th style={thStyle(false)}>
+                  <th style={thStyle()}>
                     <span style={thHintStyle}>
                       {t(locale, "tt.col.pri")}
                       <InfoHint title={t(locale, "info.pri.title")} body={t(locale, "info.pri.body")} formula={t(locale, "info.pri.formula")} />
                     </span>
                   </th>
-                  <th style={thStyle(false)}>
+                  <th style={thStyle()}>
                     <span style={thHintStyle}>
                       {t(locale, "tt.col.out")}
                       <InfoHint title={t(locale, "info.out.title")} body={t(locale, "info.out.body")} />
                     </span>
                   </th>
-                  <th style={thStyle(false)}>{t(locale, "tt.col.cases")}</th>
+                  <th style={thStyle()}>{t(locale, "tt.col.cases")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1385,7 +1373,7 @@ function TruthTableSection(props: {
                     <td style={{ ...tdStyle(true, false), color: r.consistency >= consCut ? "var(--good-text)" : undefined, fontWeight: r.consistency >= consCut ? 600 : 400 }}>{fmt(r.consistency)}</td>
                     <td style={tdStyle(true, false)}>{fmt(r.pri)}</td>
                     <td style={tdStyle(false, false)}>{chip(r.output)}</td>
-                    <td style={{ ...tdStyle(false, false), whiteSpace: "normal", maxWidth: 260, color: "var(--ink-2)", fontSize: 12.5 }}>{r.cases.join(", ")}</td>
+                    <td style={{ ...tdStyle(false, false), whiteSpace: "normal", maxWidth: 260, color: "var(--ink-2)", fontSize: 13.5 }}>{r.cases.join(", ")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1442,7 +1430,7 @@ function SolutionSection({
         return (
           <Card key={kind}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{title}</h2>
+              <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{title}</h2>
               <InfoHint title={infoTitle} body={infoBody} />
             </div>
             {s.models.length === 0 ? (
@@ -1450,7 +1438,7 @@ function SolutionSection({
             ) : (
               s.models.map((m, mi) => (
                 <div key={mi}>
-                  <div className="mono" style={{ fontSize: 14.5, background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "10px 14px", overflowX: "auto" }}>
+                  <div className="mono" style={{ fontSize: 15, background: "var(--panel-2)", borderRadius: 8, padding: "10px 14px", overflowX: "auto" }}>
                     {m.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → {outLabel}
                   </div>
                   <div style={{ display: "flex", gap: 26, margin: "12px 0" }}>
@@ -1482,23 +1470,23 @@ function SolutionSection({
                     />
                   </div>
                   <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
-                    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+                    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
                       <thead>
                         <tr>
-                          <th style={thStyle(false)}>{t(locale, "sol.col.path")}</th>
-                          <th style={thStyle(false)}>
+                          <th style={thStyle()}>{t(locale, "sol.col.path")}</th>
+                          <th style={thStyle()}>
                             <span style={thHintStyle}>
                               {t(locale, "sol.col.rawCov")}
                               <InfoHint title={t(locale, "info.rawCoverage.title")} body={t(locale, "info.rawCoverage.body")} formula={t(locale, "info.rawCoverage.formula")} />
                             </span>
                           </th>
-                          <th style={thStyle(false)}>
+                          <th style={thStyle()}>
                             <span style={thHintStyle}>
                               {t(locale, "sol.col.uniqueCov")}
                               <InfoHint title={t(locale, "info.uniqueCoverage.title")} body={t(locale, "info.uniqueCoverage.body")} formula={t(locale, "info.uniqueCoverage.formula")} />
                             </span>
                           </th>
-                          <th style={thStyle(false)}>
+                          <th style={thStyle()}>
                             <span style={thHintStyle}>
                               {t(locale, "sol.col.consistency")}
                               <InfoHint title={t(locale, "info.consistency.title")} body={t(locale, "info.consistency.body")} formula={t(locale, "info.consistency.formula")} />
@@ -1526,12 +1514,12 @@ function SolutionSection({
                 <Label>{t(locale, "sol.exp.label")}</Label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
                   {conditions.map((c) => (
-                    <label key={c} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}>
+                    <label key={c} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13.5 }}>
                       <span className="mono" style={{ color: "var(--ink-2)" }}>{c.replace(/^fs_/, "")}</span>
                       <select
                         value={expectations[c] ?? "present"}
                         onChange={(e) => setExpectations({ ...expectations, [c]: e.target.value as Expectation })}
-                        style={{ ...inputStyle, padding: "3px 6px", fontSize: 12.5 }}
+                        style={{ ...inputStyle, padding: "3px 6px", fontSize: 13.5 }}
                       >
                         <option value="present">{t(locale, "sol.exp.present")}</option>
                         <option value="absent">{t(locale, "sol.exp.absent")}</option>
@@ -1562,27 +1550,27 @@ function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessit
   return (
     <Card>
       <H2>{t(locale, "nec.title")}</H2>
-      <p style={{ color: "var(--ink-2)", marginTop: -6, marginBottom: 12, fontSize: 13 }}>
+      <p style={{ color: "var(--ink-2)", marginTop: -6, marginBottom: 12, fontSize: 13.5 }}>
         {t(locale, "nec.orderHint")}
       </p>
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
           <thead>
             <tr>
-              <th style={thStyle(false)}>{t(locale, "nec.col.condition")}</th>
-              <th style={thStyle(false)}>
+              <th style={thStyle()}>{t(locale, "nec.col.condition")}</th>
+              <th style={thStyle()}>
                 <span style={thHintStyle}>
                   {t(locale, "nec.col.consistency")}
                   <InfoHint title={t(locale, "info.necessityConsistency.title")} body={t(locale, "info.necessityConsistency.body")} formula={t(locale, "info.necessityConsistency.formula")} />
                 </span>
               </th>
-              <th style={thStyle(false)}>
+              <th style={thStyle()}>
                 <span style={thHintStyle}>
                   {t(locale, "nec.col.coverage")}
                   <InfoHint title={t(locale, "info.necessityCoverage.title")} body={t(locale, "info.necessityCoverage.body")} formula={t(locale, "info.necessityCoverage.formula")} />
                 </span>
               </th>
-              <th style={thStyle(false)}></th>
+              <th style={thStyle()}></th>
             </tr>
           </thead>
           <tbody>
@@ -1641,7 +1629,7 @@ function ProtocolSection({ ds, anchors, varMeta, conditions, outcome, freqCut, c
       <H2>{t(locale, "proto.title")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "proto.desc")}</p>
       <Button primary onClick={download}>{t(locale, "proto.downloadBtn")}</Button>
-      <pre className="mono" style={{ fontSize: 12.5, lineHeight: 1.6, background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", marginTop: 14 }}>
+      <pre className="mono" style={{ fontSize: 13.5, lineHeight: 1.6, background: "var(--panel-2)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", marginTop: 14 }}>
         {r}
       </pre>
     </Card>
@@ -1654,14 +1642,14 @@ function Header() {
   const [locale] = useLocale();
   return (
     <header style={{ display: "flex", alignItems: "baseline", gap: 13, flexWrap: "wrap", paddingBottom: 16, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
-      <a href="/" style={{ fontWeight: 650, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
+      <a href="/" style={{ fontWeight: 600, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
         open<span style={{ color: "var(--brand)" }}>QCA</span>
       </a>
-      <span style={{ fontSize: 13, color: "var(--muted)" }}>{t(locale, "header.tagline")}</span>
+      <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{t(locale, "header.tagline")}</span>
       <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12 }}>
-        <a href="/methodik" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.methodik")}</a>
-        <a href="/preise" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.tarife")}</a>
-        <a href="/download" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.download")}</a>
+        <a href="/methodik" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.methodik")}</a>
+        <a href="/preise" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.tarife")}</a>
+        <a href="/download" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.download")}</a>
         <LanguageToggle />
         <AccountButton />
       </span>
@@ -1776,9 +1764,9 @@ function SectionNav({
             display: "inline-flex",
             alignItems: "center",
             gap: 5,
-            fontSize: 12.5,
+            fontSize: 13.5,
             padding: "5px 10px",
-            borderRadius: 7,
+            borderRadius: 8,
             textDecoration: "none",
             whiteSpace: "nowrap",
           };
@@ -1791,7 +1779,7 @@ function SectionNav({
                 borderRadius: "50%",
                 display: "grid",
                 placeItems: "center",
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 color: "#fff",
                 background: color,
@@ -1836,31 +1824,33 @@ function SectionNav({
     </nav>
   );
 }
+// Dünner Wrapper — EINE Definition lebt in components/ui.tsx (SectionHeading).
 function H2({ children }: { children: React.ReactNode }) {
-  return <h2 style={{ fontSize: 16, fontWeight: 650, margin: "0 0 12px" }}>{children}</h2>;
+  return <SectionHeading>{children}</SectionHeading>;
 }
 function Label({ children }: { children: React.ReactNode }) {
-  return <span style={{ fontSize: 11.5, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>{children}</span>;
+  return <span style={{ fontSize: 12, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>{children}</span>;
 }
 function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><Label>{label}</Label>{children}</div>;
 }
 function Button({ children, primary, onClick }: { children: React.ReactNode; primary?: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} style={{ font: "inherit", fontWeight: 600, fontSize: 14, borderRadius: 7, padding: "7px 15px", cursor: "pointer", border: primary ? "1px solid var(--accent)" : "1px solid var(--line)", background: primary ? "var(--accent)" : "var(--panel)", color: primary ? "#fff" : "var(--ink)" }}>
+    <button onClick={onClick} className={`oq-btn oq-btn--${primary ? "primary" : "secondary"}`}>
       {children}
     </button>
   );
 }
+// Dünner Wrapper — EINE Definition lebt in components/ui.tsx (Kpi).
 function Kpi({ v, l }: { v: string; l: React.ReactNode }) {
-  return <div><div style={{ fontSize: 21, fontWeight: 650 }}>{v}</div><div style={{ fontSize: 11.5, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>{l}</div></div>;
+  return <UiKpi value={v} label={l} />;
 }
 function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React.ReactNode }) {
   const map = { ok: ["var(--good)", "rgba(12,163,12,0.09)"], warn: ["#b26a00", "var(--warn-wash)"], bad: ["var(--bad)", "var(--bad-wash)"] } as const;
   const [icon, wash] = map[kind];
   return (
-    <div style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13, padding: "9px 11px", borderRadius: 9, border: `1px solid ${wash}`, background: wash }}>
-      <span style={{ width: 17, height: 17, borderRadius: "50%", flex: "none", marginTop: 1, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800, color: "#fff", background: icon }}>
+    <div style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13.5, padding: "9px 11px", borderRadius: 9, border: `1px solid ${wash}`, background: wash }}>
+      <span style={{ width: 17, height: 17, borderRadius: "50%", flex: "none", marginTop: 1, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#fff", background: icon }}>
         {kind === "ok" ? "✓" : "!"}
       </span>
       <div>{children}</div>
@@ -1868,17 +1858,18 @@ function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React
   );
 }
 
-const hintStyle: React.CSSProperties = { fontSize: 12.5, color: "var(--muted)", margin: "8px 0 0" };
+const hintStyle: React.CSSProperties = { fontSize: 13.5, color: "var(--muted)", margin: "8px 0 0" };
 const thHintStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 4 };
-const inputStyle: React.CSSProperties = { font: "inherit", color: "var(--ink)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 7, padding: "6px 9px" };
-function thStyle(fs: boolean): React.CSSProperties {
-  return { textAlign: "left", fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase", color: fs ? "var(--accent-deep)" : "var(--muted)", fontWeight: 700, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel-2)", whiteSpace: "nowrap" };
+const inputStyle: React.CSSProperties = { font: "inherit", color: "var(--ink)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 9px" };
+// Spaltenköpfe immer neutral (--muted) — dürfen nicht wie Links (accent) aussehen.
+function thStyle(): React.CSSProperties {
+  return { textAlign: "left", fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel-2)", whiteSpace: "nowrap" };
 }
 function tdStyle(num: boolean, caseCol: boolean): React.CSSProperties {
   return { padding: "6px 12px", borderBottom: "1px solid var(--line-soft)", whiteSpace: "nowrap", textAlign: num ? "right" : "left", fontVariantNumeric: num ? "tabular-nums" : undefined, fontWeight: caseCol ? 600 : 400 };
 }
 function chip(out: 0 | 1 | "?") {
-  const style: React.CSSProperties = { display: "inline-block", padding: "1px 9px", borderRadius: 20, fontSize: 12, fontWeight: 700 };
+  const style: React.CSSProperties = { display: "inline-block", padding: "1px 9px", borderRadius: 999, fontSize: 12, fontWeight: 700 };
   if (out === 1) return <span style={{ ...style, background: "var(--accent-wash)", color: "var(--accent-deep)" }}>1</span>;
   if (out === 0) return <span style={{ ...style, background: "var(--line-soft)", color: "var(--ink-2)" }}>0</span>;
   return <span style={{ ...style, border: "1px dashed var(--line)", color: "var(--muted)" }}>?</span>;

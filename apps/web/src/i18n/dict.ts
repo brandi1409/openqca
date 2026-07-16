@@ -36,7 +36,7 @@ const de = {
     "Geführte Kalibrierung mit einem Coach, der typische Fehler abfängt, und ein reproduzierbares Protokoll für jede Analyse. Ihre Forschungsdaten bleiben im Browser.",
   "landing.hero.ctaPrimary": "Kostenlos analysieren",
   "landing.hero.ctaSecondary": "Beispiel ansehen",
-  "landing.hero.facts": "Validierte Engine · 26 Tests · R-Skript-Export · PDF-Bericht",
+  "landing.hero.facts": "Engine kreuzvalidiert gegen das R-Paket QCA · R-Skript-Export · PDF-Bericht",
 
   "landing.features.title": "Funktionen",
   "landing.features.calib.title": "Geführte Kalibrierung",
@@ -637,7 +637,7 @@ const en: Record<DictKey, string> = {
     "Guided calibration with a coach that catches common mistakes, and a reproducible protocol for every analysis. Your research data stays in the browser.",
   "landing.hero.ctaPrimary": "Analyze for free",
   "landing.hero.ctaSecondary": "See an example",
-  "landing.hero.facts": "Validated engine · 26 tests · R-script export · PDF report",
+  "landing.hero.facts": "Engine cross-validated against the R package QCA · R-script export · PDF report",
 
   "landing.features.title": "Features",
   "landing.features.calib.title": "Guided calibration",

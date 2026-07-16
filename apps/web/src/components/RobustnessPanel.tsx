@@ -379,11 +379,11 @@ const containerStyle: React.CSSProperties = {
 const tableStyle: React.CSSProperties = {
   borderCollapse: "collapse",
   width: "100%",
-  fontSize: 13,
+  fontSize: 13.5,
 };
 
 const hintStyle: React.CSSProperties = {
-  fontSize: 12.5,
+  fontSize: 13.5,
   color: "var(--muted)",
   margin: "8px 0 0",
 };

@@ -88,45 +88,17 @@ export function GuidedTour({ active, stepIndex, onNext, onEnd, steps }: GuidedTo
           marginBottom: 6,
         }}
       >
-        <span style={{ fontWeight: 700, fontSize: 14.5, color: "var(--ink)" }}>{step.title}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--ink)" }}>{step.title}</span>
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", whiteSpace: "nowrap" }}>
           {t(locale, "tour.progress", { n: stepIndex + 1, total: steps.length })}
         </span>
       </div>
       <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "0 0 14px" }}>{step.body}</p>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          onClick={onEnd}
-          style={{
-            font: "inherit",
-            fontSize: 13,
-            fontWeight: 600,
-            padding: "7px 14px",
-            borderRadius: 7,
-            cursor: "pointer",
-            border: "1px solid var(--line)",
-            background: "transparent",
-            color: "var(--ink-2)",
-          }}
-        >
+        <button type="button" className="oq-btn oq-btn--secondary" onClick={onEnd}>
           {t(locale, "tour.end")}
         </button>
-        <button
-          type="button"
-          onClick={onNext}
-          style={{
-            font: "inherit",
-            fontSize: 13,
-            fontWeight: 600,
-            padding: "7px 14px",
-            borderRadius: 7,
-            cursor: "pointer",
-            border: "1px solid var(--accent)",
-            background: "var(--accent)",
-            color: "#fff",
-          }}
-        >
+        <button type="button" className="oq-btn oq-btn--primary" onClick={onNext}>
           {t(locale, "tour.next")}
         </button>
       </div>
