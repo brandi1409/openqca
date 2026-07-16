@@ -1,0 +1,84 @@
+name: Methodische Frage / Method question
+description: Abweichung von fsQCA/R oder Frage zur Methodik / Deviation from fsQCA/R or methodology question
+title: "[Method] "
+labels: ["method", "question"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nutze dieses Template, wenn du festgestellt hast, dass openQCA **abweichende Ergebnisse** von fsQCA 4.1 oder dem R-Paket QCA liefert, oder wenn du eine Frage zur QCA-Methodik hast.
+
+        ---
+
+        Use this template if you have discovered that openQCA produces **different results** from fsQCA 4.1 or the R package QCA, or if you have a methodology question.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "Frage oder beobachtete Abweichung / Question or observed deviation"
+      description: "Beschreibe die Frage oder den Unterschied / Describe the question or difference"
+      placeholder: "openQCA zeigt Coverage=0.95, aber fsQCA/R zeigt Coverage=0.92. Warum?"
+    validations:
+      required: true
+
+  - type: input
+    id: openqca_version
+    attributes:
+      label: "openQCA-Version / openQCA version"
+      description: "Welche Version von openQCA nutzt du? / Which version of openQCA are you using?"
+      placeholder: "Live-Version (https://openqca.vercel.app) oder lokal (npm run dev)"
+    validations:
+      required: true
+
+  - type: input
+    id: reference_software
+    attributes:
+      label: "Referenz-Software und Version / Reference software and version"
+      description: "z. B. fsQCA 4.1 oder R/QCA 3.14 / e.g., fsQCA 4.1 or R/QCA 3.14"
+      placeholder: "fsQCA 4.1 oder R/QCA 3.14"
+
+  - type: textarea
+    id: dataset
+    attributes:
+      label: "Datensatz und Einstellungen / Dataset and settings"
+      description: |
+        Teile einen **synthetischen oder anonymisierten** Datensatz und die genauen Einstellungen (Kalibrationsmethode, Schwellen, etc.).
+
+        Share a **synthetic or anonymized** dataset and exact settings (calibration method, thresholds, etc.).
+      placeholder: |
+        **Datensatz:**
+        Case,Bedingung1,Bedingung2,Outcome
+        A,0.8,0.6,1
+        B,0.3,0.9,0
+
+        **Einstellungen:**
+        - Kalibrationsmethode: direkt / direct
+        - Crossover: 0.5
+        - Schwelle (consCut): 0.85
+        - Schwelle (freqCut): 1
+    validations:
+      required: true
+
+  - type: textarea
+    id: difference
+    attributes:
+      label: "Beobachtete Differenzen / Observed differences"
+      description: |
+        Welche Metriken oder Ergebnisse weichen ab? Nenne konkrete Zahlen.
+
+        Which metrics or results differ? Provide specific numbers.
+      placeholder: |
+        openQCA: Coverage=0.95, Konsistenz=0.99
+        fsQCA/R: Coverage=0.92, Konsistenz=0.99
+
+        Differenz: Coverage-Abweichung von ±0.03
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Zusätzliche Informationen / Additional information (optional)"
+      description: "Links zu Publikationen, Screenshots, weitere Kontextinformationen / Links to publications, screenshots, further context"
+      placeholder: "..."

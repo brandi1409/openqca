@@ -1,0 +1,62 @@
+name: Feature-Wunsch / Feature request
+description: Vorschlag für eine neue Funktion oder Verbesserung / Suggest an improvement or new feature
+title: "[Feature] "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du eine Verbesserung vorschlägst! Bitte beschreibe das Problem und deine Lösungsidee.
+
+        ---
+
+        Thank you for suggesting an improvement! Please describe the problem and your solution idea.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem / Problem statement"
+      description: |
+        Beschreibe das aktuelle Problem oder den Use Case, bei dem openQCA nicht ausreicht.
+
+        Describe the current limitation or use case where openQCA falls short.
+      placeholder: "Es ist schwierig, weil..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Gewünschte Lösung / Desired solution"
+      description: |
+        Wie soll sich openQCA verhalten? Skizziere die Lösung.
+
+        How should openQCA behave? Sketch the solution.
+      placeholder: "openQCA sollte..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternative Lösungen / Alternative solutions (optional)"
+      description: "Hast du andere Ansätze überlegt? / Have you considered other approaches?"
+      placeholder: "Alternativ könnte man..."
+
+  - type: textarea
+    id: methodology
+    attributes:
+      label: "Methodischer Bezug / Methodology reference (optional)"
+      description: |
+        Falls diese Feature QCA-Methodik betrifft: Gibt es eine Literaturquelle oder ein Referenz-Tool (fsQCA, R/QCA), das diesen Ansatz umsetzt?
+
+        If this feature affects QCA methodology: Is there a published reference or tool (fsQCA, R/QCA) that implements this approach?
+      placeholder: "Siehe Ragin (2008), Kapitel 4... oder das R-Paket QCA bietet..."
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Zusätzliche Informationen / Additional information (optional)"
+      description: "Screenshots, Links, Nutzungsbeispiele / Screenshots, links, usage examples"
+      placeholder: "..."

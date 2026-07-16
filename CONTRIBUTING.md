@@ -120,6 +120,104 @@ zusammengeführt (merged).
 - **Sicherheitslücken bitte nicht** als öffentliches Issue melden, sondern
   gemäß [`SECURITY.md`](SECURITY.md) vertraulich.
 
+## Gute erste Beiträge (good first issues)
+
+Du möchtest zum Projekt beitragen, weißt aber nicht, wo anfangen? Hier sind fünf
+konkrete, realistische Einstiegspunkte, die wenig Kontext erfordern und einen
+echten Unterschied machen:
+
+### 1. Zusätzliche Beispieldatensätze mit Dokumentation
+
+**Was:** Das Projekt hat bisher drei synthetische Beispieldatensätze
+(`datasets/*.csv`). Jeder neue Datensatz sollte ein **anderes QCA-Szenario**
+zeigen (z. B. Multi-Value-Bedingungen, höhere Fallzahl, reales Domänen-Beispiel).
+
+**Wie:**
+- Schreibe einen neuen Datensatz (CSV, min. 20 Fälle, realistische Fallnamen).
+- Füge ein **README in `datasets/`** ein: Kontext, Interpretation, erwartete
+  Lösungsmuster (2–3 Sätze pro Datensatz).
+- Datei-Hinweis: `datasets/` — neue CSV-Datei + Abschnitt in `datasets/README.md`.
+
+**Warum wichtig:** Neue Nutzer:innen profitieren von vielfältigen Beispielen; die
+Engine wird dadurch gründlicher getestet.
+
+---
+
+### 2. Zusätzliche Testfälle für die Engine
+
+**Was:** Der QCA-Rechenkern (`packages/engine`) hat ~26 Tests. Es gibt aber noch
+Edge Cases ohne Abdeckung: z. B. leere Truth Tables, Bedingungen mit konstanten
+Werten, seltene Kalibrations-Konstellationen.
+
+**Wie:**
+- Öffne `packages/engine/test/engine.test.ts` (oder ein spezialisiertes
+  `*.test.ts`).
+- Füge neue `test(…)` Blöcke hinzu; nutze bestehende Muster.
+- Führe `node --test` aus und stelle sicher, dass alle Tests grün sind.
+- Datei-Hinweis: `packages/engine/test/` — z. B.
+  `packages/engine/test/edge-cases.test.ts`.
+
+**Warum wichtig:** Mehr Test-Abdeckung = höheres Vertrauen in Korrektheit;
+besonders wichtig für ein wissenschaftliches Werkzeug.
+
+---
+
+### 3. Englische Übersetzung der QCA-Methodik-Seite
+
+**Was:** Der QCA-Primer (`docs/qca-primer.md`) erklärt Konzepte und Algorithmen
+auf Deutsch. Eine **englische Variante** (`docs/qca-primer-en.md`) würde
+internationales Publikum erreichen.
+
+**Wie:**
+- Lese `docs/qca-primer.md` und übersetze Abschnitt-für-Abschnitt ins Englische.
+- Halte Fachbegriffe konsistent (z. B. "Truth Table", "inclusion consistency").
+- Nutze Quellenangaben auf Englisch (Ragin 2008, etc.).
+- Datei-Hinweis: `docs/qca-primer-en.md`.
+
+**Warum wichtig:** Sprache ist oft eine Hürde für Open-Source; Englisch öffnet
+neue Nutzer:innen-Gruppen.
+
+---
+
+### 4. Barrierefreiheits-Review der Web-Formulare
+
+**Was:** Die Web-App (`apps/web`) hat Formulare zur Datensatz-Kalibrierung und
+-Analyse. Ein Barrierefreiheits-Audit stellt sicher, dass alles via Tastatur
+steuerbar ist und Screen-Reader-tauglich ist.
+
+**Wie:**
+- Starte die App: `npm run dev --workspace web`.
+- Teste mit deinen Augen: Sind Beschriftungen sichtbar? Ist der Kontrast
+  ausreichend? Ist Tab-Reihenfolge logisch?
+- Teste mit Tab-Navigation: Kannst du alle Bedienelemente erreichen?
+- Öffne Browser-DevTools → Lighthouse → Accessibility; notiere
+  "Passed" und "Failed" Checks.
+- Datei-Hinweis: Öffne ein Issue oder schreibe einen kurzen Accessibility-Report.
+
+**Warum wichtig:** Barrierefreiheit ist Menschenpflicht und oft gesetzlich
+verlangt (WCAG).
+
+---
+
+### 5. Verbesserte CSV-Fehlermeldungen und -Validierung
+
+**Was:** Wenn Nutzer:innen eine falsch formatierte CSV hochladen, erhalten sie
+manchmal kryptische Fehlertexte. Ziel: klare, konstruktive Meldungen.
+
+**Wie:**
+- Suche den CSV-Parser in `apps/web/src/` (likely:
+  `apps/web/src/lib/` oder `apps/web/src/hooks/`).
+- Verbessere die Fehlerbehandlung: statt "SyntaxError: unexpected token", melde
+  z. B. "Spalte 'outcome' fehlt. Stellen Sie sicher, dass die erste Zeile die
+  Spaltennamen enthält und nur alphanumerische Zeichen und Unterstriche nutzt."
+- Schreibe Tests für häufige Fehlerfälle: missing columns, wrong data types, etc.
+- Datei-Hinweis: `apps/web/src/lib/csv-parser.ts` (oder ähnlich).
+
+**Warum wichtig:** Gute Fehlermeldungen senken Frust; neue Nutzer:innen fühlen
+sich unterstützt.
+
+---
+
 ## Lizenz der Beiträge
 
 openQCA steht unter der **MIT-Lizenz** (siehe [`LICENSE`](LICENSE)). Mit dem

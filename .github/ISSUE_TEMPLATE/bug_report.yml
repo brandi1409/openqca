@@ -1,0 +1,103 @@
+name: Fehler melden / Report a bug
+description: Berichte einen Fehler in openQCA / Report a bug in openQCA
+title: "[Bug] "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du einen Fehler meldest! Bitte fülle diesen Bericht aus, damit wir das Problem schneller beheben können.
+
+        ---
+
+        Thank you for reporting a bug! Please fill out this report so we can fix the issue faster.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Beschreibung des Fehlers / Description"
+      description: "Kurze, aussagekräftige Beschreibung des Problems / Brief, clear description of the problem"
+      placeholder: "Die Truth Table zeigt falsche Werte für..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Schritte zur Reproduktion / Steps to reproduce"
+      description: "Schritt-für-Schritt-Anleitung, um den Fehler zu reproduzieren / Step-by-step guide to reproduce the bug"
+      placeholder: |
+        1. Datensatz hochladen: ...
+        2. Kalibrierung mit Werten: ...
+        3. Button klicken: ...
+        4. Fehler beobachten: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Erwartetes Verhalten / Expected behavior"
+      description: "Was hätte passieren sollen? / What should have happened?"
+      placeholder: "Ich erwartete, dass..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Tatsächliches Verhalten / Actual behavior"
+      description: "Was ist stattdessen passiert? / What actually happened?"
+      placeholder: "Stattdessen erschien..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: dataset
+    attributes:
+      label: "Beispiel-Datensatz / Example dataset (optional)"
+      description: |
+        Wenn möglich, teile einen **synthetischen oder anonymisierten** Datensatz, der das Problem reproduziert.
+
+        **Wichtig: Keine sensiblen Forschungsdaten posten!** / If possible, share a **synthetic or anonymized** dataset that reproduces the issue.
+
+        **Important: Do not post sensitive research data!**
+      placeholder: "Case,Bedingung1,Bedingung2,Outcome\nA,0.8,0.6,1\nB,0.3,0.9,0\n..."
+
+  - type: input
+    id: browser
+    attributes:
+      label: "Browser und Version / Browser and version"
+      description: "z. B. Chrome 131.0, Firefox 133.0 / e.g., Chrome 131.0, Firefox 133.0"
+      placeholder: "Chrome 131.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: "Betriebssystem und Version / Operating system and version"
+      description: "z. B. Windows 11, macOS 15, Ubuntu 24.04 / e.g., Windows 11, macOS 15, Ubuntu 24.04"
+      placeholder: "macOS 15"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: methodology
+    attributes:
+      label: "Methodische Prüfung / Methodology check"
+      description: |
+        Bitte bestätige, dass du die QCA-Methodik-Seite (oder das QCA-Primer) geprüft hast, um auszuschließen, dass dies ein Missverständnis der Methode ist.
+
+        Please confirm that you have reviewed the QCA methodology page (or the QCA primer) to rule out this being a misunderstanding of the method.
+      options:
+        - label: "Ich habe die Methodik-Seite (`docs/qca-primer.md`) oder externe QCA-Dokumentation geprüft. / I have reviewed the methodology page or external QCA documentation."
+          required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Zusätzliche Informationen / Additional information (optional)"
+      description: "Screenshots, Fehler-Logs aus der Browser-Konsole, andere Details / Screenshots, browser console errors, other details"
+      placeholder: "..."
