@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   calibrateDirect,
   buildTruthTable,
@@ -29,6 +29,7 @@ import { useLocale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { InfoHint } from "@/components/InfoHint";
+import { ChartFrame } from "@/components/ChartFrame";
 
 interface SavedState {
   dataset: RawDataset;
@@ -44,7 +45,6 @@ type SolBundle = {
   complex: ReturnType<typeof complexSolution>;
   intermediate: ReturnType<typeof intermediateSolution>;
   parsimonious: ReturnType<typeof parsimoniousSolution>;
-  necessity: ReturnType<typeof necessityAnalysis>;
 };
 
 const fmt = (v: number, d = 3) =>
@@ -153,6 +153,13 @@ export default function Home() {
     }
   }, [ds, cases, conditions, outcome, freqCut, consCut]);
 
+  // Notwendigkeitsanalyse hängt methodisch NUR von conditions/outcome/cases ab
+  // (nicht von der Truth Table) — sie gehört vor die Suffizienzanalyse.
+  const necessity: ReturnType<typeof necessityAnalysis> | null = useMemo(() => {
+    if (!(conditions.length > 0 && outcome && !conditions.includes(outcome))) return null;
+    return necessityAnalysis(conditions, outcome, cases);
+  }, [conditions, outcome, cases]);
+
   const sol: SolBundle | null = useMemo(() => {
     if (!tt) return null;
     const exp: Record<string, Expectation> = Object.fromEntries(
@@ -162,12 +169,30 @@ export default function Home() {
       complex: complexSolution(tt, cases),
       intermediate: intermediateSolution(tt, cases, exp),
       parsimonious: parsimoniousSolution(tt, cases),
-      necessity: necessityAnalysis(conditions, outcome, cases),
     };
   }, [tt, cases, conditions, outcome, expectations]);
 
+  const sections: { id: string; label: string }[] = useMemo(() => {
+    if (!ds) return [];
+    const list: { id: string; label: string }[] = [
+      { id: "daten", label: t(locale, "nav.daten") },
+    ];
+    if (fuzzyCols.length > 0) list.push({ id: "deskriptiv", label: t(locale, "nav.deskriptiv") });
+    list.push({ id: "kalibrierung", label: t(locale, "nav.kalibrierung") });
+    if (necessity) list.push({ id: "notwendigkeit", label: t(locale, "nav.notwendigkeit") });
+    list.push({ id: "truthtable", label: t(locale, "nav.truthtable") });
+    if (sol && tt) {
+      list.push({ id: "loesungen", label: t(locale, "nav.loesungen") });
+      list.push({ id: "robustheit", label: t(locale, "nav.robustheit") });
+      list.push({ id: "negiert", label: t(locale, "nav.negiert") });
+    }
+    if (conditions.length > 0 && outcome) list.push({ id: "xyplot", label: t(locale, "nav.xyplot") });
+    list.push({ id: "protokoll", label: t(locale, "nav.protokoll") });
+    return list;
+  }, [ds, fuzzyCols.length, necessity, sol, tt, conditions.length, outcome, locale]);
+
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 26px 90px" }}>
+    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px clamp(12px, 4vw, 26px) 90px" }}>
       <input
         ref={fileRef}
         type="file"
@@ -180,6 +205,7 @@ export default function Home() {
         }}
       />
       <Header />
+      {ds && <SectionNav sections={sections} />}
       <Onboarding />
       {!ds ? (
         <>
@@ -217,7 +243,7 @@ export default function Home() {
             <CloudSaveLoad getState={currentState} onLoad={loadState} />
           </div>
           {fuzzyCols.length > 0 && (
-            <Card>
+            <Card id="deskriptiv">
               <H2>{t(locale, "descriptives.title")}</H2>
               <Descriptives columns={fuzzyCols} cases={cases} />
             </Card>
@@ -230,6 +256,7 @@ export default function Home() {
             setFocusVar={setFocusVar}
             cases={cases}
           />
+          {necessity && <NecessitySection necessity={necessity} />}
           <TruthTableSection
             fuzzyCols={fuzzyCols}
             conditions={conditions}
@@ -253,7 +280,7 @@ export default function Home() {
           )}
           {sol && tt && (
             <>
-              <Card>
+              <Card id="robustheit">
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "robustness.title")}</h2>
                   <InfoHint
@@ -264,14 +291,16 @@ export default function Home() {
                 <RobustnessPanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} currentConsCut={consCut} />
               </Card>
               {/* Panel bringt eigene Karte + Überschrift mit — nicht doppelt verpacken. */}
-              <NegatedOutcomePanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
+              <div id="negiert" style={{ scrollMarginTop: 56 }}>
+                <NegatedOutcomePanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
+              </div>
             </>
           )}
           {conditions.length > 0 && outcome && (() => {
             const xc = xyCond && conditions.includes(xyCond) ? xyCond : conditions[0];
             const points = cases.map((c) => ({ label: c.label, x: c.values[xc], y: c.values[outcome] }));
             return (
-              <Card>
+              <Card id="xyplot">
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "xy.title")}</h2>
@@ -292,7 +321,7 @@ export default function Home() {
             <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
             <ReportButton
               getInput={(): ReportInput | null => {
-                if (!ds || !tt || !sol) return null;
+                if (!ds || !tt || !sol || !necessity) return null;
                 return {
                   datasetName: ds.name,
                   caseCount: ds.rows.length,
@@ -305,7 +334,7 @@ export default function Home() {
                   complex: sol.complex,
                   intermediate: sol.intermediate,
                   parsimonious: sol.parsimonious,
-                  necessity: sol.necessity,
+                  necessity,
                   expectations: Object.fromEntries(conditions.map((c) => [c, expectations[c] ?? "present"])),
                   rScript: buildRScript(ds, anchors, conditions, outcome, freqCut, consCut),
                 };
@@ -355,8 +384,14 @@ function CalibrationSection({
     setAnchors({ ...anchors, [v]: next });
   }
 
+  function resetAnchors() {
+    const orig = ds.anchors[v];
+    if (!orig) return;
+    setAnchors({ ...anchors, [v]: [orig[0], orig[1], orig[2]] });
+  }
+
   return (
-    <Card>
+    <Card id="kalibrierung">
       <H2>{t(locale, "calib.title")}</H2>
       <p style={{ color: "var(--ink-2)", maxWidth: "66ch", marginTop: 0 }}>
         {t(locale, "calib.desc")}
@@ -383,7 +418,7 @@ function CalibrationSection({
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
         {([t(locale, "calib.anchorOut"), t(locale, "calib.anchorCross"), t(locale, "calib.anchorIn")]).map((lab, i) => (
           <div key={i} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px" }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700 }}>
@@ -418,8 +453,27 @@ function CalibrationSection({
         ))}
       </div>
 
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4, marginBottom: 12 }}>
+        <button
+          onClick={resetAnchors}
+          style={{
+            font: "inherit",
+            fontSize: 12.5,
+            padding: "4px 11px",
+            borderRadius: 7,
+            cursor: "pointer",
+            border: "1px solid var(--line)",
+            background: "var(--panel)",
+            color: "var(--ink-2)",
+            fontWeight: 600,
+          }}
+        >
+          {t(locale, "calib.reset")}
+        </button>
+      </div>
+
       {ordered ? (
-        <CalibrationCurve variable={v} anchors={a} values={values} rows={rows} nearCross={nearCross} atHalf={atHalf} />
+        <CalibrationCurve variable={v} anchors={a} values={values} rows={rows} nearCross={nearCross} atHalf={atHalf} onAnchorChange={setAnchor} />
       ) : (
         <Diag kind="bad">{t(locale, "calib.badOrder")}</Diag>
       )}
@@ -485,6 +539,7 @@ function CalibrationCurve({
   rows,
   nearCross,
   atHalf,
+  onAnchorChange,
 }: {
   variable: string;
   anchors: [number, number, number];
@@ -492,59 +547,200 @@ function CalibrationCurve({
   rows: { label: string; f: number }[];
   nearCross: { label: string; f: number }[];
   atHalf: { label: string; f: number }[];
+  onAnchorChange: (index: number, value: number) => void;
 }) {
   const [locale] = useLocale();
+  const svgRef = useRef<SVGSVGElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const pointerX = useRef(0);
+  const dragIndex = useRef<number | null>(null);
+
   const [o, c, i] = anchors;
   const lo = Math.min(...values, o);
   const hi = Math.max(...values, i);
   const pad = (hi - lo) * 0.07 || 1;
   const W = 640, H = 280, ML = 44, MR = 16, MT = 12, MB = 40;
-  const px = (val: number) => ML + ((val - (lo - pad)) / (hi + pad - (lo - pad))) * (W - ML - MR);
+  const domainLo = lo - pad;
+  const domainHi = hi + pad;
+  const px = (val: number) => ML + ((val - domainLo) / (domainHi - domainLo)) * (W - ML - MR);
   const py = (val: number) => MT + (1 - val) * (H - MT - MB);
+  const invX = (xInSvg: number) =>
+    domainLo + ((xInSvg - ML) / (W - ML - MR)) * (domainHi - domainLo);
+
+  // Präzision an die Spannweite koppeln: große Skalen ganzzahlig, kleine 2 Dezimalstellen.
+  const span = hi - lo;
+  const step = span >= 100 ? 1 : 0.01;
+  const roundVal = (val: number) => (step >= 1 ? Math.round(val) : Math.round(val * 100) / 100);
+
+  // Ordnungs-Clamping (o < c < i) mit Mindestabstand von einem Präzisionsschritt.
+  const commit = (index: number, rawVal: number) => {
+    const r = roundVal(rawVal);
+    let clamped: number;
+    if (index === 0) clamped = Math.min(r, roundVal(c - step));
+    else if (index === 2) clamped = Math.max(r, roundVal(c + step));
+    else clamped = Math.min(Math.max(r, roundVal(o + step)), roundVal(i - step));
+    onAnchorChange(index, clamped);
+  };
+
+  const clientToValue = (clientX: number): number => {
+    const svg = svgRef.current;
+    if (!svg) return domainLo;
+    const rect = svg.getBoundingClientRect();
+    const xInSvg = rect.width ? ((clientX - rect.left) / rect.width) * W : ML;
+    return invX(xInSvg);
+  };
+
+  useEffect(
+    () => () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
+
   let curve = "";
   for (let s = 0; s <= 140; s++) {
-    const x = lo - pad + (s / 140) * (hi + pad - (lo - pad));
+    const x = domainLo + (s / 140) * (domainHi - domainLo);
     curve += (s ? "L" : "M") + px(x).toFixed(1) + "," + py(calibrateDirect(x, o, c, i)).toFixed(1);
   }
-  const anchorLines: [number, string][] = [[o, "0,05"], [c, "0,50"], [i, "0,95"]];
-  const flagged = [...nearCross, ...atHalf].slice(0, 4);
+
+  const anchorMeta: { value: number; name: string }[] = [
+    { value: o, name: t(locale, "calib.handle.out") },
+    { value: c, name: t(locale, "calib.handle.cross") },
+    { value: i, name: t(locale, "calib.handle.in") },
+  ];
+  const domainMin = roundVal(domainLo);
+  const domainMax = roundVal(domainHi);
+
   const rawByLabel = new Map(rows.map((r, idx) => [r.label, values[idx]]));
+  const center = (ML + (W - MR)) / 2;
+
+  // Label-Kollisionsvermeidung (aus XyPlot übernommen): nach y sortieren, bei
+  // <12px Abstand und ähnlichem x (<70px) nach unten staffeln; Anker je Hälfte.
+  const placed = [...nearCross, ...atHalf].slice(0, 4).map((r) => {
+    const raw = rawByLabel.get(r.label) ?? 0;
+    const pointX = px(raw);
+    const rightHalf = pointX >= center;
+    return {
+      label: r.label,
+      pointX,
+      anchorX: rightHalf ? pointX - 8 : pointX + 8,
+      anchorY: py(r.f) - 6,
+      textAnchor: (rightHalf ? "end" : "start") as "start" | "end",
+    };
+  });
+  placed.sort((a2, b2) => a2.anchorY - b2.anchorY);
+  for (let k = 1; k < placed.length; k++) {
+    const cur = placed[k];
+    const prev = placed[k - 1];
+    if (cur.anchorY - prev.anchorY < 12 && Math.abs(cur.pointX - prev.pointX) < 70) {
+      cur.anchorY = prev.anchorY + 12;
+    }
+  }
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ width: "100%", maxWidth: W, height: "auto", background: "var(--panel)" }}>
-      {[0, 0.25, 0.5, 0.75, 1].map((val) => (
-        <g key={val}>
-          <line x1={ML} x2={W - MR} y1={py(val)} y2={py(val)} stroke="var(--grid)" />
-          <text x={ML - 6} y={py(val) + 3.5} textAnchor="end" fill="var(--muted)" fontSize={10.5}>
-            {val.toFixed(2).replace(".", ",")}
+    <ChartFrame filename={`kalibrierung-${variable}`} caption={t(locale, "calib.rug.desc")}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} role="img" style={{ width: "100%", maxWidth: W, height: "auto", background: "var(--panel)" }}>
+        {[0, 0.25, 0.5, 0.75, 1].map((val) => (
+          <g key={val}>
+            <line x1={ML} x2={W - MR} y1={py(val)} y2={py(val)} stroke="var(--grid)" />
+            <text x={ML - 6} y={py(val) + 3.5} textAnchor="end" fill="var(--muted)" fontSize={10.5}>
+              {val.toFixed(2).replace(".", ",")}
+            </text>
+          </g>
+        ))}
+
+        {/* Rug-Plot: Verteilung der Rohwerte direkt über der X-Achse */}
+        {values.map((val, idx) => (
+          <line key={`rug-${idx}`} x1={px(val)} x2={px(val)} y1={H - MB} y2={H - MB - 8} stroke="var(--muted)" strokeWidth={1.5} opacity={0.8} />
+        ))}
+
+        {anchorMeta.map(({ value }, idx) => (
+          <g key={`anchor-line-${idx}`}>
+            <line x1={px(value)} x2={px(value)} y1={MT} y2={H - MB} stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 4" opacity={0.8} />
+            <text x={px(value)} y={H - MB + 15} textAnchor="middle" fill="var(--accent-deep)" fontSize={10.5} fontWeight={600}>
+              {String(value).replace(".", ",")}
+            </text>
+          </g>
+        ))}
+
+        <path d={curve} fill="none" stroke="var(--accent)" strokeWidth={2.25} />
+
+        {rows.map((r, idx) => {
+          const flag = r.f > 0.4 && r.f < 0.6;
+          return (
+            <circle key={idx} cx={px(values[idx])} cy={py(r.f)} r={5} fill={flag ? "#b26a00" : "var(--accent)"} stroke="var(--panel)" strokeWidth={2}>
+              <title>{`${r.label}: ${values[idx]} → ${r.f.toFixed(3)}`}</title>
+            </circle>
+          );
+        })}
+
+        {placed.map((l, idx) => (
+          <text key={`lbl-${idx}`} x={l.anchorX} y={l.anchorY} textAnchor={l.textAnchor} fill="var(--warn-text)" fontSize={10} fontWeight={600} style={{ pointerEvents: "none" }}>
+            {l.label}
           </text>
-        </g>
-      ))}
-      {anchorLines.map(([val], idx) => (
-        <g key={idx}>
-          <line x1={px(val)} x2={px(val)} y1={MT} y2={H - MB} stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 4" opacity={0.8} />
-          <text x={px(val)} y={H - MB + 15} textAnchor="middle" fill="var(--accent-deep)" fontSize={10.5} fontWeight={600}>
-            {String(val).replace(".", ",")}
-          </text>
-        </g>
-      ))}
-      <path d={curve} fill="none" stroke="var(--accent)" strokeWidth={2.25} />
-      {rows.map((r, idx) => {
-        const flag = r.f > 0.4 && r.f < 0.6;
-        return (
-          <circle key={idx} cx={px(values[idx])} cy={py(r.f)} r={5} fill={flag ? "#b26a00" : "var(--accent)"} stroke="var(--panel)" strokeWidth={2}>
-            <title>{`${r.label}: ${values[idx]} → ${r.f.toFixed(3)}`}</title>
-          </circle>
-        );
-      })}
-      {flagged.map((r, idx) => (
-        <text key={idx} x={px(rawByLabel.get(r.label) ?? 0) + 7} y={py(r.f) - 6} fill="var(--warn-text)" fontSize={10} fontWeight={600}>
-          {r.label}
+        ))}
+
+        {/* Ziehbare Griffe: sichtbarer Kreis + großzügige unsichtbare Trefferfläche */}
+        {anchorMeta.map(({ value, name }, idx) => {
+          const cx = px(value);
+          const startDrag = (e: React.PointerEvent) => {
+            (e.currentTarget as Element).setPointerCapture(e.pointerId);
+            dragIndex.current = idx;
+            e.preventDefault();
+          };
+          const moveDrag = (e: React.PointerEvent) => {
+            if (dragIndex.current !== idx) return;
+            pointerX.current = e.clientX;
+            if (rafRef.current == null) {
+              rafRef.current = requestAnimationFrame(() => {
+                rafRef.current = null;
+                if (dragIndex.current != null) commit(dragIndex.current, clientToValue(pointerX.current));
+              });
+            }
+          };
+          const endDrag = (e: React.PointerEvent) => {
+            dragIndex.current = null;
+            (e.currentTarget as Element).releasePointerCapture(e.pointerId);
+          };
+          const onKey = (e: React.KeyboardEvent) => {
+            let dir = 0;
+            if (e.key === "ArrowLeft" || e.key === "ArrowDown") dir = -1;
+            else if (e.key === "ArrowRight" || e.key === "ArrowUp") dir = 1;
+            else return;
+            e.preventDefault();
+            const mult = e.shiftKey ? 10 : 1;
+            commit(idx, value + dir * step * mult);
+          };
+          return (
+            <g key={`handle-${idx}`}>
+              <rect
+                x={cx - 12}
+                y={MT}
+                width={24}
+                height={H - MB - MT}
+                fill="transparent"
+                style={{ cursor: "ew-resize", touchAction: "none", outline: "none" }}
+                tabIndex={0}
+                role="slider"
+                aria-label={t(locale, "calib.handle.aria", { name, value: String(value).replace(".", ",") })}
+                aria-valuemin={domainMin}
+                aria-valuemax={domainMax}
+                aria-valuenow={value}
+                onPointerDown={startDrag}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onKeyDown={onKey}
+              />
+              <circle cx={cx} cy={H - MB} r={7} fill="var(--accent)" stroke="var(--panel)" strokeWidth={2} style={{ pointerEvents: "none" }} />
+            </g>
+          );
+        })}
+
+        <text x={(ML + W - MR) / 2} y={H - 2} textAnchor="middle" fill="var(--muted)" fontSize={11}>
+          {t(locale, "calib.curve.axis", { variable })}
         </text>
-      ))}
-      <text x={(ML + W - MR) / 2} y={H - 2} textAnchor="middle" fill="var(--muted)" fontSize={11}>
-        {t(locale, "calib.curve.axis", { variable })}
-      </text>
-    </svg>
+      </svg>
+    </ChartFrame>
   );
 }
 
@@ -554,7 +750,7 @@ function DataSection({ ds, fuzzyCols }: { ds: RawDataset; fuzzyCols: string[] })
   const [locale] = useLocale();
   const fs = new Set(fuzzyCols.map((c) => c.replace(/^fs_/, "")));
   return (
-    <Card>
+    <Card id="daten">
       <H2>{t(locale, "data.title", { n: ds.rows.length })}</H2>
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
@@ -610,7 +806,7 @@ function TruthTableSection(props: {
   }
 
   return (
-    <Card>
+    <Card id="truthtable">
       <H2>{t(locale, "tt.title")}</H2>
       <div style={{ marginBottom: 12 }}>
         <Label>{t(locale, "tt.conditions")}</Label>
@@ -647,7 +843,19 @@ function TruthTableSection(props: {
             </span>
           }
         >
-          <input type="number" min={0} max={1} step={0.01} value={consCut} onChange={(e) => setConsCut(Number(e.target.value) || 0.8)} style={{ ...inputStyle, width: 90 }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="number" min={0} max={1} step={0.01} value={consCut} onChange={(e) => setConsCut(Number(e.target.value) || 0.8)} style={{ ...inputStyle, width: 90 }} />
+            <input
+              type="range"
+              min={0.5}
+              max={1}
+              step={0.01}
+              value={consCut}
+              onChange={(e) => setConsCut(Number(e.target.value))}
+              aria-label={t(locale, "tt.consCut")}
+              style={{ width: 140, accentColor: "var(--accent)" }}
+            />
+          </div>
         </Field>
       </div>
 
@@ -726,7 +934,7 @@ function SolutionSection({
   const [locale] = useLocale();
   const outLabel = tt.outcome.replace(/^fs_/, "").toUpperCase();
   return (
-    <>
+    <div id="loesungen" style={{ scrollMarginTop: 56 }}>
       {(["complex", "intermediate", "parsimonious"] as const).map((kind) => {
         const s = sol[kind];
         const title =
@@ -859,43 +1067,54 @@ function SolutionSection({
           </Card>
         );
       })}
-      <Card>
-        <H2>{t(locale, "nec.title")}</H2>
-        <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
-            <thead>
-              <tr>
-                <th style={thStyle(false)}>{t(locale, "nec.col.condition")}</th>
-                <th style={thStyle(false)}>
-                  <span style={thHintStyle}>
-                    {t(locale, "nec.col.consistency")}
-                    <InfoHint title={t(locale, "info.necessityConsistency.title")} body={t(locale, "info.necessityConsistency.body")} formula={t(locale, "info.necessityConsistency.formula")} />
-                  </span>
-                </th>
-                <th style={thStyle(false)}>
-                  <span style={thHintStyle}>
-                    {t(locale, "nec.col.coverage")}
-                    <InfoHint title={t(locale, "info.necessityCoverage.title")} body={t(locale, "info.necessityCoverage.body")} formula={t(locale, "info.necessityCoverage.formula")} />
-                  </span>
-                </th>
-                <th style={thStyle(false)}></th>
+    </div>
+  );
+}
+
+/* ---------- Notwendigkeit ---------- */
+
+function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessityAnalysis> }) {
+  const [locale] = useLocale();
+  return (
+    <Card id="notwendigkeit">
+      <H2>{t(locale, "nec.title")}</H2>
+      <p style={{ color: "var(--ink-2)", marginTop: -6, marginBottom: 12, fontSize: 13 }}>
+        {t(locale, "nec.orderHint")}
+      </p>
+      <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+          <thead>
+            <tr>
+              <th style={thStyle(false)}>{t(locale, "nec.col.condition")}</th>
+              <th style={thStyle(false)}>
+                <span style={thHintStyle}>
+                  {t(locale, "nec.col.consistency")}
+                  <InfoHint title={t(locale, "info.necessityConsistency.title")} body={t(locale, "info.necessityConsistency.body")} formula={t(locale, "info.necessityConsistency.formula")} />
+                </span>
+              </th>
+              <th style={thStyle(false)}>
+                <span style={thHintStyle}>
+                  {t(locale, "nec.col.coverage")}
+                  <InfoHint title={t(locale, "info.necessityCoverage.title")} body={t(locale, "info.necessityCoverage.body")} formula={t(locale, "info.necessityCoverage.formula")} />
+                </span>
+              </th>
+              <th style={thStyle(false)}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {necessity.map((n) => (
+              <tr key={n.condition}>
+                <td style={tdStyle(false, false)} className="mono">{n.condition.replace(/^fs_/, "")}</td>
+                <td style={tdStyle(true, false)}>{fmt(n.consistency)}</td>
+                <td style={tdStyle(true, false)}>{fmt(n.coverage)}</td>
+                <td style={tdStyle(false, false)}>{n.isCandidate ? <span style={{ color: "var(--good-text)", fontWeight: 600 }}>{t(locale, "nec.candidate")}</span> : ""}</td>
               </tr>
-            </thead>
-            <tbody>
-              {sol.necessity.map((n) => (
-                <tr key={n.condition}>
-                  <td style={tdStyle(false, false)} className="mono">{n.condition.replace(/^fs_/, "")}</td>
-                  <td style={tdStyle(true, false)}>{fmt(n.consistency)}</td>
-                  <td style={tdStyle(true, false)}>{fmt(n.coverage)}</td>
-                  <td style={tdStyle(false, false)}>{n.isCandidate ? <span style={{ color: "var(--good-text)", fontWeight: 600 }}>{t(locale, "nec.candidate")}</span> : ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="hint" style={hintStyle}>{t(locale, "nec.hint")}</p>
-      </Card>
-    </>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="hint" style={hintStyle}>{t(locale, "nec.hint")}</p>
+    </Card>
   );
 }
 
@@ -933,7 +1152,7 @@ function ProtocolSection({ ds, anchors, conditions, outcome, freqCut, consCut }:
   }
 
   return (
-    <Card>
+    <Card id="protokoll">
       <H2>{t(locale, "proto.title")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "proto.desc")}</p>
       <Button primary onClick={download}>{t(locale, "proto.downloadBtn")}</Button>
@@ -965,8 +1184,116 @@ function Header() {
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
-  return <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px", marginBottom: 18 }}>{children}</div>;
+function Card({ children, id }: { children: React.ReactNode; id?: string }) {
+  return (
+    <div
+      id={id}
+      style={{
+        background: "var(--panel)",
+        border: "1px solid var(--line)",
+        borderRadius: 12,
+        padding: "18px 20px",
+        marginBottom: 18,
+        scrollMarginTop: id ? 56 : undefined,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ---------- Sektions-Navigation (Scroll-Spy) ---------- */
+
+function SectionNav({ sections }: { sections: { id: string; label: string }[] }) {
+  const [locale] = useLocale();
+  const [activeId, setActiveId] = useState<string>(sections[0]?.id ?? "");
+  const idsKey = sections.map((s) => s.id).join("|");
+
+  useEffect(() => {
+    if (!idsKey) return;
+    const ids = idsKey.split("|");
+    const entryMap = new Map<string, IntersectionObserverEntry>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => entryMap.set(entry.target.id, entry));
+        const visible = ids
+          .map((id) => entryMap.get(id))
+          .filter((e): e is IntersectionObserverEntry => !!e && e.isIntersecting);
+        if (visible.length > 0) {
+          visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+          setActiveId(visible[0].target.id);
+        }
+      },
+      { rootMargin: "-56px 0px -65% 0px", threshold: 0 },
+    );
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [idsKey]);
+
+  if (sections.length === 0) return null;
+
+  function go(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  return (
+    <nav
+      aria-label={t(locale, "nav.ariaLabel")}
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 30,
+        background: "var(--bg)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        borderBottom: "1px solid var(--line)",
+        marginBottom: 18,
+      }}
+    >
+      <style>{`
+        .oq-section-nav { scrollbar-width: thin; }
+        .oq-section-nav::-webkit-scrollbar { height: 4px; }
+        .oq-section-nav::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+      `}</style>
+      <div
+        className="oq-section-nav"
+        style={{
+          display: "flex",
+          gap: 2,
+          overflowX: "auto",
+          padding: "8px 2px",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {sections.map((s) => (
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            onClick={(e) => {
+              e.preventDefault();
+              go(s.id);
+            }}
+            style={{
+              flex: "none",
+              fontSize: 12.5,
+              padding: "5px 10px",
+              borderRadius: 7,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              color: activeId === s.id ? "var(--accent-deep)" : "var(--ink-2)",
+              fontWeight: activeId === s.id ? 600 : 400,
+              background: activeId === s.id ? "var(--panel-2)" : "transparent",
+            }}
+          >
+            {s.label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
 }
 function H2({ children }: { children: React.ReactNode }) {
   return <h2 style={{ fontSize: 16, fontWeight: 650, margin: "0 0 12px" }}>{children}</h2>;

@@ -6,9 +6,10 @@ import {
   type QcaCase,
   type ConsistencySweepEntry,
 } from "@openqca/engine";
-import { useLocale } from "@/i18n/locale";
+import { useLocale, type Locale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
 import { InfoHint } from "@/components/InfoHint";
+import { ChartFrame } from "@/components/ChartFrame";
 
 interface RobustnessPanelProps {
   cases: QcaCase[];
@@ -103,7 +104,15 @@ export function RobustnessPanel({
 
   return (
     <div>
-      <div style={containerStyle}>
+      <ChartFrame filename="robustheit-sweep">
+        <SweepChart
+          entries={entries}
+          currentConsCut={currentConsCut}
+          nearestIndex={nearestIndex}
+          locale={locale}
+        />
+      </ChartFrame>
+      <div style={{ ...containerStyle, marginTop: 16 }}>
         <table style={tableStyle}>
           <thead>
             <tr>
@@ -139,6 +148,227 @@ export function RobustnessPanel({
     </div>
   );
 }
+
+// -- Sweep-Diagramm -----------------------------------------------------------
+
+const CW = 620;
+const CH = 200;
+const CML = 40;
+const CMR = 96;
+const CMT = 16;
+const CMB = 30;
+const C_FROM = 0.7;
+const C_TO = 0.95;
+const YT = [0, 0.25, 0.5, 0.75, 1] as const;
+
+const cScaleX = (cutoff: number): number =>
+  CML + ((cutoff - C_FROM) / (C_TO - C_FROM)) * (CW - CML - CMR);
+const cScaleY = (v: number): number => CMT + (1 - v) * (CH - CMT - CMB);
+const ctick = (v: number): string => v.toFixed(2).replace(".", ",");
+const isFin = (v: number): boolean => typeof v === "number" && Number.isFinite(v);
+
+/** Findet alle Sweep-Indizes, an denen sich die Lösungsformel ändert (Streifen). */
+function allChangePoints(entries: ConsistencySweepEntry[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < entries.length; i++) {
+    if (solutionFormula(entries[i]) !== solutionFormula(entries[i - 1])) out.push(i);
+  }
+  return out;
+}
+
+/**
+ * Kompaktes Linien-Diagramm des Cutoff-Sweeps: Lösungs-Konsistenz (durchgezogen)
+ * und Lösungs-Coverage (gestrichelt) über dem Cutoff-Bereich, mit direkter
+ * Linienbeschriftung, Pfadzahl je Konsistenz-Punkt, aktuellem Cutoff als
+ * gepunkteter Vertikale und getönten Streifen an Lösungswechseln.
+ */
+function SweepChart({
+  entries,
+  currentConsCut,
+  nearestIndex,
+  locale,
+}: {
+  entries: ConsistencySweepEntry[];
+  currentConsCut: number;
+  nearestIndex: number;
+  locale: Locale;
+}) {
+  const changePoints = allChangePoints(entries);
+
+  const consPts = entries.filter((e) => isFin(e.solutionConsistency));
+  const covPts = entries.filter((e) => isFin(e.solutionCoverage));
+
+  const consLine = consPts
+    .map((e) => `${cScaleX(e.cutoff)},${cScaleY(e.solutionConsistency)}`)
+    .join(" ");
+  const covLine = covPts
+    .map((e) => `${cScaleX(e.cutoff)},${cScaleY(e.solutionCoverage)}`)
+    .join(" ");
+
+  const lastCons = consPts[consPts.length - 1];
+  const lastCov = covPts[covPts.length - 1];
+
+  // Direktbeschriftung rechts; bei Überlappung vertikal auseinanderziehen.
+  let consLabelY = lastCons ? cScaleY(lastCons.solutionConsistency) : cScaleY(1);
+  let covLabelY = lastCov ? cScaleY(lastCov.solutionCoverage) : cScaleY(0);
+  if (Math.abs(consLabelY - covLabelY) < 13) {
+    if (consLabelY <= covLabelY) {
+      consLabelY -= 7;
+      covLabelY += 7;
+    } else {
+      consLabelY += 7;
+      covLabelY -= 7;
+    }
+  }
+
+  const cutClamped = Math.min(C_TO, Math.max(C_FROM, currentConsCut));
+
+  return (
+    <svg
+      viewBox={`0 0 ${CW} ${CH}`}
+      role="img"
+      aria-label={t(locale, "rob.chart.aria")}
+      style={sweepSvgStyle}
+    >
+      <defs>
+        <pattern
+          id="rob-change-hatch"
+          patternUnits="userSpaceOnUse"
+          width={6}
+          height={6}
+          patternTransform="rotate(45)"
+        >
+          <line x1={0} y1={0} x2={0} y2={6} stroke="var(--warn-text)" strokeWidth={1} opacity={0.35} />
+        </pattern>
+      </defs>
+
+      {/* Lösungswechsel-Streifen */}
+      {changePoints.map((i) => {
+        const x1 = cScaleX(entries[i - 1].cutoff);
+        const x2 = cScaleX(entries[i].cutoff);
+        return (
+          <g key={`band-${i}`}>
+            <rect x={x1} y={CMT} width={x2 - x1} height={CH - CMT - CMB} fill="var(--warn-text)" opacity={0.08} />
+            <rect x={x1} y={CMT} width={x2 - x1} height={CH - CMT - CMB} fill="url(#rob-change-hatch)" />
+          </g>
+        );
+      })}
+
+      {/* Y-Gitter + Ticks */}
+      {YT.map((v) => (
+        <g key={`gy-${v}`}>
+          <line x1={CML} x2={CW - CMR} y1={cScaleY(v)} y2={cScaleY(v)} stroke="var(--grid)" />
+          <text x={CML - 6} y={cScaleY(v) + 3.5} textAnchor="end" fill="var(--muted)" fontSize={10}>
+            {ctick(v)}
+          </text>
+        </g>
+      ))}
+
+      {/* X-Ticks (Cutoffs) */}
+      {entries.map((e) => (
+        <text
+          key={`gx-${e.cutoff}`}
+          x={cScaleX(e.cutoff)}
+          y={CH - CMB + 15}
+          textAnchor="middle"
+          fill="var(--muted)"
+          fontSize={10}
+        >
+          {ctick(e.cutoff)}
+        </text>
+      ))}
+
+      {/* Aktueller Cutoff */}
+      <line
+        x1={cScaleX(cutClamped)}
+        x2={cScaleX(cutClamped)}
+        y1={CMT}
+        y2={CH - CMB}
+        stroke="var(--ink-2)"
+        strokeWidth={1}
+        strokeDasharray="2 3"
+        opacity={0.8}
+      />
+      <text
+        x={cScaleX(cutClamped)}
+        y={CMT - 4}
+        textAnchor="middle"
+        fill="var(--ink-2)"
+        fontSize={10}
+      >
+        {t(locale, "rob.chart.currentCutoff", { cutoff: ctick(cutClamped) })}
+      </text>
+
+      {/* Coverage-Linie (gestrichelt) */}
+      {covLine && (
+        <polyline
+          points={covLine}
+          fill="none"
+          stroke="var(--brand)"
+          strokeWidth={2}
+          strokeDasharray="5 4"
+        />
+      )}
+      {/* Konsistenz-Linie (durchgezogen) */}
+      {consLine && (
+        <polyline points={consLine} fill="none" stroke="var(--accent)" strokeWidth={2} />
+      )}
+
+      {/* Coverage-Punkte */}
+      {covPts.map((e) => (
+        <circle
+          key={`cov-${e.cutoff}`}
+          cx={cScaleX(e.cutoff)}
+          cy={cScaleY(e.solutionCoverage)}
+          r={3}
+          fill="var(--brand)"
+        />
+      ))}
+
+      {/* Konsistenz-Punkte + Pfadzahl */}
+      {consPts.map((e) => {
+        const isNear = entries[nearestIndex]?.cutoff === e.cutoff;
+        return (
+          <g key={`cons-${e.cutoff}`}>
+            <circle
+              cx={cScaleX(e.cutoff)}
+              cy={cScaleY(e.solutionConsistency)}
+              r={isNear ? 4 : 3}
+              fill="var(--accent)"
+              stroke={isNear ? "var(--panel)" : "none"}
+              strokeWidth={isNear ? 1.5 : 0}
+            />
+            <text
+              x={cScaleX(e.cutoff)}
+              y={cScaleY(e.solutionConsistency) - 7}
+              textAnchor="middle"
+              fill="var(--muted)"
+              fontSize={9.5}
+            >
+              {e.pathCount}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Direkte Linienbeschriftung rechts */}
+      <text x={CW - CMR + 6} y={consLabelY + 3.5} textAnchor="start" fill="var(--accent-deep)" fontSize={10.5} fontWeight={600}>
+        {t(locale, "rob.chart.consistency")}
+      </text>
+      <text x={CW - CMR + 6} y={covLabelY + 3.5} textAnchor="start" fill="var(--brand)" fontSize={10.5} fontWeight={600}>
+        {t(locale, "rob.chart.coverage")}
+      </text>
+    </svg>
+  );
+}
+
+const sweepSvgStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  maxWidth: CW,
+  height: "auto",
+  background: "var(--panel)",
+};
 
 const containerStyle: React.CSSProperties = {
   overflowX: "auto",

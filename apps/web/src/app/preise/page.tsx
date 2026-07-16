@@ -39,7 +39,7 @@ export default function PricingPage() {
         {t(locale, "pricing.intro")}
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 24 }}>
         <Tier tag={t(locale, "pricing.free.tag")} name={t(locale, "pricing.free.name")} price={t(locale, "pricing.free.price")}>
           <li>{t(locale, "pricing.free.li1")}</li>
           <li>{t(locale, "pricing.free.li2")}</li>

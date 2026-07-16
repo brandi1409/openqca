@@ -142,7 +142,9 @@ const actionsStyle: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
   gap: 8,
-  flexShrink: 0,
+  flexGrow: 1,
+  flexBasis: 220,
+  minWidth: 0,
 };
 
 const buttonBase: CSSProperties = {
@@ -152,6 +154,9 @@ const buttonBase: CSSProperties = {
   borderRadius: 8,
   cursor: "pointer",
   lineHeight: 1.2,
+  flex: "1 1 180px",
+  minWidth: 0,
+  textAlign: "center",
 };
 
 const primaryButtonStyle: CSSProperties = {

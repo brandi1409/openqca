@@ -145,6 +145,19 @@ const de = {
   "data.title": "Daten · {n} Fälle",
   "descriptives.title": "Deskriptive Statistik (kalibrierte Sets)",
 
+  // -- Sektions-Navigation ------------------------------------------------------
+  "nav.ariaLabel": "Sektionsnavigation",
+  "nav.daten": "Daten",
+  "nav.deskriptiv": "Deskriptiv",
+  "nav.kalibrierung": "Kalibrierung",
+  "nav.notwendigkeit": "Notwendigkeit",
+  "nav.truthtable": "Truth Table",
+  "nav.loesungen": "Lösungen",
+  "nav.robustheit": "Robustheit",
+  "nav.negiert": "Negiert",
+  "nav.xyplot": "XY-Plot",
+  "nav.protokoll": "Protokoll",
+
   // -- Kalibrierung -----------------------------------------------------------
   "calib.title": "Kalibrierung, die mitdenkt",
   "calib.desc":
@@ -170,6 +183,12 @@ const de = {
   "calib.ai.skew": "Verteilung erklären",
   "calib.ai.methods": "Methoden-Absatz entwerfen",
   "calib.curve.axis": "{variable} (Rohwert) → Zugehörigkeit",
+  "calib.reset": "Anker zurücksetzen",
+  "calib.handle.aria": "{name}: {value} — mit den Pfeiltasten anpassen (Umschalt für größere Schritte)",
+  "calib.handle.out": "Anker voll draußen",
+  "calib.handle.cross": "Anker Kreuzung",
+  "calib.handle.in": "Anker voll drinnen",
+  "calib.rug.desc": "Die Griffe unter der Kurve lassen sich ziehen; die kurzen Striche zeigen die Verteilung der Rohwerte.",
 
   // -- Truth Table ------------------------------------------------------------
   "tt.title": "Truth Table",
@@ -206,6 +225,8 @@ const de = {
     "Zwischen komplexer und sparsamer Lösung: nur theoriekonforme (einfache) Vereinfachungsannahmen.",
   "sol.pars.hint": "Remainder werden als Vereinfachungsannahmen zugelassen.",
   "nec.title": "Notwendige Bedingungen",
+  "nec.orderHint":
+    "Die Notwendigkeitsanalyse gehört methodisch vor die Suffizienzanalyse (Truth Table und Lösungen).",
   "nec.col.condition": "Bedingung",
   "nec.col.consistency": "Konsistenz",
   "nec.col.coverage": "Coverage",
@@ -226,6 +247,11 @@ const de = {
   "rob.stable": "Die Lösung ist über den geprüften Cutoff-Bereich stabil.",
   "rob.change":
     "Die Lösung wechselt bei Cutoff {cutoff} von {from} zu {to} — die Cutoff-Wahl ist hier folgenreich und sollte begründet werden.",
+  "rob.chart.aria":
+    "Liniendiagramm des Cutoff-Sweeps: Lösungs-Konsistenz und Lösungs-Coverage über dem Konsistenz-Cutoff (0,70 bis 0,95).",
+  "rob.chart.consistency": "Konsistenz",
+  "rob.chart.coverage": "Coverage",
+  "rob.chart.currentCutoff": "Cutoff {cutoff}",
 
   // -- Negiertes Outcome ------------------------------------------------------
   "neg.heading": "Negiertes Outcome ({label})",
@@ -239,6 +265,11 @@ const de = {
   "neg.error": "Fehler bei der Berechnung von {label}: {msg}",
   "neg.calcErrorUnknown": "Unbekannter Fehler bei der Berechnung von ~Y.",
 
+  // -- Grafik-Export ----------------------------------------------------------
+  "chart.exportSvg": "SVG",
+  "chart.exportPng": "PNG",
+  "chart.exportAria": "Grafik exportieren als {fmt}",
+
   // -- XY-Plot ----------------------------------------------------------------
   "xy.title": "XY-Plot (Suffizienz)",
   "xy.hint":
@@ -247,6 +278,14 @@ const de = {
   "xyplot.kpi.coverage": "Coverage",
   "xyplot.aria":
     "Fuzzy-Set-XY-Plot: {x} (X) gegen {y} (Y), {n} Fälle, Achsen 0 bis 1",
+  "xy.labelsToggle": "Fall-Labels",
+  "xy.labels.off": "Aus",
+  "xy.labels.notable": "Auffällige",
+  "xy.labels.all": "Alle",
+  "xy.diagonalLabel": "X = Y",
+  "xy.consistentZone": "konsistent: X ≤ Y",
+  "xy.legend.consistent": "konsistent (X ≤ Y)",
+  "xy.legend.inconsistent": "widerspricht (X > Y)",
 
   // -- Protokoll --------------------------------------------------------------
   "proto.title": "Analyseprotokoll",
@@ -596,6 +635,19 @@ const en: Record<DictKey, string> = {
   "data.title": "Data · {n} cases",
   "descriptives.title": "Descriptive statistics (calibrated sets)",
 
+  // -- Section navigation -------------------------------------------------------
+  "nav.ariaLabel": "Section navigation",
+  "nav.daten": "Data",
+  "nav.deskriptiv": "Descriptives",
+  "nav.kalibrierung": "Calibration",
+  "nav.notwendigkeit": "Necessity",
+  "nav.truthtable": "Truth table",
+  "nav.loesungen": "Solutions",
+  "nav.robustheit": "Robustness",
+  "nav.negiert": "Negated",
+  "nav.xyplot": "XY plot",
+  "nav.protokoll": "Protocol",
+
   // -- Calibration ------------------------------------------------------------
   "calib.title": "Calibration that thinks along",
   "calib.desc":
@@ -621,6 +673,12 @@ const en: Record<DictKey, string> = {
   "calib.ai.skew": "Explain the distribution",
   "calib.ai.methods": "Draft a methods paragraph",
   "calib.curve.axis": "{variable} (raw value) → membership",
+  "calib.reset": "Reset anchors",
+  "calib.handle.aria": "{name}: {value} — adjust with the arrow keys (hold Shift for larger steps)",
+  "calib.handle.out": "Fully-out anchor",
+  "calib.handle.cross": "Crossover anchor",
+  "calib.handle.in": "Fully-in anchor",
+  "calib.rug.desc": "Drag the handles beneath the curve; the short ticks show the distribution of raw values.",
 
   // -- Truth table ------------------------------------------------------------
   "tt.title": "Truth table",
@@ -657,6 +715,8 @@ const en: Record<DictKey, string> = {
     "Between the complex and parsimonious solution: only theory-consistent (easy) counterfactuals.",
   "sol.pars.hint": "Remainders are admitted as simplifying assumptions.",
   "nec.title": "Necessary conditions",
+  "nec.orderHint":
+    "The necessity analysis methodologically belongs before the sufficiency analysis (truth table and solutions).",
   "nec.col.condition": "Condition",
   "nec.col.consistency": "Consistency",
   "nec.col.coverage": "Coverage",
@@ -677,6 +737,11 @@ const en: Record<DictKey, string> = {
   "rob.stable": "The solution is stable across the tested cutoff range.",
   "rob.change":
     "The solution changes at cutoff {cutoff} from {from} to {to} — the cutoff choice is consequential here and should be justified.",
+  "rob.chart.aria":
+    "Line chart of the cutoff sweep: solution consistency and solution coverage across the consistency cutoff (0.70 to 0.95).",
+  "rob.chart.consistency": "Consistency",
+  "rob.chart.coverage": "Coverage",
+  "rob.chart.currentCutoff": "Cutoff {cutoff}",
 
   // -- Negated outcome --------------------------------------------------------
   "neg.heading": "Negated outcome ({label})",
@@ -690,6 +755,11 @@ const en: Record<DictKey, string> = {
   "neg.error": "Error computing {label}: {msg}",
   "neg.calcErrorUnknown": "Unknown error while computing ~Y.",
 
+  // -- Chart export -----------------------------------------------------------
+  "chart.exportSvg": "SVG",
+  "chart.exportPng": "PNG",
+  "chart.exportAria": "Export chart as {fmt}",
+
   // -- XY plot ----------------------------------------------------------------
   "xy.title": "XY plot (sufficiency)",
   "xy.hint":
@@ -698,6 +768,14 @@ const en: Record<DictKey, string> = {
   "xyplot.kpi.coverage": "Coverage",
   "xyplot.aria":
     "Fuzzy-set XY plot: {x} (X) against {y} (Y), {n} cases, axes 0 to 1",
+  "xy.labelsToggle": "Case labels",
+  "xy.labels.off": "Off",
+  "xy.labels.notable": "Notable",
+  "xy.labels.all": "All",
+  "xy.diagonalLabel": "X = Y",
+  "xy.consistentZone": "consistent: X ≤ Y",
+  "xy.legend.consistent": "consistent (X ≤ Y)",
+  "xy.legend.inconsistent": "contradicts (X > Y)",
 
   // -- Protocol ---------------------------------------------------------------
   "proto.title": "Analysis protocol",
