@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   calibrateDirect,
   buildTruthTable,
@@ -20,22 +20,36 @@ import { AccountButton, CloudSaveLoad } from "@/components/cloud";
 import { XyPlot } from "@/components/XyPlot";
 import { Descriptives } from "@/components/Descriptives";
 import { Onboarding } from "@/components/Onboarding";
+import { Glossary } from "@/components/Glossary";
+import { GuidedTour, type GuidedTourStep } from "@/components/GuidedTour";
 import { ExampleDatasets } from "@/components/ExampleDatasets";
 import { RobustnessPanel } from "@/components/RobustnessPanel";
 import NegatedOutcomePanel from "@/components/NegatedOutcomePanel";
 import { ReportButton } from "@/components/ReportButton";
 import { type ReportInput } from "@/lib/report";
 import { useLocale } from "@/i18n/locale";
-import { t } from "@/i18n/dict";
+import { t, type DictKey } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { InfoHint } from "@/components/InfoHint";
 import { ChartFrame } from "@/components/ChartFrame";
 
+/** Datenart je numerischer Spalte: Rohwert (muss kalibriert werden), bereits Fuzzy, oder Crisp. */
+type VarType = "raw" | "fuzzy" | "crisp";
+/** Rolle je Spalte in der Analyse. */
+type VarRole = "condition" | "outcome" | "ignore";
+interface VarMeta {
+  type: VarType;
+  role: VarRole;
+}
+
 interface SavedState {
   dataset: RawDataset;
   anchors: Anchors;
-  conditions: string[];
-  outcome: string;
+  varMeta?: Record<string, VarMeta>;
+  // Ältere Speicherstände hielten Bedingungen/Outcome (mit fs_-Präfix) direkt —
+  // werden beim Laden bewusst ignoriert und aus varMeta neu abgeleitet.
+  conditions?: string[];
+  outcome?: string;
   freqCut: number;
   consCut: number;
 }
@@ -50,37 +64,140 @@ type SolBundle = {
 const fmt = (v: number, d = 3) =>
   v == null || Number.isNaN(v) ? "—" : v.toFixed(d).replace(".", ",");
 
+/** Zustand eines Stepper-Schritts: erledigt / aktiv (bereit) / gesperrt. */
+type StepStatus = "done" | "active" | "locked";
+/** Gesperrt wenn Voraussetzung fehlt, sonst erledigt wenn fertig, sonst aktiv. */
+function statusOf(unlocked: boolean, done: boolean): StepStatus {
+  if (!unlocked) return "locked";
+  return done ? "done" : "active";
+}
+
 function numericCols(ds: RawDataset): string[] {
   return ds.columns.filter(
     (c) => c !== ds.caseCol && ds.rows.every((r) => typeof r[c] === "number"),
   );
 }
 
+/** Numerische Werte einer Spalte (NaN herausgefiltert). */
+function colNumericValues(ds: RawDataset, col: string): number[] {
+  return ds.rows.map((r) => Number(r[col])).filter((v) => !Number.isNaN(v));
+}
+
+/**
+ * Datenart einer numerischen Spalte automatisch erkennen:
+ * - alle Werte ∈ {0,1} → "crisp"
+ * - alle Werte ∈ [0,1] (mind. ein Nicht-0/1-Wert) → "fuzzy"
+ * - sonst → "raw"
+ */
+function detectVarType(values: number[]): VarType {
+  if (values.length === 0) return "raw";
+  const all01 = values.every((v) => v === 0 || v === 1);
+  if (all01) return "crisp";
+  const allUnit = values.every((v) => v >= 0 && v <= 1);
+  return allUnit ? "fuzzy" : "raw";
+}
+
+/** Anker strikt aufsteigend? Nur dann ist calibrateDirect definiert (wirft sonst). */
+function anchorsAscending(a: [number, number, number] | undefined): boolean {
+  return !!a && a[0] < a[1] && a[1] < a[2];
+}
+
+/**
+ * Ist eine Spalte mit ihrer (ggf. übersteuerten) Datenart als Set nutzbar?
+ * crisp verlangt Werte ∈ {0,1}, fuzzy Werte ∈ [0,1], raw aufsteigende Anker.
+ */
+function isColUsable(type: VarType, values: number[], anchors: Anchors, col: string): boolean {
+  if (type === "crisp") return values.every((v) => v === 0 || v === 1);
+  if (type === "fuzzy") return values.every((v) => v >= 0 && v <= 1);
+  return anchorsAscending(anchors[col]);
+}
+
+/** Auto-Ableitung des Variablen-Metamodells: Datenart erkennen, Rollen heuristisch vorbelegen. */
+function deriveVarMeta(ds: RawDataset): Record<string, VarMeta> {
+  const cols = numericCols(ds);
+  const meta: Record<string, VarMeta> = {};
+  const outcomeCol = cols.length ? cols[cols.length - 1] : "";
+  let conditionBudget = 3;
+  cols.forEach((col) => {
+    const type = detectVarType(colNumericValues(ds, col));
+    let role: VarRole;
+    if (col === outcomeCol) {
+      role = "outcome";
+    } else if (conditionBudget > 0) {
+      role = "condition";
+      conditionBudget--;
+    } else {
+      role = "ignore";
+    }
+    meta[col] = { type, role };
+  });
+  return meta;
+}
+
+/** Anker nur der Roh-Variablen mit gültiger (aufsteigender) Kalibrierung — für Bericht & R-Skript. */
+function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, anchors: Anchors): Anchors {
+  const out: Anchors = {};
+  for (const col of numericCols(ds)) {
+    if (varMeta[col]?.type === "raw" && anchorsAscending(anchors[col])) out[col] = anchors[col];
+  }
+  return out;
+}
+
 export default function Home() {
   const [locale] = useLocale();
   const [ds, setDs] = useState<RawDataset | null>(null);
   const [anchors, setAnchors] = useState<Anchors>({});
+  const [varMeta, setVarMeta] = useState<Record<string, VarMeta>>({});
   const [focusVar, setFocusVar] = useState<string>("");
-  const [conditions, setConditions] = useState<string[]>([]);
-  const [outcome, setOutcome] = useState<string>("");
   const [freqCut, setFreqCut] = useState(1);
   const [consCut, setConsCut] = useState(0.8);
   const [xyCond, setXyCond] = useState("");
   const [expectations, setExpectations] = useState<Record<string, Expectation>>({});
+  // Geführte Beispiel-Tour: null = aus, sonst Index der aktiven Station.
+  const [tourStep, setTourStep] = useState<number | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const tourSteps: GuidedTourStep[] = useMemo(
+    () => [
+      { targetId: "daten", title: t(locale, "tour.s1.title"), body: t(locale, "tour.s1.body") },
+      { targetId: "variablen", title: t(locale, "tour.s2.title"), body: t(locale, "tour.s2.body") },
+      { targetId: "kalibrierung", title: t(locale, "tour.s3.title"), body: t(locale, "tour.s3.body") },
+      { targetId: "notwendigkeit", title: t(locale, "tour.s4.title"), body: t(locale, "tour.s4.body") },
+      { targetId: "truthtable", title: t(locale, "tour.s5.title"), body: t(locale, "tour.s5.body") },
+      { targetId: "loesungen", title: t(locale, "tour.s6.title"), body: t(locale, "tour.s6.body") },
+      { targetId: "protokoll", title: t(locale, "tour.s7.title"), body: t(locale, "tour.s7.body") },
+    ],
+    [locale],
+  );
+
+  function firstRawFocus(dataset: RawDataset, meta: Record<string, VarMeta>): string {
+    return (
+      numericCols(dataset).find((c) => meta[c]?.type === "raw" && meta[c]?.role !== "ignore") ?? ""
+    );
+  }
 
   function applyDataset(dataset: RawDataset) {
     setDs(dataset);
     setAnchors({ ...dataset.anchors });
-    const raw = numericCols(dataset);
-    setFocusVar(raw[0] ?? "");
-    setConditions(raw.slice(0, Math.min(3, Math.max(1, raw.length - 1))).map((c) => "fs_" + c));
-    setOutcome(raw.length ? "fs_" + raw[raw.length - 1] : "");
+    const meta = deriveVarMeta(dataset);
+    setVarMeta(meta);
+    setFocusVar(firstRawFocus(dataset, meta));
   }
 
   function loadDemo() {
     applyDataset(DEMO);
+  }
+
+  function startTour() {
+    loadDemo();
+    setTourStep(0);
+  }
+  function nextTourStep() {
+    setTourStep((s) => (s === null ? null : s + 1 >= tourSteps.length ? null : s + 1));
+  }
+  function endTour() {
+    setTourStep(null);
   }
 
   function importCsv(file: File) {
@@ -112,36 +229,59 @@ export default function Home() {
   }
 
   function currentState(): SavedState {
-    return { dataset: ds!, anchors, conditions, outcome, freqCut, consCut };
+    return { dataset: ds!, anchors, varMeta, freqCut, consCut };
   }
   function loadState(raw: unknown) {
     const s = raw as SavedState;
     if (!s?.dataset) return;
     setDs(s.dataset);
     setAnchors(s.anchors ?? {});
-    setConditions(s.conditions ?? []);
-    setOutcome(s.outcome ?? "");
+    // Fehlt das Variablen-Metamodell (alter Speicherstand), neu ableiten;
+    // alte fs_-Bedingungen werden bewusst ignoriert (kein Crash).
+    const meta =
+      s.varMeta && Object.keys(s.varMeta).length > 0 ? s.varMeta : deriveVarMeta(s.dataset);
+    setVarMeta(meta);
     setFreqCut(s.freqCut ?? 1);
     setConsCut(s.consCut ?? 0.8);
-    setFocusVar(numericCols(s.dataset)[0] ?? "");
+    setFocusVar(firstRawFocus(s.dataset, meta));
   }
 
-  const { cases, fuzzyCols } = useMemo(() => {
-    if (!ds) return { cases: [] as QcaCase[], fuzzyCols: [] as string[] };
-    const raw = numericCols(ds);
-    const fcols = raw.map((c) => "fs_" + c);
+  // Berechnungskette: Schlüssel = Spaltenname (kein fs_-Präfix). crisp/fuzzy →
+  // Wert unverändert; raw → calibrateDirect NUR bei aufsteigenden Ankern (sonst
+  // Spalte ausgeschlossen). setCols = tatsächlich nutzbare Set-Spalten.
+  const { cases, setCols } = useMemo(() => {
+    if (!ds) return { cases: [] as QcaCase[], setCols: [] as string[] };
+    const usable = numericCols(ds).filter((c) => {
+      const meta = varMeta[c];
+      if (!meta || meta.role === "ignore") return false;
+      return isColUsable(meta.type, colNumericValues(ds, c), anchors, c);
+    });
     const cs: QcaCase[] = ds.rows.map((r) => {
       const values: Record<string, number> = {};
-      raw.forEach((c) => {
-        const a = anchors[c];
-        values["fs_" + c] = a
-          ? +calibrateDirect(Number(r[c]), a[0], a[1], a[2]).toFixed(4)
-          : Number(r[c]);
+      usable.forEach((c) => {
+        const x = Number(r[c]);
+        if (varMeta[c].type === "raw") {
+          const a = anchors[c];
+          // isColUsable garantiert aufsteigende Anker → calibrateDirect wirft nicht.
+          values[c] = a ? +calibrateDirect(x, a[0], a[1], a[2]).toFixed(4) : x;
+        } else {
+          values[c] = x;
+        }
       });
       return { label: String(r[ds.caseCol]), values };
     });
-    return { cases: cs, fuzzyCols: fcols };
-  }, [ds, anchors]);
+    return { cases: cs, setCols: usable };
+  }, [ds, anchors, varMeta]);
+
+  // Bedingungen/Outcome leiten sich aus varMeta ab (nur nutzbare Set-Spalten).
+  const conditions = useMemo(
+    () => setCols.filter((c) => varMeta[c]?.role === "condition"),
+    [setCols, varMeta],
+  );
+  const outcome = useMemo(
+    () => setCols.find((c) => varMeta[c]?.role === "outcome") ?? "",
+    [setCols, varMeta],
+  );
 
   const tt: TruthTableResult | null = useMemo(() => {
     if (!ds || conditions.length < 1 || !outcome) return null;
@@ -157,7 +297,11 @@ export default function Home() {
   // (nicht von der Truth Table) — sie gehört vor die Suffizienzanalyse.
   const necessity: ReturnType<typeof necessityAnalysis> | null = useMemo(() => {
     if (!(conditions.length > 0 && outcome && !conditions.includes(outcome))) return null;
-    return necessityAnalysis(conditions, outcome, cases);
+    try {
+      return necessityAnalysis(conditions, outcome, cases);
+    } catch {
+      return null;
+    }
   }, [conditions, outcome, cases]);
 
   const sol: SolBundle | null = useMemo(() => {
@@ -172,24 +316,80 @@ export default function Home() {
     };
   }, [tt, cases, conditions, outcome, expectations]);
 
-  const sections: { id: string; label: string }[] = useMemo(() => {
-    if (!ds) return [];
-    const list: { id: string; label: string }[] = [
-      { id: "daten", label: t(locale, "nav.daten") },
-    ];
-    if (fuzzyCols.length > 0) list.push({ id: "deskriptiv", label: t(locale, "nav.deskriptiv") });
-    list.push({ id: "kalibrierung", label: t(locale, "nav.kalibrierung") });
-    if (necessity) list.push({ id: "notwendigkeit", label: t(locale, "nav.notwendigkeit") });
-    list.push({ id: "truthtable", label: t(locale, "nav.truthtable") });
-    if (sol && tt) {
-      list.push({ id: "loesungen", label: t(locale, "nav.loesungen") });
-      list.push({ id: "robustheit", label: t(locale, "nav.robustheit") });
-      list.push({ id: "negiert", label: t(locale, "nav.negiert") });
-    }
-    if (conditions.length > 0 && outcome) list.push({ id: "xyplot", label: t(locale, "nav.xyplot") });
-    list.push({ id: "protokoll", label: t(locale, "nav.protokoll") });
-    return list;
-  }, [ds, fuzzyCols.length, necessity, sol, tt, conditions.length, outcome, locale]);
+  // -- Geführter 6-Schritte-Stepper: Status je Schritt aus dem State ableiten. --
+  // Roh-Variablen mit Rolle ≠ ignorieren müssen kalibriert (Anker aufsteigend) sein.
+  const rawActiveCols = useMemo(
+    () =>
+      ds
+        ? numericCols(ds).filter(
+            (c) => varMeta[c]?.type === "raw" && varMeta[c]?.role !== "ignore",
+          )
+        : [],
+    [ds, varMeta],
+  );
+
+  const step1Done = !!ds;
+  const step2Done = conditions.length > 0 && !!outcome;
+  // Kalibrierung fertig, sobald keine aktive Roh-Variable mehr unkalibriert ist.
+  // Ohne Roh-Variablen (leeres Array) sofort fertig — an step2Done gekoppelt,
+  // damit „fertig" erst nach gesetzten Rollen gilt.
+  const step3Done =
+    step2Done && rawActiveCols.every((c) => anchorsAscending(anchors[c]));
+  const step4Done = step3Done && !!necessity; // Analyse-Schritt: bereit = Ergebnis liegt vor
+  const step5Done = step3Done && !!(tt && sol);
+  const step6Done = false; // Terminal-Schritt: bleibt „aktiv", solange man hier arbeitet
+
+  const s1 = statusOf(true, step1Done);
+  const s2 = statusOf(step1Done, step2Done);
+  const s3 = statusOf(step2Done, step3Done);
+  const s4 = statusOf(step3Done, step4Done);
+  const s5 = statusOf(step3Done, step5Done);
+  const s6 = statusOf(!!(tt && sol), step6Done);
+  const statuses: StepStatus[] = [s1, s2, s3, s4, s5, s6];
+
+  // Anzahl der von vorne lückenlos erledigten Schritte → aktiver Schritt = k+1.
+  let doneRun = 0;
+  for (const st of statuses) {
+    if (st === "done") doneRun++;
+    else break;
+  }
+  const activeStepNum = doneRun < 6 ? doneRun + 1 : 0;
+
+  const stepMeta: { id: string; titleKey: DictKey; navKey: DictKey }[] = [
+    { id: "daten", titleKey: "step.title.1", navKey: "nav.step1" },
+    { id: "variablen", titleKey: "step.title.2", navKey: "nav.step2" },
+    { id: "kalibrierung", titleKey: "step.title.3", navKey: "nav.step3" },
+    { id: "notwendigkeit", titleKey: "step.title.4", navKey: "nav.step4" },
+    { id: "truthtable", titleKey: "step.title.5", navKey: "nav.step5" },
+    { id: "robustheit", titleKey: "step.title.6", navKey: "nav.step6" },
+  ];
+  const lockedReasonKeys: (DictKey | null)[] = [
+    null,
+    "step.locked.2",
+    "step.locked.3",
+    "step.locked.4",
+    "step.locked.5",
+    "step.locked.6",
+  ];
+  const navSteps = stepMeta.map((m, i) => ({
+    n: i + 1,
+    id: m.id,
+    label: t(locale, m.navKey),
+    status: statuses[i],
+  }));
+  const activeStepId = activeStepNum > 0 ? stepMeta[activeStepNum - 1].id : stepMeta[0].id;
+
+  // „Weiter"-Button unter dem zuletzt erledigten Schritt (= aktiver − 1),
+  // zeigt auf den nun aktiven Schritt. Nicht unter Schritt 6.
+  const continueUnder = doneRun >= 1 && doneRun < 6 ? doneRun : 0;
+  const renderContinue = (afterStep: number) =>
+    continueUnder === afterStep ? (
+      <ContinueButton
+        targetN={afterStep + 1}
+        targetTitle={t(locale, stepMeta[afterStep].titleKey)}
+        targetId={stepMeta[afterStep].id}
+      />
+    ) : null;
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px clamp(12px, 4vw, 26px) 90px" }}>
@@ -205,144 +405,290 @@ export default function Home() {
         }}
       />
       <Header />
-      {ds && <SectionNav sections={sections} />}
+      <SectionNav steps={navSteps} activeStepId={activeStepId} />
+      {ds && <Glossary />}
       <Onboarding />
-      {!ds ? (
-        <>
-          <div style={{ padding: "10px 2px 22px" }}>
-            <h1 style={{ fontSize: 28, fontWeight: 680, letterSpacing: "-0.015em", margin: "0 0 8px", maxWidth: "24ch" }}>
-              {t(locale, "hero.title")}
-            </h1>
-            <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: 0 }}>
-              {t(locale, "hero.desc")}
-            </p>
-          </div>
-          <Card>
-            <H2>{t(locale, "load.title")}</H2>
-            <p style={{ color: "var(--ink-2)", maxWidth: "60ch" }}>
-              {t(locale, "load.desc")}
-            </p>
-            <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Button primary onClick={loadDemo}>{t(locale, "load.demoBtn")}</Button>
-              <Button onClick={() => fileRef.current?.click()}>{t(locale, "load.importBtn")}</Button>
-            </div>
-            <p className="hint" style={hintStyle}>
-              {t(locale, "load.hint")}
-            </p>
-          </Card>
-          <Card>
-            <H2>{t(locale, "examples.title")}</H2>
-            <ExampleDatasets onSelect={applyDataset} />
-          </Card>
-        </>
-      ) : (
-        <>
-          <DataSection ds={ds} fuzzyCols={fuzzyCols} />
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, margin: "-8px 0 18px" }}>
-            <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
-            <CloudSaveLoad getState={currentState} onLoad={loadState} />
-          </div>
-          {fuzzyCols.length > 0 && (
-            <Card id="deskriptiv">
-              <H2>{t(locale, "descriptives.title")}</H2>
-              <Descriptives columns={fuzzyCols} cases={cases} />
-            </Card>
-          )}
-          <CalibrationSection
-            ds={ds}
-            anchors={anchors}
-            setAnchors={setAnchors}
-            focusVar={focusVar}
-            setFocusVar={setFocusVar}
-            cases={cases}
-          />
-          {necessity && <NecessitySection necessity={necessity} />}
-          <TruthTableSection
-            fuzzyCols={fuzzyCols}
-            conditions={conditions}
-            setConditions={setConditions}
-            outcome={outcome}
-            setOutcome={setOutcome}
-            freqCut={freqCut}
-            setFreqCut={setFreqCut}
-            consCut={consCut}
-            setConsCut={setConsCut}
-            tt={tt}
-          />
-          {sol && tt && (
-            <SolutionSection
-              tt={tt}
-              sol={sol}
-              expectations={expectations}
-              setExpectations={setExpectations}
-              conditions={conditions}
-            />
-          )}
-          {sol && tt && (
-            <>
-              <Card id="robustheit">
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "robustness.title")}</h2>
-                  <InfoHint
-                    title={t(locale, "info.robustness.title")}
-                    body={t(locale, "info.robustness.body")}
-                  />
-                </div>
-                <RobustnessPanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} currentConsCut={consCut} />
-              </Card>
-              {/* Panel bringt eigene Karte + Überschrift mit — nicht doppelt verpacken. */}
-              <div id="negiert" style={{ scrollMarginTop: 56 }}>
-                <NegatedOutcomePanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
-              </div>
-            </>
-          )}
-          {conditions.length > 0 && outcome && (() => {
-            const xc = xyCond && conditions.includes(xyCond) ? xyCond : conditions[0];
-            const points = cases.map((c) => ({ label: c.label, x: c.values[xc], y: c.values[outcome] }));
-            return (
-              <Card id="xyplot">
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "xy.title")}</h2>
-                    <InfoHint title={t(locale, "info.xyPlot.title")} body={t(locale, "info.xyPlot.body")} />
-                  </div>
-                  <select value={xc} onChange={(e) => setXyCond(e.target.value)} style={{ ...inputStyle, marginLeft: "auto" }}>
-                    {conditions.map((c) => (<option key={c} value={c}>{c}</option>))}
-                  </select>
-                </div>
-                <XyPlot xLabel={xc.replace(/^fs_/, "")} yLabel={outcome.replace(/^fs_/, "")} points={points} />
-                <p className="hint" style={hintStyle}>{t(locale, "xy.hint")}</p>
-              </Card>
-            );
-          })()}
-          <ProtocolSection ds={ds} anchors={anchors} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
-          <Card>
-            <H2>{t(locale, "report.title")}</H2>
-            <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
-            <ReportButton
-              getInput={(): ReportInput | null => {
-                if (!ds || !tt || !sol || !necessity) return null;
-                return {
-                  datasetName: ds.name,
-                  caseCount: ds.rows.length,
-                  anchors,
-                  conditions,
-                  outcome,
-                  freqCut,
-                  consCut,
-                  tt,
-                  complex: sol.complex,
-                  intermediate: sol.intermediate,
-                  parsimonious: sol.parsimonious,
-                  necessity,
-                  expectations: Object.fromEntries(conditions.map((c) => [c, expectations[c] ?? "present"])),
-                  rScript: buildRScript(ds, anchors, conditions, outcome, freqCut, consCut),
-                };
-              }}
-            />
-          </Card>
-        </>
+      {!ds && (
+        <div style={{ padding: "10px 2px 22px" }}>
+          <h1 style={{ fontSize: 28, fontWeight: 680, letterSpacing: "-0.015em", margin: "0 0 8px", maxWidth: "24ch" }}>
+            {t(locale, "hero.title")}
+          </h1>
+          <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: 0 }}>
+            {t(locale, "hero.desc")}
+          </p>
+          <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: "8px 0 0" }}>
+            {t(locale, "hero.tourHint")}
+          </p>
+        </div>
       )}
+
+      {/* Schritt 1 — Daten laden */}
+      <Step n={1} id={stepMeta[0].id} title={t(locale, stepMeta[0].titleKey)} status={s1} intro={t(locale, "step.intro.1")}>
+        {!ds ? (
+          <>
+            <Card>
+              {/* Titel liefert der Step-Wrapper — hier nicht doppeln. */}
+              <p style={{ color: "var(--ink-2)", maxWidth: "60ch", marginTop: 0 }}>
+                {t(locale, "load.desc")}
+              </p>
+              <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Button primary onClick={loadDemo}>{t(locale, "load.demoBtn")}</Button>
+                <Button onClick={() => fileRef.current?.click()}>{t(locale, "load.importBtn")}</Button>
+                <Button onClick={startTour}>{t(locale, "tour.start")}</Button>
+              </div>
+              <p className="hint" style={hintStyle}>
+                {t(locale, "load.hint")}
+              </p>
+            </Card>
+            <Card>
+              <H2>{t(locale, "examples.title")}</H2>
+              <ExampleDatasets onSelect={applyDataset} />
+            </Card>
+          </>
+        ) : (
+          <>
+            <DataSection ds={ds} setCols={setCols} />
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, margin: "-8px 0 18px" }}>
+              <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
+              <CloudSaveLoad getState={currentState} onLoad={loadState} />
+            </div>
+          </>
+        )}
+      </Step>
+      {renderContinue(1)}
+
+      {/* Schritt 2 — Variablen & Rollen */}
+      <Step n={2} id={stepMeta[1].id} title={t(locale, stepMeta[1].titleKey)} status={s2} lockedReason={t(locale, lockedReasonKeys[1]!)} intro={t(locale, "step.intro.2")}>
+        {ds && <VariablesSection ds={ds} varMeta={varMeta} setVarMeta={setVarMeta} anchors={anchors} />}
+      </Step>
+      {renderContinue(2)}
+
+      {/* Schritt 3 — Kalibrieren (inkl. Deskriptivstatistik) */}
+      <Step n={3} id={stepMeta[2].id} title={t(locale, stepMeta[2].titleKey)} status={s3} lockedReason={t(locale, lockedReasonKeys[2]!)} intro={t(locale, "step.intro.3")}>
+        {ds && (
+          <>
+            {setCols.length > 0 && (
+              <Card id="deskriptiv">
+                <H2>{t(locale, "descriptives.title")}</H2>
+                <Descriptives columns={setCols} cases={cases} />
+              </Card>
+            )}
+            <CalibrationSection
+              ds={ds}
+              varMeta={varMeta}
+              anchors={anchors}
+              setAnchors={setAnchors}
+              focusVar={focusVar}
+              setFocusVar={setFocusVar}
+              cases={cases}
+            />
+          </>
+        )}
+      </Step>
+      {renderContinue(3)}
+
+      {/* Schritt 4 — Notwendigkeit */}
+      <Step n={4} id={stepMeta[3].id} title={t(locale, stepMeta[3].titleKey)} status={s4} lockedReason={t(locale, lockedReasonKeys[3]!)} intro={t(locale, "step.intro.4")}>
+        {necessity ? <NecessitySection necessity={necessity} /> : <p className="hint" style={hintStyle}>{t(locale, "step.pending")}</p>}
+      </Step>
+      {renderContinue(4)}
+
+      {/* Schritt 5 — Truth Table & Lösungen */}
+      <Step n={5} id={stepMeta[4].id} title={t(locale, stepMeta[4].titleKey)} status={s5} lockedReason={t(locale, lockedReasonKeys[4]!)} intro={t(locale, "step.intro.5")}>
+        <TruthTableSection
+          freqCut={freqCut}
+          setFreqCut={setFreqCut}
+          consCut={consCut}
+          setConsCut={setConsCut}
+          tt={tt}
+        />
+        {sol && tt && (
+          <SolutionSection
+            tt={tt}
+            sol={sol}
+            expectations={expectations}
+            setExpectations={setExpectations}
+            conditions={conditions}
+          />
+        )}
+      </Step>
+      {renderContinue(5)}
+
+      {/* Schritt 6 — Robustheit, Bericht & Export */}
+      <Step n={6} id={stepMeta[5].id} title={t(locale, stepMeta[5].titleKey)} status={s6} lockedReason={t(locale, lockedReasonKeys[5]!)} intro={t(locale, "step.intro.6")}>
+        {sol && tt && ds && (
+          <>
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "robustness.title")}</h2>
+                <InfoHint
+                  title={t(locale, "info.robustness.title")}
+                  body={t(locale, "info.robustness.body")}
+                />
+              </div>
+              <RobustnessPanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} currentConsCut={consCut} />
+            </Card>
+            {/* Panel bringt eigene Karte + Überschrift mit — nicht doppelt verpacken. */}
+            <div id="negiert" style={{ scrollMarginTop: 56 }}>
+              <NegatedOutcomePanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
+            </div>
+            {conditions.length > 0 && outcome && (() => {
+              const xc = xyCond && conditions.includes(xyCond) ? xyCond : conditions[0];
+              const points = cases.map((c) => ({ label: c.label, x: c.values[xc], y: c.values[outcome] }));
+              return (
+                <Card id="xyplot">
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "xy.title")}</h2>
+                      <InfoHint title={t(locale, "info.xyPlot.title")} body={t(locale, "info.xyPlot.body")} />
+                    </div>
+                    <select value={xc} onChange={(e) => setXyCond(e.target.value)} style={{ ...inputStyle, marginLeft: "auto" }}>
+                      {conditions.map((c) => (<option key={c} value={c}>{c}</option>))}
+                    </select>
+                  </div>
+                  <XyPlot xLabel={xc} yLabel={outcome} points={points} />
+                  <p className="hint" style={hintStyle}>{t(locale, "xy.hint")}</p>
+                </Card>
+              );
+            })()}
+            <ProtocolSection ds={ds} anchors={anchors} varMeta={varMeta} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
+            <Card>
+              <H2>{t(locale, "report.title")}</H2>
+              <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
+              <ReportButton
+                getInput={(): ReportInput | null => {
+                  if (!ds || !tt || !sol || !necessity) return null;
+                  return {
+                    datasetName: ds.name,
+                    caseCount: ds.rows.length,
+                    anchors: rawAnchorsOf(ds, varMeta, anchors),
+                    conditions,
+                    outcome,
+                    freqCut,
+                    consCut,
+                    tt,
+                    complex: sol.complex,
+                    intermediate: sol.intermediate,
+                    parsimonious: sol.parsimonious,
+                    necessity,
+                    expectations: Object.fromEntries(conditions.map((c) => [c, expectations[c] ?? "present"])),
+                    rScript: buildRScript(ds, anchors, varMeta, conditions, outcome, freqCut, consCut),
+                  };
+                }}
+              />
+            </Card>
+          </>
+        )}
+      </Step>
+      <GuidedTour
+        active={tourStep !== null}
+        stepIndex={tourStep ?? 0}
+        onNext={nextTourStep}
+        onEnd={endTour}
+        steps={tourSteps}
+      />
+    </div>
+  );
+}
+
+/* ---------- Stepper-Bausteine ---------- */
+
+function Step({
+  n,
+  title,
+  status,
+  lockedReason,
+  id,
+  intro,
+  children,
+}: {
+  n: number;
+  title: string;
+  status: StepStatus;
+  lockedReason?: string;
+  id: string;
+  intro?: string;
+  children: React.ReactNode;
+}) {
+  const [locale] = useLocale();
+  const done = status === "done";
+  const locked = status === "locked";
+  const chip =
+    status === "done"
+      ? { label: t(locale, "step.status.done"), color: "var(--good-text)", bg: "rgba(12,163,12,0.10)" }
+      : status === "active"
+        ? { label: t(locale, "step.status.active"), color: "var(--accent-deep)", bg: "var(--accent-wash)" }
+        : { label: t(locale, "step.status.locked"), color: "var(--muted)", bg: "var(--line-soft)" };
+  return (
+    <section id={id} style={{ scrollMarginTop: 56, marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: locked ? 6 : 14 }}>
+        <span
+          aria-hidden
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            flex: "none",
+            display: "grid",
+            placeItems: "center",
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#fff",
+            background: locked ? "var(--muted)" : "var(--brand)",
+          }}
+        >
+          {done ? "✓" : n}
+        </span>
+        <h2 style={{ fontSize: 16.5, fontWeight: 650, margin: 0, flex: 1, color: locked ? "var(--muted)" : "var(--ink)" }}>
+          {title}
+        </h2>
+        <span style={{ fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap", color: chip.color, background: chip.bg }}>
+          {chip.label}
+        </span>
+      </div>
+      {intro && (
+        <p
+          style={{
+            color: "var(--ink-2)",
+            fontSize: 13.5,
+            lineHeight: 1.5,
+            margin: locked ? "0 0 4px" : "0 0 14px",
+            paddingLeft: 40,
+            maxWidth: "70ch",
+          }}
+        >
+          {intro}
+        </p>
+      )}
+      {locked ? (
+        <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "0 0 4px", paddingLeft: 40 }}>{lockedReason}</p>
+      ) : (
+        children
+      )}
+    </section>
+  );
+}
+
+function ContinueButton({ targetN, targetTitle, targetId }: { targetN: number; targetTitle: string; targetId: string }) {
+  const [locale] = useLocale();
+  return (
+    <div style={{ margin: "-4px 0 22px", paddingLeft: 40 }}>
+      <button
+        onClick={() => document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        style={{
+          font: "inherit",
+          fontSize: 13.5,
+          fontWeight: 600,
+          color: "var(--accent-deep)",
+          background: "var(--accent-wash)",
+          border: "1px solid var(--accent)",
+          borderRadius: 8,
+          padding: "7px 14px",
+          cursor: "pointer",
+        }}
+      >
+        {t(locale, "step.next", { n: targetN, title: targetTitle })}
+      </button>
     </div>
   );
 }
@@ -351,6 +697,7 @@ export default function Home() {
 
 function CalibrationSection({
   ds,
+  varMeta,
   anchors,
   setAnchors,
   focusVar,
@@ -358,6 +705,7 @@ function CalibrationSection({
   cases,
 }: {
   ds: RawDataset;
+  varMeta: Record<string, VarMeta>;
   anchors: Anchors;
   setAnchors: (a: Anchors) => void;
   focusVar: string;
@@ -365,11 +713,23 @@ function CalibrationSection({
   cases: QcaCase[];
 }) {
   const [locale] = useLocale();
-  const raw = numericCols(ds);
-  const v = focusVar || raw[0];
+  // Kalibrierung betrifft nur Roh-Variablen mit Rolle ≠ ignorieren.
+  const raw = numericCols(ds).filter(
+    (c) => varMeta[c]?.type === "raw" && varMeta[c]?.role !== "ignore",
+  );
+
+  if (raw.length === 0) {
+    return (
+      <Card>
+        <H2>{t(locale, "calib.title")}</H2>
+        <Diag kind="ok">{t(locale, "calib.allCalibrated")}</Diag>
+      </Card>
+    );
+  }
+
+  const v = raw.includes(focusVar) ? focusVar : raw[0];
   const a = anchors[v] ?? [0, 0.5, 1];
-  const fsName = "fs_" + v;
-  const rows = cases.map((c) => ({ label: c.label, f: c.values[fsName] }));
+  const rows = cases.map((c) => ({ label: c.label, f: c.values[v] }));
   const values = ds.rows.map((r) => Number(r[v]));
 
   const hi = rows.filter((r) => r.f > 0.5).length;
@@ -391,7 +751,7 @@ function CalibrationSection({
   }
 
   return (
-    <Card id="kalibrierung">
+    <Card>
       <H2>{t(locale, "calib.title")}</H2>
       <p style={{ color: "var(--ink-2)", maxWidth: "66ch", marginTop: 0 }}>
         {t(locale, "calib.desc")}
@@ -746,11 +1106,11 @@ function CalibrationCurve({
 
 /* ---------- Daten ---------- */
 
-function DataSection({ ds, fuzzyCols }: { ds: RawDataset; fuzzyCols: string[] }) {
+function DataSection({ ds, setCols }: { ds: RawDataset; setCols: string[] }) {
   const [locale] = useLocale();
-  const fs = new Set(fuzzyCols.map((c) => c.replace(/^fs_/, "")));
+  const fs = new Set(setCols);
   return (
-    <Card id="daten">
+    <Card>
       <H2>{t(locale, "data.title", { n: ds.rows.length })}</H2>
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
@@ -778,14 +1138,152 @@ function DataSection({ ds, fuzzyCols }: { ds: RawDataset; fuzzyCols: string[] })
   );
 }
 
+/* ---------- Variablen & Rollen ---------- */
+
+function VariablesSection({
+  ds,
+  varMeta,
+  setVarMeta,
+  anchors,
+}: {
+  ds: RawDataset;
+  varMeta: Record<string, VarMeta>;
+  setVarMeta: (m: Record<string, VarMeta>) => void;
+  anchors: Anchors;
+}) {
+  const [locale] = useLocale();
+  const cols = numericCols(ds);
+
+  function setType(col: string, type: VarType) {
+    setVarMeta({ ...varMeta, [col]: { ...varMeta[col], type } });
+  }
+  function setRole(col: string, role: VarRole) {
+    const next: Record<string, VarMeta> = { ...varMeta };
+    if (role === "outcome") {
+      // Genau ein Outcome: vorhandenes Outcome auf Bedingung zurücksetzen.
+      for (const k of Object.keys(next)) {
+        if (next[k].role === "outcome") next[k] = { ...next[k], role: "condition" };
+      }
+    }
+    next[col] = { ...next[col], role };
+    setVarMeta(next);
+  }
+
+  const typeOptions: { id: VarType; key: DictKey }[] = [
+    { id: "raw", key: "vars.type.raw" },
+    { id: "fuzzy", key: "vars.type.fuzzy" },
+    { id: "crisp", key: "vars.type.crisp" },
+  ];
+  const roleOptions: { id: VarRole; key: DictKey }[] = [
+    { id: "condition", key: "vars.role.condition" },
+    { id: "outcome", key: "vars.role.outcome" },
+    { id: "ignore", key: "vars.role.ignore" },
+  ];
+
+  return (
+    <Card>
+      {/* Titel + Intro liefert der Step-Wrapper (step.intro.2) — hier nicht doppeln. */}
+      <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+          <thead>
+            <tr>
+              <th style={thStyle(false)}>{t(locale, "vars.col.name")}</th>
+              <th style={thStyle(false)}>{t(locale, "vars.col.type")}</th>
+              <th style={thStyle(false)}>{t(locale, "vars.col.role")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cols.map((col) => {
+              const meta = varMeta[col] ?? { type: "raw" as VarType, role: "ignore" as VarRole };
+              const values = colNumericValues(ds, col);
+              const detected = detectVarType(values);
+              const usable = meta.role === "ignore" || isColUsable(meta.type, values, anchors, col);
+              const badgeKey: DictKey = meta.type === "raw" ? "vars.badge.raw" : "vars.badge.ready";
+              const warnKey: DictKey =
+                meta.type === "crisp"
+                  ? "vars.warn.crisp"
+                  : meta.type === "fuzzy"
+                    ? "vars.warn.fuzzy"
+                    : "vars.warn.raw";
+              return (
+                <Fragment key={col}>
+                  <tr>
+                    <td style={{ ...tdStyle(false, true), verticalAlign: "top" }} className="mono">{col}</td>
+                    <td style={{ ...tdStyle(false, false), verticalAlign: "top" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                        <select
+                          value={meta.type}
+                          onChange={(e) => setType(col, e.target.value as VarType)}
+                          style={{ ...inputStyle, padding: "4px 7px", fontSize: 13 }}
+                        >
+                          {typeOptions.map((o) => (
+                            <option key={o.id} value={o.id}>{t(locale, o.key)}</option>
+                          ))}
+                        </select>
+                        {meta.type === detected && (
+                          <span style={autoBadgeStyle}>{t(locale, "vars.autoDetected")}</span>
+                        )}
+                        <span style={typeBadgeStyle(meta.type)}>{t(locale, badgeKey)}</span>
+                      </div>
+                    </td>
+                    <td style={{ ...tdStyle(false, false), verticalAlign: "top" }}>
+                      <select
+                        value={meta.role}
+                        onChange={(e) => setRole(col, e.target.value as VarRole)}
+                        style={{ ...inputStyle, padding: "4px 7px", fontSize: 13 }}
+                      >
+                        {roleOptions.map((o) => (
+                          <option key={o.id} value={o.id}>{t(locale, o.key)}</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                  {!usable && (
+                    <tr>
+                      <td colSpan={3} style={{ padding: "0 12px 8px", borderBottom: "1px solid var(--line-soft)" }}>
+                        <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{t(locale, warnKey)}</span>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+const autoBadgeStyle: React.CSSProperties = {
+  fontSize: 10.5,
+  fontWeight: 600,
+  letterSpacing: "0.03em",
+  color: "var(--muted)",
+  border: "1px solid var(--line)",
+  borderRadius: 999,
+  padding: "1px 7px",
+  whiteSpace: "nowrap",
+};
+
+function typeBadgeStyle(type: VarType): React.CSSProperties {
+  const raw = type === "raw";
+  return {
+    fontSize: 10.5,
+    fontWeight: 700,
+    letterSpacing: "0.03em",
+    textTransform: "uppercase",
+    color: raw ? "var(--warn-text)" : "var(--accent-deep)",
+    background: raw ? "var(--warn-wash)" : "var(--accent-wash)",
+    borderRadius: 999,
+    padding: "1px 8px",
+    whiteSpace: "nowrap",
+  };
+}
+
 /* ---------- Truth Table ---------- */
 
 function TruthTableSection(props: {
-  fuzzyCols: string[];
-  conditions: string[];
-  setConditions: (c: string[]) => void;
-  outcome: string;
-  setOutcome: (o: string) => void;
   freqCut: number;
   setFreqCut: (n: number) => void;
   consCut: number;
@@ -793,7 +1291,7 @@ function TruthTableSection(props: {
   tt: TruthTableResult | null;
 }) {
   const [locale] = useLocale();
-  const { fuzzyCols, conditions, setConditions, outcome, setOutcome, freqCut, setFreqCut, consCut, setConsCut, tt } = props;
+  const { freqCut, setFreqCut, consCut, setConsCut, tt } = props;
   const observed = tt
     ? tt.rows
         .filter((r) => r.n > 0)
@@ -801,30 +1299,16 @@ function TruthTableSection(props: {
     : [];
   const remainders = tt ? tt.rows.length - observed.length : 0;
 
-  function toggle(c: string) {
-    setConditions(conditions.includes(c) ? conditions.filter((x) => x !== c) : [...conditions, c]);
-  }
-
   return (
-    <Card id="truthtable">
+    <Card>
       <H2>{t(locale, "tt.title")}</H2>
-      <div style={{ marginBottom: 12 }}>
-        <Label>{t(locale, "tt.conditions")}</Label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 4 }}>
-          {fuzzyCols.map((c) => (
-            <label key={c} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
-              <input type="checkbox" checked={conditions.includes(c) && c !== outcome} disabled={c === outcome} onChange={() => toggle(c)} />
-              <span className="mono">{c}</span>
-            </label>
-          ))}
-        </div>
-      </div>
+      <p className="hint" style={{ ...hintStyle, marginTop: 0, marginBottom: 12 }}>
+        {t(locale, "tt.rolesHint")}{" "}
+        <a href="#variablen" style={{ color: "var(--accent-deep)", textDecoration: "none", fontWeight: 600 }}>
+          {t(locale, "tt.rolesLink")}
+        </a>
+      </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "end" }}>
-        <Field label={t(locale, "tt.outcome")}>
-          <select value={outcome} onChange={(e) => setOutcome(e.target.value)} style={inputStyle}>
-            {fuzzyCols.map((c) => (<option key={c} value={c}>{c}</option>))}
-          </select>
-        </Field>
         <Field
           label={
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -1076,7 +1560,7 @@ function SolutionSection({
 function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessityAnalysis> }) {
   const [locale] = useLocale();
   return (
-    <Card id="notwendigkeit">
+    <Card>
       <H2>{t(locale, "nec.title")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: -6, marginBottom: 12, fontSize: 13 }}>
         {t(locale, "nec.orderHint")}
@@ -1120,10 +1604,11 @@ function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessit
 
 /* ---------- Protokoll ---------- */
 
-function buildRScript(ds: RawDataset, anchors: Anchors, conditions: string[], outcome: string, freqCut: number, consCut: number): string {
+function buildRScript(ds: RawDataset, anchors: Anchors, varMeta: Record<string, VarMeta>, conditions: string[], outcome: string, freqCut: number, consCut: number): string {
   const lines = ["library(QCA)", "", `df <- read.csv("${ds.name}.csv")`];
-  for (const [v, a] of Object.entries(anchors)) {
-    lines.push(`df$fs_${v} <- calibrate(df$${v}, type = "fuzzy", thresholds = "e=${a[0]}, c=${a[1]}, i=${a[2]}")`);
+  // calibrate()-Zeilen NUR für Roh-Variablen mit gültigen Ankern; Spaltennamen ohne Präfix.
+  for (const [v, a] of Object.entries(rawAnchorsOf(ds, varMeta, anchors))) {
+    lines.push(`df$${v} <- calibrate(df$${v}, type = "fuzzy", thresholds = "e=${a[0]}, c=${a[1]}, i=${a[2]}")`);
   }
   if (conditions.length && outcome) {
     lines.push("", `tt <- truthTable(df, outcome = "${outcome}", conditions = "${conditions.join(", ")}",`);
@@ -1134,15 +1619,15 @@ function buildRScript(ds: RawDataset, anchors: Anchors, conditions: string[], ou
   return lines.join("\n");
 }
 
-function ProtocolSection({ ds, anchors, conditions, outcome, freqCut, consCut }: { ds: RawDataset; anchors: Anchors; conditions: string[]; outcome: string; freqCut: number; consCut: number }) {
+function ProtocolSection({ ds, anchors, varMeta, conditions, outcome, freqCut, consCut }: { ds: RawDataset; anchors: Anchors; varMeta: Record<string, VarMeta>; conditions: string[]; outcome: string; freqCut: number; consCut: number }) {
   const [locale] = useLocale();
   const r = useMemo(
-    () => buildRScript(ds, anchors, conditions, outcome, freqCut, consCut),
-    [ds, anchors, conditions, outcome, freqCut, consCut],
+    () => buildRScript(ds, anchors, varMeta, conditions, outcome, freqCut, consCut),
+    [ds, anchors, varMeta, conditions, outcome, freqCut, consCut],
   );
 
   function download() {
-    const payload = { tool: "openQCA", exportiert: new Date().toISOString(), datensatz: ds.name, kalibrierungen: anchors, bedingungen: conditions, outcome, freqCut, consCut };
+    const payload = { tool: "openQCA", exportiert: new Date().toISOString(), datensatz: ds.name, kalibrierungen: rawAnchorsOf(ds, varMeta, anchors), bedingungen: conditions, outcome, freqCut, consCut };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -1204,10 +1689,25 @@ function Card({ children, id }: { children: React.ReactNode; id?: string }) {
 
 /* ---------- Sektions-Navigation (Scroll-Spy) ---------- */
 
-function SectionNav({ sections }: { sections: { id: string; label: string }[] }) {
+function SectionNav({
+  steps,
+  activeStepId,
+}: {
+  steps: { n: number; id: string; label: string; status: StepStatus }[];
+  activeStepId: string;
+}) {
   const [locale] = useLocale();
-  const [activeId, setActiveId] = useState<string>(sections[0]?.id ?? "");
-  const idsKey = sections.map((s) => s.id).join("|");
+  const [activeId, setActiveId] = useState<string>(activeStepId);
+  // Scroll-Spy nur für freigeschaltete (nicht gesperrte) Schritte.
+  const idsKey = steps
+    .filter((s) => s.status !== "locked")
+    .map((s) => s.id)
+    .join("|");
+
+  // Fortschritt springt weiter → aktiven Schritt hervorheben, bis der Nutzer scrollt.
+  useEffect(() => {
+    setActiveId(activeStepId);
+  }, [activeStepId]);
 
   useEffect(() => {
     if (!idsKey) return;
@@ -1232,8 +1732,6 @@ function SectionNav({ sections }: { sections: { id: string; label: string }[] })
     });
     return () => observer.disconnect();
   }, [idsKey]);
-
-  if (sections.length === 0) return null;
 
   function go(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1268,29 +1766,72 @@ function SectionNav({ sections }: { sections: { id: string; label: string }[] })
           whiteSpace: "nowrap",
         }}
       >
-        {sections.map((s) => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            onClick={(e) => {
-              e.preventDefault();
-              go(s.id);
-            }}
-            style={{
-              flex: "none",
-              fontSize: 12.5,
-              padding: "5px 10px",
-              borderRadius: 7,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-              color: activeId === s.id ? "var(--accent-deep)" : "var(--ink-2)",
-              fontWeight: activeId === s.id ? 600 : 400,
-              background: activeId === s.id ? "var(--panel-2)" : "transparent",
-            }}
-          >
-            {s.label}
-          </a>
-        ))}
+        {steps.map((s) => {
+          const locked = s.status === "locked";
+          const done = s.status === "done";
+          const isActive = !locked && activeId === s.id;
+          const prefix = done ? "✓" : `${s.n}`;
+          const baseStyle: React.CSSProperties = {
+            flex: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            fontSize: 12.5,
+            padding: "5px 10px",
+            borderRadius: 7,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          };
+          const badge = (color: string) => (
+            <span
+              aria-hidden
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#fff",
+                background: color,
+              }}
+            >
+              {prefix}
+            </span>
+          );
+          if (locked) {
+            return (
+              <span
+                key={s.id}
+                aria-disabled
+                style={{ ...baseStyle, color: "var(--muted)", opacity: 0.55, cursor: "default" }}
+              >
+                {badge("var(--muted)")}
+                {s.label}
+              </span>
+            );
+          }
+          return (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                go(s.id);
+              }}
+              style={{
+                ...baseStyle,
+                color: isActive ? "var(--accent-deep)" : done ? "var(--good-text)" : "var(--ink-2)",
+                fontWeight: isActive ? 600 : 400,
+                background: isActive ? "var(--panel-2)" : "transparent",
+              }}
+            >
+              {badge(done ? "var(--good-text)" : "var(--brand)")}
+              {s.label}
+            </a>
+          );
+        })}
       </div>
     </nav>
   );

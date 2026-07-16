@@ -125,6 +125,8 @@ const de = {
   "hero.title": "Das offene, geführte Werkzeug für Qualitative Comparative Analysis.",
   "hero.desc":
     "openQCA führt durch Kalibrierung, Truth Table und Minimierung — mit einem Coach, der typische Fehler abfängt, und einem Protokoll, das jede Analyse reproduzierbar macht. Kostenlos, Open Source (MIT), und Ihre Daten bleiben im Browser.",
+  "hero.tourHint":
+    "Am schnellsten geht's mit der Beispiel-Tour — sie führt Sie anhand von Demo-Daten Schritt für Schritt durch die App.",
 
   "load.title": "Daten laden",
   "load.desc":
@@ -148,6 +150,7 @@ const de = {
   // -- Sektions-Navigation ------------------------------------------------------
   "nav.ariaLabel": "Sektionsnavigation",
   "nav.daten": "Daten",
+  "nav.variablen": "Variablen",
   "nav.deskriptiv": "Deskriptiv",
   "nav.kalibrierung": "Kalibrierung",
   "nav.notwendigkeit": "Notwendigkeit",
@@ -157,6 +160,88 @@ const de = {
   "nav.negiert": "Negiert",
   "nav.xyplot": "XY-Plot",
   "nav.protokoll": "Protokoll",
+
+  // -- Stepper: Kurzlabels (Navigation) ---------------------------------------
+  "nav.step1": "Daten",
+  "nav.step2": "Variablen",
+  "nav.step3": "Kalibrieren",
+  "nav.step4": "Notwendigkeit",
+  "nav.step5": "Truth Table",
+  "nav.step6": "Bericht",
+
+  // -- Stepper: Schritt-Titel, Status, Sperrgründe ----------------------------
+  "step.title.1": "Daten laden",
+  "step.title.2": "Variablen & Rollen",
+  "step.title.3": "Kalibrieren",
+  "step.title.4": "Notwendigkeit",
+  "step.title.5": "Truth Table & Lösungen",
+  "step.title.6": "Robustheit, Bericht & Export",
+  "step.status.done": "✓ erledigt",
+  "step.status.active": "aktiv",
+  "step.status.locked": "gesperrt",
+  "step.locked.2": "Erst Daten laden.",
+  "step.locked.3": "Erst Variablen & Rollen festlegen.",
+  "step.locked.4": "Erst kalibrieren.",
+  "step.locked.5": "Erst kalibrieren.",
+  "step.locked.6": "Erst Truth Table & Lösungen berechnen.",
+  "step.pending": "Ergebnisse werden berechnet …",
+  "step.next": "Weiter zu Schritt {n}: {title} →",
+
+  // -- Stepper: Klartext-Intros je Schritt (für Erstnutzer ohne QCA-Vorwissen) -
+  "step.intro.1":
+    "Laden Sie eigene Daten (CSV/Excel) oder ein Beispiel. Jede Zeile ist ein Fall (z. B. ein Land), jede Spalte eine Eigenschaft.",
+  "step.intro.2":
+    "QCA arbeitet mit Mengen („Sets“): Jeder Fall gehört zu jeder Eigenschaft irgendwo zwischen 0 (klar nicht dabei) und 1 (klar dabei). Hier legen Sie fest, welche Spalten Bedingungen sind, welche das Ergebnis (Outcome) ist — und ob die Werte schon Zugehörigkeiten sind oder erst übersetzt werden müssen.",
+  "step.intro.3":
+    "Kalibrieren heißt: Rohwerte (z. B. Einkommen in €) in Zugehörigkeiten von 0–1 übersetzen. Sie setzen drei Anker — ab wann ein Fall klar draußen (0,05), unentschieden (0,50) und klar drinnen (0,95) ist. Begründen Sie die Anker inhaltlich, nicht aus den Daten.",
+  "step.intro.4":
+    "Bevor wir Kombinationen prüfen: Gibt es eine Bedingung, ohne die das Outcome (fast) nie vorkommt? Das wäre eine notwendige Bedingung — sie wird separat berichtet.",
+  "step.intro.5":
+    "Jetzt das Herzstück: Jede Zeile der Wahrheitstafel ist eine Kombination von Bedingungen. Wir behalten Kombinationen, die verlässlich mit dem Outcome einhergehen (Konsistenz) und oft genug vorkommen (n) — und kürzen sie zu möglichst einfachen Lösungsformeln.",
+  "step.intro.6":
+    "Zum Schluss: Wie stabil ist Ihre Lösung bei anderen Schwellen? Erklärt dieselbe Logik auch das Ausbleiben des Outcomes? Und alles zum Mitnehmen: Bericht (PDF), Protokoll (JSON) und R-Skript.",
+
+  // -- Beispiel-Tour (GuidedTour) -----------------------------------------------
+  "tour.start": "🧭 Beispiel-Tour starten",
+  "tour.next": "Weiter",
+  "tour.end": "Tour beenden",
+  "tour.progress": "{n}/{total}",
+  "tour.s1.title": "Ihre Daten",
+  "tour.s1.body": "18 Länder, 5 Eigenschaften.",
+  "tour.s2.title": "Rollen",
+  "tour.s2.body": "Was ist Bedingung, was Outcome — hier schon vorbelegt.",
+  "tour.s3.title": "Rohwerte → 0–1",
+  "tour.s3.body": "Ziehen Sie die Anker und beobachten Sie die Kurve.",
+  "tour.s4.title": "Notwendigkeit prüfen",
+  "tour.s4.body": "Gibt es eine Bedingung, ohne die das Outcome fast nie vorkommt? Das prüfen wir hier zuerst.",
+  "tour.s5.title": "Wahrheitstafel",
+  "tour.s5.body": "Jede Zeile ist eine Kombination von Bedingungen — mit Konsistenz und Fallzahl je Zeile.",
+  "tour.s6.title": "Die drei Lösungsformeln",
+  "tour.s6.body": "Die intermediäre ist der Standard fürs Paper.",
+  "tour.s7.title": "Bericht, Protokoll, R-Skript",
+  "tour.s7.body": "Alles reproduzierbar. Tour Ende.",
+
+  // -- Grundbegriffe (Glossary) -------------------------------------------------
+  "gloss.toggle": "📖 Grundbegriffe (Set, fuzzy, crisp, Kalibrierung …)",
+  "gloss.set.term": "Set / Menge",
+  "gloss.set.def":
+    "Eine Menge ist eine Eigenschaft, zu der ein Fall mehr oder weniger stark gehört — z. B. „demokratisch“.",
+  "gloss.membership.term": "Zugehörigkeit (0–1)",
+  "gloss.membership.def":
+    "Die Zahl zwischen 0 und 1, die angibt, wie stark ein Fall zu einem Set gehört.",
+  "gloss.crispFuzzy.term": "Crisp vs. Fuzzy",
+  "gloss.crispFuzzy.def":
+    "Crisp kennt nur 0 oder 1 (ganz draußen/drinnen); Fuzzy erlaubt Abstufungen dazwischen.",
+  "gloss.calibration.term": "Kalibrierung",
+  "gloss.calibration.def":
+    "Das Übersetzen von Rohwerten in Zugehörigkeiten von 0 bis 1, anhand inhaltlich begründeter Anker.",
+  "gloss.consistency.term": "Konsistenz",
+  "gloss.consistency.def":
+    "Wie verlässlich eine Bedingung (oder Kombination) mit dem Outcome einhergeht.",
+  "gloss.coverage.term": "Coverage",
+  "gloss.coverage.def":
+    "Wie viel vom Outcome eine Lösung tatsächlich erklärt — ihre Erklärungsreichweite.",
+  "gloss.moreLink": "Ausführlich: Methodik →",
 
   // -- Kalibrierung -----------------------------------------------------------
   "calib.title": "Kalibrierung, die mitdenkt",
@@ -189,11 +274,14 @@ const de = {
   "calib.handle.cross": "Anker Kreuzung",
   "calib.handle.in": "Anker voll drinnen",
   "calib.rug.desc": "Die Griffe unter der Kurve lassen sich ziehen; die kurzen Striche zeigen die Verteilung der Rohwerte.",
+  "calib.allCalibrated": "Ihre Daten sind bereits kalibriert — nichts zu tun.",
 
   // -- Truth Table ------------------------------------------------------------
   "tt.title": "Truth Table",
   "tt.conditions": "Bedingungen",
   "tt.outcome": "Outcome",
+  "tt.rolesHint": "Bedingungen und Outcome werden unter „Variablen & Rollen“ festgelegt.",
+  "tt.rolesLink": "→ Variablen & Rollen",
   "tt.freqCut": "Frequenz-Cutoff",
   "tt.consCut": "Konsistenz-Cutoff",
   "tt.unassignedWarn":
@@ -324,18 +412,41 @@ const de = {
   "ex.rohwerte.title": "Rohwerte Demokratie",
   "ex.rohwerte.badge": "Rohwerte",
   "ex.rohwerte.desc":
-    "16 erfundene Länder mit Rohwerten (Prozente und Indizes) – zum Selber-Kalibrieren.",
+    "16 erfundene Länder mit Rohwerten (Prozente und Indizes) – Rohwerte, die zuerst kalibriert werden müssen (Schritt 3).",
   "ex.fuzzy.title": "Fuzzy-Sets Beispiel",
   "ex.fuzzy.badge": "Fuzzy [0,1]",
   "ex.fuzzy.desc":
-    "14 Fälle, bereits als Fuzzy-Zugehörigkeit in [0,1] – direkt zu Truth Table und Minimierung.",
+    "14 Fälle mit bereits vorliegenden Zugehörigkeiten in [0,1] – direkt nutzbar, keine Kalibrierung nötig.",
   "ex.crisp.title": "Crisp-Sets Beispiel",
   "ex.crisp.badge": "Crisp 0/1",
   "ex.crisp.desc":
-    "14 fiktive Start-ups, alle Werte strikt binär (0/1) – Grundlage für csQCA.",
+    "14 fiktive Start-ups mit nur 0/1 (Crisp-Sets) – direkt nutzbar, Grundlage für csQCA.",
   "ex.meta": "{cases} Fälle · {conditions} Bedingungen",
   "ex.synthetic": "synthetisch",
   "ex.error": "Beispiel-Datensatz konnte nicht geladen werden.",
+
+  // -- Variablen & Rollen -----------------------------------------------------
+  "vars.title": "Variablen & Rollen",
+  "vars.intro":
+    "QCA arbeitet mit Mengen (Sets): Jede Bedingung und das Outcome brauchen Zugehörigkeitswerte zwischen 0 und 1. Legen Sie hier fest, welche Spalte welche Datenart hat und welche Rolle sie in der Analyse spielt.",
+  "vars.col.name": "Variable",
+  "vars.col.type": "Datenart",
+  "vars.col.role": "Rolle",
+  "vars.type.raw": "Rohwert",
+  "vars.type.fuzzy": "Fuzzy (0–1)",
+  "vars.type.crisp": "Crisp (0/1)",
+  "vars.role.condition": "Bedingung",
+  "vars.role.outcome": "Outcome",
+  "vars.role.ignore": "ignorieren",
+  "vars.autoDetected": "automatisch erkannt",
+  "vars.badge.raw": "muss kalibriert werden",
+  "vars.badge.ready": "direkt verwendbar",
+  "vars.warn.crisp":
+    "Als „Crisp (0/1)“ gewählt, aber es gibt Werte außerhalb von {0, 1} — diese Variable ist nicht nutzbar.",
+  "vars.warn.fuzzy":
+    "Als „Fuzzy (0–1)“ gewählt, aber es gibt Werte außerhalb von [0, 1] — diese Variable ist nicht nutzbar.",
+  "vars.warn.raw":
+    "Kalibrierungsanker fehlen oder sind nicht aufsteigend — bitte in der Kalibrierung festlegen. Bis dahin ist diese Variable nicht nutzbar.",
 
   // -- KI-Assistent -----------------------------------------------------------
   "ai.contextPlaceholder": "Inhaltliche Beschreibung (optional) …",
@@ -615,6 +726,8 @@ const en: Record<DictKey, string> = {
   "hero.title": "The open, guided tool for Qualitative Comparative Analysis.",
   "hero.desc":
     "openQCA walks you through calibration, the truth table and minimization — with a coach that catches common mistakes and a protocol that makes every analysis reproducible. Free, open source (MIT), and your data stays in the browser.",
+  "hero.tourHint":
+    "The fastest way in is the example tour — it walks you through the app step by step using demo data.",
 
   "load.title": "Load data",
   "load.desc":
@@ -638,6 +751,7 @@ const en: Record<DictKey, string> = {
   // -- Section navigation -------------------------------------------------------
   "nav.ariaLabel": "Section navigation",
   "nav.daten": "Data",
+  "nav.variablen": "Variables",
   "nav.deskriptiv": "Descriptives",
   "nav.kalibrierung": "Calibration",
   "nav.notwendigkeit": "Necessity",
@@ -647,6 +761,88 @@ const en: Record<DictKey, string> = {
   "nav.negiert": "Negated",
   "nav.xyplot": "XY plot",
   "nav.protokoll": "Protocol",
+
+  // -- Stepper: short labels (navigation) -------------------------------------
+  "nav.step1": "Data",
+  "nav.step2": "Variables",
+  "nav.step3": "Calibrate",
+  "nav.step4": "Necessity",
+  "nav.step5": "Truth table",
+  "nav.step6": "Report",
+
+  // -- Stepper: step titles, status, lock reasons -----------------------------
+  "step.title.1": "Load data",
+  "step.title.2": "Variables & roles",
+  "step.title.3": "Calibrate",
+  "step.title.4": "Necessity",
+  "step.title.5": "Truth table & solutions",
+  "step.title.6": "Robustness, report & export",
+  "step.status.done": "✓ done",
+  "step.status.active": "active",
+  "step.status.locked": "locked",
+  "step.locked.2": "Load data first.",
+  "step.locked.3": "Set variables & roles first.",
+  "step.locked.4": "Calibrate first.",
+  "step.locked.5": "Calibrate first.",
+  "step.locked.6": "Compute the truth table & solutions first.",
+  "step.pending": "Computing results …",
+  "step.next": "Continue to step {n}: {title} →",
+
+  // -- Stepper: plain-language intros per step (for first-time users) --------
+  "step.intro.1":
+    "Load your own data (CSV/Excel) or an example. Each row is a case (e.g. a country), each column a property.",
+  "step.intro.2":
+    "QCA works with sets: every case belongs to every property somewhere between 0 (clearly not in) and 1 (clearly in). Here you define which columns are conditions, which one is the outcome — and whether the values are already memberships or still need to be translated.",
+  "step.intro.3":
+    "Calibrating means translating raw values (e.g. income in €) into memberships from 0–1. You set three anchors — the point at which a case is clearly out (0.05), undecided (0.50), and clearly in (0.95). Justify the anchors substantively, not from the data.",
+  "step.intro.4":
+    "Before we check combinations: is there a condition without which the outcome (almost) never occurs? That would be a necessary condition — it is reported separately.",
+  "step.intro.5":
+    "Now the centerpiece: every row of the truth table is a combination of conditions. We keep combinations that reliably go together with the outcome (consistency) and occur often enough (n) — and reduce them to the simplest possible solution formulas.",
+  "step.intro.6":
+    "Finally: how stable is your solution under different thresholds? Does the same logic also explain the absence of the outcome? And everything to take with you: report (PDF), protocol (JSON), and R script.",
+
+  // -- Example tour (GuidedTour) -----------------------------------------------
+  "tour.start": "🧭 Start example tour",
+  "tour.next": "Next",
+  "tour.end": "End tour",
+  "tour.progress": "{n}/{total}",
+  "tour.s1.title": "Your data",
+  "tour.s1.body": "18 countries, 5 properties.",
+  "tour.s2.title": "Roles",
+  "tour.s2.body": "What's a condition, what's the outcome — already pre-filled here.",
+  "tour.s3.title": "Raw values → 0–1",
+  "tour.s3.body": "Drag the anchors and watch the curve.",
+  "tour.s4.title": "Checking necessity",
+  "tour.s4.body": "Is there a condition without which the outcome almost never occurs? We check that here first.",
+  "tour.s5.title": "Truth table",
+  "tour.s5.body": "Each row is a combination of conditions — with consistency and case count per row.",
+  "tour.s6.title": "The three solution formulas",
+  "tour.s6.body": "The intermediate one is the standard for the paper.",
+  "tour.s7.title": "Report, protocol, R script",
+  "tour.s7.body": "All reproducible. Tour end.",
+
+  // -- Key terms (Glossary) -----------------------------------------------------
+  "gloss.toggle": "📖 Key terms (set, fuzzy, crisp, calibration …)",
+  "gloss.set.term": "Set",
+  "gloss.set.def":
+    "A set is a property that a case belongs to more or less strongly — e.g. “democratic”.",
+  "gloss.membership.term": "Membership (0–1)",
+  "gloss.membership.def":
+    "The number between 0 and 1 that shows how strongly a case belongs to a set.",
+  "gloss.crispFuzzy.term": "Crisp vs. fuzzy",
+  "gloss.crispFuzzy.def":
+    "Crisp only knows 0 or 1 (fully out/in); fuzzy allows degrees in between.",
+  "gloss.calibration.term": "Calibration",
+  "gloss.calibration.def":
+    "Translating raw values into memberships from 0 to 1, using substantively justified anchors.",
+  "gloss.consistency.term": "Consistency",
+  "gloss.consistency.def":
+    "How reliably a condition (or combination) goes together with the outcome.",
+  "gloss.coverage.term": "Coverage",
+  "gloss.coverage.def":
+    "How much of the outcome a solution actually explains — its explanatory reach.",
+  "gloss.moreLink": "In depth: methodology →",
 
   // -- Calibration ------------------------------------------------------------
   "calib.title": "Calibration that thinks along",
@@ -679,11 +875,14 @@ const en: Record<DictKey, string> = {
   "calib.handle.cross": "Crossover anchor",
   "calib.handle.in": "Fully-in anchor",
   "calib.rug.desc": "Drag the handles beneath the curve; the short ticks show the distribution of raw values.",
+  "calib.allCalibrated": "Your data is already calibrated — nothing to do.",
 
   // -- Truth table ------------------------------------------------------------
   "tt.title": "Truth table",
   "tt.conditions": "Conditions",
   "tt.outcome": "Outcome",
+  "tt.rolesHint": "Conditions and outcome are set under “Variables & roles”.",
+  "tt.rolesLink": "→ Variables & roles",
   "tt.freqCut": "Frequency cutoff",
   "tt.consCut": "Consistency cutoff",
   "tt.unassignedWarn":
@@ -814,18 +1013,41 @@ const en: Record<DictKey, string> = {
   "ex.rohwerte.title": "Raw values democracy",
   "ex.rohwerte.badge": "Raw values",
   "ex.rohwerte.desc":
-    "16 fictional countries with raw values (percentages and indices) – to calibrate yourself.",
+    "16 fictional countries with raw values (percentages and indices) – raw values that must be calibrated first (step 3).",
   "ex.fuzzy.title": "Fuzzy-sets example",
   "ex.fuzzy.badge": "Fuzzy [0,1]",
   "ex.fuzzy.desc":
-    "14 cases, already as fuzzy membership in [0,1] – straight to truth table and minimization.",
+    "14 cases with memberships already in [0,1] – directly usable, no calibration needed.",
   "ex.crisp.title": "Crisp-sets example",
   "ex.crisp.badge": "Crisp 0/1",
   "ex.crisp.desc":
-    "14 fictional start-ups, all values strictly binary (0/1) – the basis for csQCA.",
+    "14 fictional start-ups with only 0/1 (crisp sets) – directly usable, the basis for csQCA.",
   "ex.meta": "{cases} cases · {conditions} conditions",
   "ex.synthetic": "synthetic",
   "ex.error": "Example dataset could not be loaded.",
+
+  // -- Variables & roles ------------------------------------------------------
+  "vars.title": "Variables & roles",
+  "vars.intro":
+    "QCA works with sets: every condition and the outcome need membership values between 0 and 1. Here you define which data type each column has and what role it plays in the analysis.",
+  "vars.col.name": "Variable",
+  "vars.col.type": "Data type",
+  "vars.col.role": "Role",
+  "vars.type.raw": "Raw value",
+  "vars.type.fuzzy": "Fuzzy (0–1)",
+  "vars.type.crisp": "Crisp (0/1)",
+  "vars.role.condition": "Condition",
+  "vars.role.outcome": "Outcome",
+  "vars.role.ignore": "ignore",
+  "vars.autoDetected": "auto-detected",
+  "vars.badge.raw": "must be calibrated",
+  "vars.badge.ready": "directly usable",
+  "vars.warn.crisp":
+    "Set to “Crisp (0/1)”, but there are values outside {0, 1} — this variable is not usable.",
+  "vars.warn.fuzzy":
+    "Set to “Fuzzy (0–1)”, but there are values outside [0, 1] — this variable is not usable.",
+  "vars.warn.raw":
+    "Calibration anchors are missing or not ascending — please set them in calibration. Until then this variable is not usable.",
 
   // -- AI assistant -----------------------------------------------------------
   "ai.contextPlaceholder": "Substantive description (optional) …",
