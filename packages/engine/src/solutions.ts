@@ -128,46 +128,93 @@ export function parsimoniousSolution(tt: TruthTableResult, cases: QcaCase[]): So
 }
 
 /**
- * Ermittelt die als „einfache" Counterfactuals zugelassenen Remainder.
- *
- * Ein Remainder ist zugelassen, wenn er sich von mindestens einem positiven
- * Minterm ausschließlich in Positionen unterscheidet, in denen die Bit-Änderung
- * der Richtungserwartung folgt:
- *   - Erwartung "present" → an einer abweichenden Position ist Bit 1 erwartet,
- *   - Erwartung "absent"  → an einer abweichenden Position ist Bit 0 erwartet,
- *   - Erwartung "either"  → keine Einschränkung in dieser Position.
- * Fehlt für eine Bedingung eine Erwartung, gilt "either" (keine Einschränkung).
+ * Subsumtion auf Zeilenmengen: Deckt der allgemeinere Term `general` jede Zeile
+ * ab, die `specific` abdeckt? Für Term-Strings über {"0","1","-"} gilt das genau
+ * dann, wenn an jeder Position `general` entweder "-" ist oder mit `specific`
+ * übereinstimmt — d. h. die Literale von `general` sind eine Teilmenge der
+ * Literale von `specific` (`general` ist gleich oder allgemeiner).
  */
-export function allowedRemainders(
-  positives: string[],
-  remainders: string[],
-  conditions: string[],
-  expectations: Record<string, Expectation>,
-): string[] {
-  const followsExpectation = (bit: string, cond: string): boolean => {
-    const e = expectations[cond] ?? "either";
-    if (e === "either") return true;
-    if (e === "present") return bit === "1";
-    return bit === "0"; // "absent"
-  };
-  return remainders.filter((r) =>
-    positives.some((p) => {
-      for (let i = 0; i < r.length; i++) {
-        if (r[i] === p[i]) continue; // keine Änderung an dieser Position
-        if (!followsExpectation(r[i], conditions[i])) return false;
-      }
-      return true;
-    }),
-  );
+function subsumes(general: string, specific: string): boolean {
+  for (let i = 0; i < general.length; i++) {
+    if (general[i] !== "-" && general[i] !== specific[i]) return false;
+  }
+  return true;
 }
 
 /**
- * Intermediäre Lösung (Enhanced Standard Analysis, Ragin & Sonnett 2005):
- * zwischen komplexer und sparsamer Lösung. Es werden nur „einfache"
- * Counterfactuals als Vereinfachungsannahmen zugelassen — Remainder, die mit
- * den Richtungserwartungen konsistent sind (siehe {@link allowedRemainders}).
- * Auf den positiven Mintermen plus diesen zugelassenen Remaindern läuft dieselbe
- * Minimierungspipeline wie bei komplexer/sparsamer Lösung.
+ * Bildet den intermediären Term aus einem konservativen Primimplikanten `c` und
+ * einem ihn subsumierenden sparsamen PI `p` (Literale von `p` ⊆ Literale von `c`).
+ *
+ * Ausgangspunkt ist `p`. Für jedes Literal (X=v), das in `c`, aber nicht in `p`
+ * enthalten ist (Position, an der `c` fixiert und `p` "-" ist), wird entschieden,
+ * ob es wieder aufgenommen wird. Das Entfernen eines solchen Literals entspricht
+ * einer Vereinfachungsannahme (Counterfactual über einen Remainder):
+ *   - Literal v="1" entfernen ⇒ Annahme „Outcome trotz Abwesenheit von X" —
+ *     ein EINFACHES Counterfactual nur bei Erwartung „absent".
+ *   - Literal v="0" entfernen ⇒ Annahme „Outcome trotz Anwesenheit von X" —
+ *     ein EINFACHES Counterfactual nur bei Erwartung „present".
+ * Ein Literal wird also GENAU DANN entfernt (easy), wenn die Richtungserwartung
+ * die STRIKTE Gegenpolarität hat; andernfalls (passende Polarität, „either" oder
+ * fehlende Erwartung) bleibt es erhalten, weil sein Wegfall ein „difficult
+ * counterfactual" wäre.
+ *
+ * Hinweis zur Semantik von „either"/fehlend: Die Kreuzvalidierung gegen das
+ * R-Paket QCA (scripts/r-oracle) belegt, dass eine fehlende bzw. „either"-
+ * Erwartung ("-" in `dir.exp`) das Literal ERHÄLT (kein einfaches Counterfactual)
+ * — nicht entfernt. Das ist die kanonische Enhanced-Standard-Analysis-Regel
+ * (Ragin & Sonnett 2005; Schneider & Wagemann 2012, Kap. 8; Dușa 2019).
+ */
+function buildIntermediateTerm(
+  c: string,
+  p: string,
+  conditions: string[],
+  expectations: Record<string, Expectation>,
+): string {
+  const out = [...p];
+  for (let i = 0; i < c.length; i++) {
+    if (p[i] !== "-" || c[i] === "-") continue; // nur Literale aus c∖p
+    const v = c[i]; // "0" oder "1"
+    const e = expectations[conditions[i]] ?? "either";
+    const oppositeExpectation = v === "1" ? "absent" : "present";
+    // Entfernen (easy) nur bei strikter Gegenpolarität; sonst Literal behalten.
+    if (e !== oppositeExpectation) out[i] = v;
+  }
+  return out.join("");
+}
+
+/** Kanonischer Schlüssel eines Modells (sortierte Terme) zum Deduplizieren. */
+function modelKey(terms: string[]): string {
+  return [...terms].sort().join(",");
+}
+
+/**
+ * Intermediäre Lösung — kanonische Enhanced Standard Analysis (ESA).
+ *
+ * Quellen der Konstruktion:
+ *   - Ragin, C. C. & Sonnett, J. (2005): Between Complexity and Parsimony.
+ *   - Schneider, C. Q. & Wagemann, C. (2012): Set-Theoretic Methods, Kap. 8.
+ *   - Dușa, A. (2019): QCA with R. A Comprehensive Resource.
+ *
+ * Konstruktion (konservative × sparsame Modelle):
+ *   1. Berechne die konservativen (komplexen) Überdeckungen `C` (Primimplikanten
+ *      nur der positiven Minterme) und die sparsamen Überdeckungen `P`
+ *      (Primimplikanten der positiven Minterme + aller Remainder).
+ *   2. Für jedes Modellpaar (C, P) und jeden konservativen PI `c ∈ C`:
+ *      wähle jeden sparsamen PI `p ∈ P`, der `c` subsumiert (Literale von `p` ⊆
+ *      Literale von `c`, als Zeilenmengen `c ⊆ p`). Jeder solche `p` liefert
+ *      einen intermediären Term (siehe {@link buildIntermediateTerm}); mehrere
+ *      subsumierende `p` erzeugen alle Varianten (Modell-Ambiguität).
+ *   3. Sammle die intermediären Terme je Modellkombination, entferne Duplikate
+ *      und Terme, die von einem anderen intermediären Term desselben Modells
+ *      subsumiert werden. Dedupliziere identische Modelle über alle Kombinationen.
+ *
+ * Invariante: Jeder intermediäre Term liegt (als Literalmenge) zwischen einem
+ * sparsamen `p` (⊆) und dem konservativen `c` (⊇). Damit deckt jedes Modell alle
+ * positiven Minterme ab (jeder `c` wird von seinem intermediären Term abgedeckt),
+ * und die intermediäre Lösung liegt zwischen komplexer und sparsamer Lösung.
+ *
+ * Signatur und Rückgabetyp sind bewusst unverändert; die Kennzahlen werden mit
+ * derselben computeModel-Pipeline wie bei komplexer/sparsamer Lösung berechnet.
  */
 export function intermediateSolution(
   tt: TruthTableResult,
@@ -175,8 +222,45 @@ export function intermediateSolution(
   expectations: Record<string, Expectation>,
 ): Solution {
   const positives = positiveMinterms(tt);
-  const allowed = allowedRemainders(positives, remainderMinterms(tt), tt.conditions, expectations);
-  return buildSolution("intermediate", tt, cases, positives, allowed);
+  if (!positives.length) return { type: "intermediate", models: [] };
+
+  const conservativeCovers = minimalCovers(primeImplicants(positives, []), positives);
+  const parsimoniousCovers = minimalCovers(
+    primeImplicants(positives, remainderMinterms(tt)),
+    positives,
+  );
+
+  const dedupedModels = new Map<string, string[]>();
+
+  for (const C of conservativeCovers) {
+    for (const P of parsimoniousCovers) {
+      const iTerms: string[] = [];
+      for (const c of C) {
+        // Alle sparsamen PIs, die c subsumieren (garantiert nicht leer, da jeder
+        // konservative Implikant Implikant der positiven+Remainder-Funktion ist).
+        const subsumers = P.filter((p) => subsumes(p, c));
+        const fallback = subsumers.length ? subsumers : [c];
+        for (const p of fallback) {
+          iTerms.push(buildIntermediateTerm(c, p, tt.conditions, expectations));
+        }
+      }
+      // Duplikate entfernen.
+      const unique = [...new Set(iTerms)];
+      // Terme entfernen, die von einem anderen (allgemeineren) iTerm subsumiert werden.
+      const minimal = unique.filter(
+        (a) => !unique.some((b) => b !== a && subsumes(b, a)),
+      );
+      const key = modelKey(minimal);
+      if (!dedupedModels.has(key)) dedupedModels.set(key, minimal);
+    }
+  }
+
+  return {
+    type: "intermediate",
+    models: [...dedupedModels.values()].map((cover) =>
+      computeModel(cover, tt.conditions, tt.outcome, cases),
+    ),
+  };
 }
 
 /** Analyse notwendiger Bedingungen (jede Bedingung und ihre Negation). */

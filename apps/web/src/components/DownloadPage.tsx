@@ -84,6 +84,14 @@ export function DownloadPage() {
 
         <Card title={t(locale, "download.source.title")}>
           <p style={cardBodyStyle}>{t(locale, "download.source.body")}</p>
+          <a
+            href="https://github.com/brandi1409/openqca"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none", fontWeight: 600 }}
+          >
+            {t(locale, "download.source.link")}
+          </a>
         </Card>
       </div>
     </div>

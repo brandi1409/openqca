@@ -118,7 +118,8 @@ const de = {
 
   "download.source.title": "Quellcode",
   "download.source.body":
-    "openQCA ist Open Source (MIT-Lizenz). Die Veröffentlichung des Repositories ist in Vorbereitung.",
+    "openQCA ist Open Source (MIT-Lizenz). Der vollständige Quellcode — Rechenkern, Web-App und Validierungs-Suite — ist öffentlich auf GitHub.",
+  "download.source.link": "Zum Repository auf GitHub →",
 
   // -- Startzustand / Hero ----------------------------------------------------
   "hero.title": "Das offene, geführte Werkzeug für Qualitative Comparative Analysis.",
@@ -370,6 +371,91 @@ const de = {
   "account.viewPricing": "Tarife ansehen →",
   "account.signInPrompt":
     "Melde dich an, um Projekte in der Cloud zu speichern und KI-Funktionen zu nutzen.",
+
+  // -- Erklär-Popover (InfoHint) ------------------------------------------------
+  "info.moreLink": "Mehr in der Methodik →",
+
+  "info.consistency.title": "Konsistenz (Suffizienz)",
+  "info.consistency.body":
+    "Der Anteil der Zugehörigkeit zu X, der auch in Y liegt. Werte nahe 1 bedeuten: Fast überall, wo X hoch ausgeprägt ist, ist auch Y hoch ausgeprägt. Ab dem gewählten Konsistenz-Cutoff gilt eine Konfiguration als hinreichend konsistent für das Outcome.",
+  "info.consistency.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ",
+
+  "info.pri.title": "PRI (Proportional Reduction in Inconsistency)",
+  "info.pri.body":
+    "Der PRI schützt vor Konfigurationen, die gleichzeitig Teilmenge von Y und von ~Y sind — ein Fall, den die einfache Konsistenz übersieht. Ist der PRI deutlich niedriger als die Konsistenz, ist das ein Warnsignal für eine widersprüchliche Konfiguration.",
+  "info.pri.formula": "(Σmin(Xᵢ,Yᵢ) − Σmin(Xᵢ,Yᵢ,1−Yᵢ)) / (ΣXᵢ − Σmin(Xᵢ,Yᵢ,1−Yᵢ))",
+
+  "info.rawCoverage.title": "Raw Coverage",
+  "info.rawCoverage.body":
+    "Der Anteil von Y, den dieser Pfad (bzw. diese Lösung) abdeckt. Hohe Coverage zeigt empirische Relevanz — sie sagt aber nichts über Hinreichendheit aus, dafür ist die Konsistenz zuständig.",
+  "info.rawCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Yᵢ",
+
+  "info.uniqueCoverage.title": "Unique Coverage",
+  "info.uniqueCoverage.body":
+    "Der Teil der Outcome-Abdeckung, den ausschließlich dieser Pfad liefert — kein anderer Pfad der Lösung erklärt diese Fälle. Sie ergibt sich als Coverage der Gesamtlösung minus Coverage der Lösung ohne diesen Pfad.",
+  "info.uniqueCoverage.formula": "Coverage(Lösung) − Coverage(Lösung ohne Pfad)",
+
+  "info.solutionConsistency.title": "Lösungs-Konsistenz",
+  "info.solutionConsistency.body":
+    "Konsistenz der gesamten Lösung: X ist hier die Zugehörigkeit zur Vereinigung aller Pfade (Maximum über alle Pfade je Fall). Sie zeigt, wie hinreichend die kombinierte Lösung insgesamt für das Outcome ist.",
+  "info.solutionConsistency.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ  — X = max über alle Pfade",
+
+  "info.solutionCoverage.title": "Lösungs-Coverage",
+  "info.solutionCoverage.body":
+    "Coverage der gesamten Lösung: wie viel von Y durch die Vereinigung aller Pfade abgedeckt wird. Ergänzt die Lösungs-Konsistenz um die empirische Relevanz der kombinierten Lösung.",
+  "info.solutionCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Yᵢ  — X = max über alle Pfade",
+
+  "info.necessityConsistency.title": "Notwendigkeits-Konsistenz",
+  "info.necessityConsistency.body":
+    "Prüft, ob Y eine Teilmenge von X ist — also ob X (fast) immer vorliegt, wenn Y vorliegt. Ab ≥ 0,9 gilt eine Bedingung konventionell als Kandidat für eine notwendige Bedingung; die Coverage sollte zusätzlich als Relevanz-Check herangezogen werden.",
+  "info.necessityConsistency.formula": "Σ min(Xᵢ,Yᵢ) / Σ Yᵢ",
+
+  "info.necessityCoverage.title": "Notwendigkeits-Coverage",
+  "info.necessityCoverage.body":
+    "Zeigt, wie relevant eine notwendige Bedingung ist: Ist X trivial (z. B. fast immer vorhanden), kann die Konsistenz hoch sein, ohne dass X inhaltlich etwas erklärt. Niedrige Coverage bei hoher Konsistenz ist daher ein Warnsignal für eine triviale Bedingung.",
+  "info.necessityCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ",
+
+  "info.freqCutoff.title": "Frequenz-Cutoff (n)",
+  "info.freqCutoff.body":
+    "Die Mindestzahl an Fällen, die eine Konfiguration in der Truth Table aufweisen muss, damit sie als beobachtet gilt. Konfigurationen mit weniger Fällen werden wie Remainder behandelt, unabhängig von ihrer Konsistenz.",
+
+  "info.consCutoff.title": "Konsistenz-Cutoff",
+  "info.consCutoff.body":
+    "Die Schwelle, ab der eine beobachtete Konfiguration als konsistent gilt und OUT auf 1 gesetzt wird. Üblich sind Werte ab 0,75–0,8; die Wahl sollte begründet und im Robustheits-Sweep geprüft werden.",
+
+  "info.out.title": "OUT (Truth-Table-Outcome)",
+  "info.out.body":
+    "1 = beobachtet und konsistent (erfüllt Frequenz- und Konsistenz-Cutoff); 0 = beobachtet, aber inkonsistent; ? = Remainder — eine Konfiguration ohne (ausreichend) beobachtete Fälle, für die keine empirische Aussage möglich ist.",
+
+  "info.calibAnchors.title": "Kalibrierungs-Anker (e / c / i)",
+  "info.calibAnchors.body":
+    "Die drei Ankerpunkte übersetzen Rohwerte in Fuzzy-Set-Zugehörigkeit: „voll draußen“ (e) wird zu 0,05, der Kreuzungspunkt (c) zu 0,50 und „voll drinnen“ (i) zu 0,95. Die direkte Methode berechnet dazwischen eine logistische Kurve, sodass die Zugehörigkeit stetig zwischen den Ankern verläuft.",
+  "info.calibAnchors.formula": "e → 0,05 · c → 0,50 · i → 0,95",
+
+  "info.solComplex.title": "Komplexe (konservative) Lösung",
+  "info.solComplex.body":
+    "Nutzt nur beobachtete Konfigurationen; Remainder werden nicht als Vereinfachungsannahmen zugelassen. Das ergibt die vorsichtigste, am wenigsten sparsame Lösung — jede Aussage stützt sich ausschließlich auf tatsächlich beobachtete Fälle.",
+
+  "info.solIntermediate.title": "Intermediäre Lösung",
+  "info.solIntermediate.body":
+    "Liegt zwischen komplexer und sparsamer Lösung: Nur Remainder, die zu den angegebenen Richtungserwartungen passen („easy counterfactuals“), werden als Vereinfachungsannahmen zugelassen. Das gilt meist als die theoretisch am besten begründete Lösung.",
+
+  "info.solParsimonious.title": "Sparsame (parsimonious) Lösung",
+  "info.solParsimonious.body":
+    "Lässt alle Remainder als Vereinfachungsannahmen zu, auch theoretisch nicht plausible („difficult“) Counterfactuals. Das ergibt die einfachste Lösung, die aber unbegründete Annahmen über unbeobachtete Fälle enthalten kann.",
+
+  "info.robustness.title": "Robustheits-Sweep",
+  "info.robustness.body":
+    "Zeigt, wie die sparsame Lösung sich verändert, wenn der Konsistenz-Cutoff systematisch variiert wird. Bleibt die Lösung über einen weiten Bereich stabil, ist die Cutoff-Wahl unkritisch; ändert sie sich schnell, sollte der gewählte Cutoff besonders sorgfältig begründet werden.",
+
+  "info.negatedOutcome.title": "Negiertes Outcome (~Y)",
+  "info.negatedOutcome.body":
+    "QCA ist asymmetrisch: Eine Lösung, die Y erklärt, erklärt nicht automatisch das Fehlen von Y. Deshalb wird dieselbe Analyse separat für ~Y durchgeführt, indem die Outcome-Zugehörigkeit jedes Falls durch 1 − y ersetzt wird — die Pfade können völlig andere Bedingungen umfassen.",
+  "info.negatedOutcome.formula": "~Y = 1 − Y",
+
+  "info.xyPlot.title": "XY-Plot (Suffizienz)",
+  "info.xyPlot.body":
+    "Stellt jeden Fall als Punkt mit X-Zugehörigkeit (Bedingung) gegen Y-Zugehörigkeit (Outcome) dar. Punkte oberhalb der Diagonale (Y ≥ X) stützen die These „X ist hinreichend für Y“; Punkte weit unterhalb der Diagonale sprechen dagegen.",
 } as const;
 
 export type DictKey = keyof typeof de;
@@ -483,7 +569,8 @@ const en: Record<DictKey, string> = {
 
   "download.source.title": "Source code",
   "download.source.body":
-    "openQCA is open source (MIT license). Publishing the repository is in preparation.",
+    "openQCA is open source (MIT license). The full source code — engine, web app, and validation suite — is publicly available on GitHub.",
+  "download.source.link": "View the repository on GitHub →",
 
   // -- Landing / hero ---------------------------------------------------------
   "hero.title": "The open, guided tool for Qualitative Comparative Analysis.",
@@ -735,6 +822,91 @@ const en: Record<DictKey, string> = {
   "account.viewPricing": "View pricing →",
   "account.signInPrompt":
     "Sign in to save projects in the cloud and use the AI features.",
+
+  // -- Explainer popover (InfoHint) --------------------------------------------
+  "info.moreLink": "More in the methodology →",
+
+  "info.consistency.title": "Consistency (sufficiency)",
+  "info.consistency.body":
+    "The share of membership in X that also lies in Y. Values near 1 mean that wherever X is strongly present, Y tends to be strongly present too. From the chosen consistency cutoff onward, a configuration counts as sufficiently consistent for the outcome.",
+  "info.consistency.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ",
+
+  "info.pri.title": "PRI (proportional reduction in inconsistency)",
+  "info.pri.body":
+    "PRI guards against configurations that are simultaneously a subset of both Y and ~Y — a case plain consistency can miss. A PRI markedly lower than the consistency value is a warning sign of a contradictory configuration.",
+  "info.pri.formula": "(Σmin(Xᵢ,Yᵢ) − Σmin(Xᵢ,Yᵢ,1−Yᵢ)) / (ΣXᵢ − Σmin(Xᵢ,Yᵢ,1−Yᵢ))",
+
+  "info.rawCoverage.title": "Raw coverage",
+  "info.rawCoverage.body":
+    "The share of Y that this path (or solution) accounts for. High coverage indicates empirical relevance — but says nothing about sufficiency, which is what consistency measures.",
+  "info.rawCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Yᵢ",
+
+  "info.uniqueCoverage.title": "Unique coverage",
+  "info.uniqueCoverage.body":
+    "The portion of outcome coverage that only this path provides — no other path in the solution explains these cases. It equals the solution's coverage minus the coverage of the solution without this path.",
+  "info.uniqueCoverage.formula": "Coverage(Lösung) − Coverage(Lösung ohne Pfad)",
+
+  "info.solutionConsistency.title": "Solution consistency",
+  "info.solutionConsistency.body":
+    "Consistency of the whole solution: X here is membership in the union of all paths (the maximum across paths for each case). It shows how sufficient the combined solution is for the outcome overall.",
+  "info.solutionConsistency.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ  — X = max über alle Pfade",
+
+  "info.solutionCoverage.title": "Solution coverage",
+  "info.solutionCoverage.body":
+    "Coverage of the whole solution: how much of Y is accounted for by the union of all paths. It complements solution consistency with the combined solution's empirical relevance.",
+  "info.solutionCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Yᵢ  — X = max über alle Pfade",
+
+  "info.necessityConsistency.title": "Necessity consistency",
+  "info.necessityConsistency.body":
+    "Tests whether Y is a subset of X — that is, whether X is (almost) always present when Y is present. By convention, ≥ 0.9 marks a condition as a candidate necessary condition; coverage should additionally be checked as a relevance indicator.",
+  "info.necessityConsistency.formula": "Σ min(Xᵢ,Yᵢ) / Σ Yᵢ",
+
+  "info.necessityCoverage.title": "Necessity coverage",
+  "info.necessityCoverage.body":
+    "Shows how relevant a necessary condition is: if X is trivial (e.g. present almost always), consistency can be high without X explaining anything substantive. Low coverage alongside high consistency is therefore a warning sign of a trivial condition.",
+  "info.necessityCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ",
+
+  "info.freqCutoff.title": "Frequency cutoff (n)",
+  "info.freqCutoff.body":
+    "The minimum number of cases a configuration must have in the truth table to count as observed. Configurations with fewer cases are treated like remainders, regardless of their consistency.",
+
+  "info.consCutoff.title": "Consistency cutoff",
+  "info.consCutoff.body":
+    "The threshold above which an observed configuration counts as consistent and OUT is set to 1. Common values start around 0.75–0.8; the choice should be justified and checked in the robustness sweep.",
+
+  "info.out.title": "OUT (truth table outcome)",
+  "info.out.body":
+    "1 = observed and consistent (meets the frequency and consistency cutoffs); 0 = observed but inconsistent; ? = remainder — a configuration without (enough) observed cases, for which no empirical claim can be made.",
+
+  "info.calibAnchors.title": "Calibration anchors (e / c / i)",
+  "info.calibAnchors.body":
+    "The three anchor points translate raw values into fuzzy-set membership: “fully out” (e) maps to 0.05, the crossover point (c) to 0.50, and “fully in” (i) to 0.95. The direct method fits a logistic curve between them, so membership varies continuously between the anchors.",
+  "info.calibAnchors.formula": "e → 0,05 · c → 0,50 · i → 0,95",
+
+  "info.solComplex.title": "Complex (conservative) solution",
+  "info.solComplex.body":
+    "Uses only observed configurations; remainders are not admitted as simplifying assumptions. This yields the most cautious, least parsimonious solution — every claim rests exclusively on actually observed cases.",
+
+  "info.solIntermediate.title": "Intermediate solution",
+  "info.solIntermediate.body":
+    "Lies between the complex and parsimonious solution: only remainders consistent with the stated directional expectations (“easy counterfactuals”) are admitted as simplifying assumptions. This is usually considered the most theoretically defensible solution.",
+
+  "info.solParsimonious.title": "Parsimonious solution",
+  "info.solParsimonious.body":
+    "Admits all remainders as simplifying assumptions, including theoretically implausible (“difficult”) counterfactuals. This yields the simplest solution, but it may embed unjustified assumptions about unobserved cases.",
+
+  "info.robustness.title": "Robustness sweep",
+  "info.robustness.body":
+    "Shows how the parsimonious solution changes as the consistency cutoff is systematically varied. If the solution stays stable across a wide range, the cutoff choice is uncritical; if it changes quickly, the chosen cutoff should be justified with particular care.",
+
+  "info.negatedOutcome.title": "Negated outcome (~Y)",
+  "info.negatedOutcome.body":
+    "QCA is asymmetric: a solution explaining Y does not automatically explain the absence of Y. The same analysis is therefore run separately for ~Y by replacing each case's outcome membership with 1 − y — the resulting paths can involve entirely different conditions.",
+  "info.negatedOutcome.formula": "~Y = 1 − Y",
+
+  "info.xyPlot.title": "XY plot (sufficiency)",
+  "info.xyPlot.body":
+    "Plots each case as a point of X membership (condition) against Y membership (outcome). Points above the diagonal (Y ≥ X) support the claim “X is sufficient for Y”; points well below the diagonal argue against it.",
 };
 
 export const dict: Record<Locale, Record<DictKey, string>> = { de, en };

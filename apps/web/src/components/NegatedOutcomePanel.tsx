@@ -10,6 +10,7 @@ import {
 } from "@openqca/engine";
 import { useLocale, type Locale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
+import { InfoHint } from "@/components/InfoHint";
 
 export interface NegatedOutcomePanelProps {
   cases: QcaCase[];
@@ -85,7 +86,14 @@ export default function NegatedOutcomePanel({ cases, conditions, outcome, freqCu
 
   return (
     <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px", marginBottom: 18 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 650, margin: "0 0 8px" }}>{t(locale, "neg.heading", { label: negOutLabel })}</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 8px" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "neg.heading", { label: negOutLabel })}</h2>
+        <InfoHint
+          title={t(locale, "info.negatedOutcome.title")}
+          body={t(locale, "info.negatedOutcome.body")}
+          formula={t(locale, "info.negatedOutcome.formula")}
+        />
+      </div>
       <p style={{ ...labelStyle, margin: "0 0 4px" }}>
         {t(locale, "neg.intro", { label: negOutLabel })}
       </p>

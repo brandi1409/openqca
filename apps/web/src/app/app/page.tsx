@@ -28,6 +28,7 @@ import { type ReportInput } from "@/lib/report";
 import { useLocale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { InfoHint } from "@/components/InfoHint";
 
 interface SavedState {
   dataset: RawDataset;
@@ -253,7 +254,13 @@ export default function Home() {
           {sol && tt && (
             <>
               <Card>
-                <H2>{t(locale, "robustness.title")}</H2>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "robustness.title")}</h2>
+                  <InfoHint
+                    title={t(locale, "info.robustness.title")}
+                    body={t(locale, "info.robustness.body")}
+                  />
+                </div>
                 <RobustnessPanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} currentConsCut={consCut} />
               </Card>
               {/* Panel bringt eigene Karte + Überschrift mit — nicht doppelt verpacken. */}
@@ -266,7 +273,10 @@ export default function Home() {
             return (
               <Card>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                  <H2>{t(locale, "xy.title")}</H2>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "xy.title")}</h2>
+                    <InfoHint title={t(locale, "info.xyPlot.title")} body={t(locale, "info.xyPlot.body")} />
+                  </div>
                   <select value={xc} onChange={(e) => setXyCond(e.target.value)} style={{ ...inputStyle, marginLeft: "auto" }}>
                     {conditions.map((c) => (<option key={c} value={c}>{c}</option>))}
                   </select>
@@ -376,8 +386,15 @@ function CalibrationSection({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 14 }}>
         {([t(locale, "calib.anchorOut"), t(locale, "calib.anchorCross"), t(locale, "calib.anchorIn")]).map((lab, i) => (
           <div key={i} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px" }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700 }}>
               {lab}
+              {i === 1 && (
+                <InfoHint
+                  title={t(locale, "info.calibAnchors.title")}
+                  body={t(locale, "info.calibAnchors.body")}
+                  formula={t(locale, "info.calibAnchors.formula")}
+                />
+              )}
             </div>
             <input
               type="number"
@@ -612,10 +629,24 @@ function TruthTableSection(props: {
             {fuzzyCols.map((c) => (<option key={c} value={c}>{c}</option>))}
           </select>
         </Field>
-        <Field label={t(locale, "tt.freqCut")}>
+        <Field
+          label={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {t(locale, "tt.freqCut")}
+              <InfoHint title={t(locale, "info.freqCutoff.title")} body={t(locale, "info.freqCutoff.body")} />
+            </span>
+          }
+        >
           <input type="number" min={1} value={freqCut} onChange={(e) => setFreqCut(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, width: 90 }} />
         </Field>
-        <Field label={t(locale, "tt.consCut")}>
+        <Field
+          label={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {t(locale, "tt.consCut")}
+              <InfoHint title={t(locale, "info.consCutoff.title")} body={t(locale, "info.consCutoff.body")} />
+            </span>
+          }
+        >
           <input type="number" min={0} max={1} step={0.01} value={consCut} onChange={(e) => setConsCut(Number(e.target.value) || 0.8)} style={{ ...inputStyle, width: 90 }} />
         </Field>
       </div>
@@ -633,9 +664,24 @@ function TruthTableSection(props: {
                 <tr>
                   {tt.conditions.map((c) => (<th key={c} style={thStyle(false)}>{c.replace(/^fs_/, "")}</th>))}
                   <th style={thStyle(false)}>{t(locale, "tt.col.n")}</th>
-                  <th style={thStyle(false)}>{t(locale, "tt.col.consistency")}</th>
-                  <th style={thStyle(false)}>{t(locale, "tt.col.pri")}</th>
-                  <th style={thStyle(false)}>{t(locale, "tt.col.out")}</th>
+                  <th style={thStyle(false)}>
+                    <span style={thHintStyle}>
+                      {t(locale, "tt.col.consistency")}
+                      <InfoHint title={t(locale, "info.consistency.title")} body={t(locale, "info.consistency.body")} formula={t(locale, "info.consistency.formula")} />
+                    </span>
+                  </th>
+                  <th style={thStyle(false)}>
+                    <span style={thHintStyle}>
+                      {t(locale, "tt.col.pri")}
+                      <InfoHint title={t(locale, "info.pri.title")} body={t(locale, "info.pri.body")} formula={t(locale, "info.pri.formula")} />
+                    </span>
+                  </th>
+                  <th style={thStyle(false)}>
+                    <span style={thHintStyle}>
+                      {t(locale, "tt.col.out")}
+                      <InfoHint title={t(locale, "info.out.title")} body={t(locale, "info.out.body")} />
+                    </span>
+                  </th>
                   <th style={thStyle(false)}>{t(locale, "tt.col.cases")}</th>
                 </tr>
               </thead>
@@ -689,9 +735,24 @@ function SolutionSection({
             : kind === "intermediate"
               ? t(locale, "sol.intermediate.title")
               : t(locale, "sol.parsimonious.title");
+        const infoTitle =
+          kind === "complex"
+            ? t(locale, "info.solComplex.title")
+            : kind === "intermediate"
+              ? t(locale, "info.solIntermediate.title")
+              : t(locale, "info.solParsimonious.title");
+        const infoBody =
+          kind === "complex"
+            ? t(locale, "info.solComplex.body")
+            : kind === "intermediate"
+              ? t(locale, "info.solIntermediate.body")
+              : t(locale, "info.solParsimonious.body");
         return (
           <Card key={kind}>
-            <H2>{title}</H2>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{title}</h2>
+              <InfoHint title={infoTitle} body={infoBody} />
+            </div>
             {s.models.length === 0 ? (
               <p className="hint" style={hintStyle}>{t(locale, "sol.none")}</p>
             ) : (
@@ -701,17 +762,56 @@ function SolutionSection({
                     {m.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → {outLabel}
                   </div>
                   <div style={{ display: "flex", gap: 26, margin: "12px 0" }}>
-                    <Kpi v={fmt(m.solutionConsistency)} l={t(locale, "sol.kpi.consistency")} />
-                    <Kpi v={fmt(m.solutionCoverage)} l={t(locale, "sol.kpi.coverage")} />
+                    <Kpi
+                      v={fmt(m.solutionConsistency)}
+                      l={
+                        <span style={thHintStyle}>
+                          {t(locale, "sol.kpi.consistency")}
+                          <InfoHint
+                            title={t(locale, "info.solutionConsistency.title")}
+                            body={t(locale, "info.solutionConsistency.body")}
+                            formula={t(locale, "info.solutionConsistency.formula")}
+                          />
+                        </span>
+                      }
+                    />
+                    <Kpi
+                      v={fmt(m.solutionCoverage)}
+                      l={
+                        <span style={thHintStyle}>
+                          {t(locale, "sol.kpi.coverage")}
+                          <InfoHint
+                            title={t(locale, "info.solutionCoverage.title")}
+                            body={t(locale, "info.solutionCoverage.body")}
+                            formula={t(locale, "info.solutionCoverage.formula")}
+                          />
+                        </span>
+                      }
+                    />
                   </div>
                   <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
                     <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
                       <thead>
                         <tr>
                           <th style={thStyle(false)}>{t(locale, "sol.col.path")}</th>
-                          <th style={thStyle(false)}>{t(locale, "sol.col.rawCov")}</th>
-                          <th style={thStyle(false)}>{t(locale, "sol.col.uniqueCov")}</th>
-                          <th style={thStyle(false)}>{t(locale, "sol.col.consistency")}</th>
+                          <th style={thStyle(false)}>
+                            <span style={thHintStyle}>
+                              {t(locale, "sol.col.rawCov")}
+                              <InfoHint title={t(locale, "info.rawCoverage.title")} body={t(locale, "info.rawCoverage.body")} formula={t(locale, "info.rawCoverage.formula")} />
+                            </span>
+                          </th>
+                          <th style={thStyle(false)}>
+                            <span style={thHintStyle}>
+                              {t(locale, "sol.col.uniqueCov")}
+                              <InfoHint title={t(locale, "info.uniqueCoverage.title")} body={t(locale, "info.uniqueCoverage.body")} formula={t(locale, "info.uniqueCoverage.formula")} />
+                            </span>
+                          </th>
+                          <th style={thStyle(false)}>
+                            <span style={thHintStyle}>
+                              {t(locale, "sol.col.consistency")}
+                              <InfoHint title={t(locale, "info.consistency.title")} body={t(locale, "info.consistency.body")} formula={t(locale, "info.consistency.formula")} />
+                            </span>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -766,8 +866,18 @@ function SolutionSection({
             <thead>
               <tr>
                 <th style={thStyle(false)}>{t(locale, "nec.col.condition")}</th>
-                <th style={thStyle(false)}>{t(locale, "nec.col.consistency")}</th>
-                <th style={thStyle(false)}>{t(locale, "nec.col.coverage")}</th>
+                <th style={thStyle(false)}>
+                  <span style={thHintStyle}>
+                    {t(locale, "nec.col.consistency")}
+                    <InfoHint title={t(locale, "info.necessityConsistency.title")} body={t(locale, "info.necessityConsistency.body")} formula={t(locale, "info.necessityConsistency.formula")} />
+                  </span>
+                </th>
+                <th style={thStyle(false)}>
+                  <span style={thHintStyle}>
+                    {t(locale, "nec.col.coverage")}
+                    <InfoHint title={t(locale, "info.necessityCoverage.title")} body={t(locale, "info.necessityCoverage.body")} formula={t(locale, "info.necessityCoverage.formula")} />
+                  </span>
+                </th>
                 <th style={thStyle(false)}></th>
               </tr>
             </thead>
@@ -864,7 +974,7 @@ function H2({ children }: { children: React.ReactNode }) {
 function Label({ children }: { children: React.ReactNode }) {
   return <span style={{ fontSize: 11.5, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>{children}</span>;
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><Label>{label}</Label>{children}</div>;
 }
 function Button({ children, primary, onClick }: { children: React.ReactNode; primary?: boolean; onClick: () => void }) {
@@ -874,7 +984,7 @@ function Button({ children, primary, onClick }: { children: React.ReactNode; pri
     </button>
   );
 }
-function Kpi({ v, l }: { v: string; l: string }) {
+function Kpi({ v, l }: { v: string; l: React.ReactNode }) {
   return <div><div style={{ fontSize: 21, fontWeight: 650 }}>{v}</div><div style={{ fontSize: 11.5, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>{l}</div></div>;
 }
 function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React.ReactNode }) {
@@ -891,6 +1001,7 @@ function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React
 }
 
 const hintStyle: React.CSSProperties = { fontSize: 12.5, color: "var(--muted)", margin: "8px 0 0" };
+const thHintStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 4 };
 const inputStyle: React.CSSProperties = { font: "inherit", color: "var(--ink)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 7, padding: "6px 9px" };
 function thStyle(fs: boolean): React.CSSProperties {
   return { textAlign: "left", fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase", color: fs ? "var(--accent-deep)" : "var(--muted)", fontWeight: 700, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel-2)", whiteSpace: "nowrap" };

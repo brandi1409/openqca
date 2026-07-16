@@ -12,7 +12,7 @@ version: "0.1.0"
 date-released: "2026-01-01"
 license: MIT
 # TODO: Bitte durch die tatsächliche URL des Repositories ersetzen (Platzhalter).
-repository-code: "https://example.org/PLATZHALTER/openqca"
+repository-code: "https://github.com/brandi1409/openqca"
 # TODO: Optionale Projekt-Website (Platzhalter) — sonst Zeile entfernen.
 url: "https://example.org/PLATZHALTER/openqca"
 keywords:

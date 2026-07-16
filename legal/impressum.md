@@ -51,7 +51,7 @@ Die Inhalte dieser Seiten wurden mit größtmöglicher Sorgfalt erstellt. Für d
 
 ## Urheberrecht und Open-Source-Hinweis
 
-Die Software „openQCA" ist quelloffen und wird unter der MIT-Lizenz veröffentlicht; der Quellcode ist unter [PLATZHALTER: öffentliche Repository-URL — derzeit privates Repository] verfügbar. Für die Inhalte dieser Website (Texte, Grafiken) gelten, soweit nicht anders gekennzeichnet, die allgemeinen urheberrechtlichen Bestimmungen bzw. die angegebene Lizenz.
+Die Software „openQCA" ist quelloffen und wird unter der MIT-Lizenz veröffentlicht; der Quellcode ist unter https://github.com/brandi1409/openqca verfügbar. Für die Inhalte dieser Website (Texte, Grafiken) gelten, soweit nicht anders gekennzeichnet, die allgemeinen urheberrechtlichen Bestimmungen bzw. die angegebene Lizenz.
 
 ---
 

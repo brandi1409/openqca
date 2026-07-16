@@ -6,7 +6,6 @@ import {
   complexSolution,
   parsimoniousSolution,
   intermediateSolution,
-  allowedRemainders,
   termCovers,
   type QcaCase,
   type Expectation,
@@ -89,10 +88,17 @@ test("intermediäre Lösung: alle Erwartungen \"present\" ⇒ gleich der komplex
   approx(inter.models[0].solutionCoverage, complex.models[0].solutionCoverage);
 });
 
-test("intermediäre Lösung: wohlstand \"either\", sonst \"present\" ⇒ fs_bildung*fs_stabil (zwischen komplex und sparsam)", () => {
+test("intermediäre Lösung: wohlstand \"absent\", sonst \"present\" ⇒ fs_bildung*fs_stabil (zwischen komplex und sparsam)", () => {
+  // Kanonische ESA: ein konservatives Literal wird nur dann entfernt (easy
+  // counterfactual), wenn die Richtungserwartung seine STRIKTE Gegenpolarität
+  // hat. Die einzige positive Ecke ist 111 (fs_wohlstand*fs_bildung*fs_stabil);
+  // mit Erwartung fs_wohlstand="absent" wird das (present-)Literal fs_wohlstand
+  // entfernt, fs_bildung/fs_stabil bleiben ("present" == Polarität) erhalten.
+  // (Früher testete dieser Fall die Näherungs-Semantik "either ⇒ entfernen";
+  // gegen das R-Paket QCA validiert gilt jedoch "either/fehlend ⇒ erhalten".)
   const { cases, tt } = makeTt();
   const inter = intermediateSolution(tt, cases, {
-    fs_wohlstand: "either", fs_bildung: "present", fs_stabil: "present",
+    fs_wohlstand: "absent", fs_bildung: "present", fs_stabil: "present",
   });
   assert.equal(inter.models.length, 1);
   assert.deepEqual(inter.models[0].paths.map((p) => p.expression), ["fs_bildung*fs_stabil"]);
@@ -129,20 +135,22 @@ test("Struktureigenschaft: intermediäre Lösung nutzt ⊆ der Remainder der spa
   }
 });
 
-test("allowedRemainders: alle \"present\" ⇒ leer (Voll-Präsenz-Ecke); alle \"either\" ⇒ alle Remainder", () => {
-  const { tt } = makeTt();
-  const positives = tt.rows.filter((r) => r.output === 1).map((r) => r.bits);
-  const remainders = tt.rows.filter((r) => r.output === "?").map((r) => r.bits);
-
-  const none = allowedRemainders(positives, remainders, CONDS, {
-    fs_wohlstand: "present", fs_bildung: "present", fs_stabil: "present",
-  });
-  assert.deepEqual(none, []);
-
-  const all = allowedRemainders(positives, remainders, CONDS, {
+test("intermediäre Lösung: alle \"either\" ⇒ gleich der komplexen Lösung (kanonisch: fehlende Erwartung erhält Literale)", () => {
+  // Gegen das R-Paket QCA validiert (scripts/r-oracle): eine "either"/fehlende
+  // Erwartung ("-" in dir.exp) erhält das Literal — kein einfaches Counterfactual.
+  // Alle "either" ⇒ kein Literal wird entfernt ⇒ intermediär == komplex.
+  // (Dieser Test ersetzt den früheren allowedRemainders-Test, der die entfernte
+  // Näherungs-Semantik "either ⇒ alle Remainder zulassen" prüfte.)
+  const { cases, tt } = makeTt();
+  const inter = intermediateSolution(tt, cases, {
     fs_wohlstand: "either", fs_bildung: "either", fs_stabil: "either",
   });
-  assert.deepEqual([...all].sort(), [...remainders].sort());
+  const complex = complexSolution(tt, cases);
+  assert.equal(inter.models.length, 1);
+  assert.deepEqual(
+    inter.models[0].paths.map((p) => p.expression),
+    complex.models[0].paths.map((p) => p.expression),
+  );
 });
 
 test("intermediäre Lösung: keine positive Konfiguration ⇒ keine Modelle", () => {
@@ -153,4 +161,112 @@ test("intermediäre Lösung: keine positive Konfiguration ⇒ keine Modelle", ()
     fs_wohlstand: "present", fs_bildung: "present", fs_stabil: "present",
   });
   assert.deepEqual(inter.models, []);
+});
+
+// ---------------------------------------------------------------------------
+// Property-Tests der kanonischen Konstruktion auf dem echten (mehr-eckigen)
+// Fuzzy-Datensatz. Anders als der synthetische Zwischenkriegs-Datensatz (eine
+// einzige positive Ecke 111) hat dieser eine konservative Lösung aus ZWEI PIs
+// mit gegensätzlichen Polaritäten (WOHLSTAND*BILDUNG und
+// ~WOHLSTAND*~BILDUNG*STAATSKAPAZITAET), sodass die Konstruktion nicht-trivial
+// wird. Alle Aussagen sind gegen das R-Paket QCA kreuzvalidiert (scripts/
+// r-oracle, scripts/cross-validate.mjs).
+// ---------------------------------------------------------------------------
+const FUZZY: [string, number, number, number, number][] = [
+  ["Fall_01", 0.9, 0.8, 0.2, 0.85], ["Fall_02", 0.8, 0.9, 0.1, 0.9],
+  ["Fall_03", 0.7, 0.7, 0.3, 0.75], ["Fall_04", 0.2, 0.3, 0.9, 0.9],
+  ["Fall_05", 0.1, 0.2, 0.8, 0.85], ["Fall_06", 0.3, 0.1, 0.7, 0.72],
+  ["Fall_07", 0.9, 0.9, 0.8, 0.95], ["Fall_08", 0.2, 0.2, 0.2, 0.15],
+  ["Fall_09", 0.1, 0.3, 0.1, 0.1], ["Fall_10", 0.8, 0.2, 0.3, 0.25],
+  ["Fall_11", 0.3, 0.8, 0.2, 0.3], ["Fall_12", 0.7, 0.3, 0.2, 0.35],
+  ["Fall_13", 0.6, 0.7, 0.4, 0.65], ["Fall_14", 0.4, 0.4, 0.6, 0.62],
+];
+const FUZZY_CONDS = ["WOHLSTAND", "BILDUNG", "STAATSKAPAZITAET"];
+const FUZZY_OUT = "DEMOKRATIE";
+function fuzzyCases(): QcaCase[] {
+  return FUZZY.map(([label, w, b, s, d]) => ({
+    label,
+    values: { WOHLSTAND: w, BILDUNG: b, STAATSKAPAZITAET: s, DEMOKRATIE: d },
+  }));
+}
+function fuzzyTt() {
+  const cases = fuzzyCases();
+  const tt = buildTruthTable({
+    cases, conditions: FUZZY_CONDS, outcome: FUZZY_OUT, freqCut: 1, consCut: 0.85,
+  });
+  return { cases, tt };
+}
+
+test("Property (1): alle Erwartungen == Literal-Polarität ⇒ intermediär == konservativ", () => {
+  // Ein Literal wird nur bei strikter Gegenpolarität entfernt. Setzt man die
+  // Erwartung jeder Bedingung exakt auf ihre Polarität in der konservativen
+  // Lösung, kann kein Literal entfernt werden ⇒ intermediär == konservativ.
+  // Hier sind die (eindeutigen) konservativen Polaritäten der reduzierbaren
+  // Positionen: STAATSKAPAZITAET tritt als present auf; WOHLSTAND/BILDUNG als
+  // present in einem PI. "either" für WOHLSTAND/BILDUNG erhält ebenfalls (siehe
+  // Property 1'). Wir prüfen die robuste Variante: alle "either" ⇒ konservativ.
+  const { cases, tt } = fuzzyTt();
+  const inter = intermediateSolution(tt, cases, {
+    WOHLSTAND: "either", BILDUNG: "either", STAATSKAPAZITAET: "either",
+  });
+  const complex = complexSolution(tt, cases);
+  const norm = (s: string[]) => [...s].sort();
+  assert.equal(inter.models.length, complex.models.length);
+  assert.deepEqual(
+    norm(inter.models.flatMap((m) => m.paths.map((p) => p.expression))),
+    norm(complex.models.flatMap((m) => m.paths.map((p) => p.expression))),
+  );
+});
+
+test("Property (2): Gegenpolarität aller reduzierbaren Literale ⇒ intermediär == sparsam (Fuzzy)", () => {
+  // Für diesen Datensatz sind die aus den konservativen PIs gegenüber den
+  // sparsamen PIs entfernbaren Literale genau die absence-Literale ~WOHLSTAND,
+  // ~BILDUNG (aus ~WOHLSTAND*~BILDUNG*STAATSKAPAZITAET). Ihre STRIKTE
+  // Gegenpolarität ist "present"; die Erwartung WOHLSTAND="present",
+  // BILDUNG="present" entfernt sie also (easy counterfactuals) und reduziert auf
+  // die sparsame Lösung. STAATSKAPAZITAET ist gemeinsames Literal ⇒ irrelevant.
+  const { cases, tt } = fuzzyTt();
+  const inter = intermediateSolution(tt, cases, {
+    WOHLSTAND: "present", BILDUNG: "present", STAATSKAPAZITAET: "either",
+  });
+  const parsi = parsimoniousSolution(tt, cases);
+  const norm = (s: string[]) => [...s].sort();
+  assert.deepEqual(
+    norm(inter.models.flatMap((m) => m.paths.map((p) => p.expression))),
+    norm(parsi.models.flatMap((m) => m.paths.map((p) => p.expression))),
+  );
+});
+
+test("Property (3): alle 27 Erwartungskombinationen — Deckung aller Positiven & Zeilenmenge zwischen konservativ und sparsam", () => {
+  const { cases, tt } = fuzzyTt();
+  const positives = tt.rows.filter((r) => r.output === 1).map((r) => r.bits);
+  const consTerms = complexSolution(tt, cases).models.flatMap((m) => m.terms);
+  const parsTerms = parsimoniousSolution(tt, cases).models.flatMap((m) => m.terms);
+
+  for (const a of ALL) for (const b of ALL) for (const c of ALL) {
+    const exp: Record<string, Expectation> = { WOHLSTAND: a, BILDUNG: b, STAATSKAPAZITAET: c };
+    const inter = intermediateSolution(tt, cases, exp);
+    assert.ok(inter.models.length >= 1, `keine Modelle bei ${JSON.stringify(exp)}`);
+    for (const model of inter.models) {
+      // (a) jedes Modell deckt alle positiven Minterme ab
+      for (const m of positives) {
+        assert.ok(
+          model.terms.some((t) => termCovers(t, m)),
+          `Positiv-Minterm ${m} nicht gedeckt bei ${JSON.stringify(exp)}`,
+        );
+      }
+      for (const t of model.terms) {
+        // (b) jeder iTerm wird von mindestens einem sparsamen PI subsumiert
+        assert.ok(
+          parsTerms.some((p) => termCovers(p, t)),
+          `iTerm ${t} nicht ⊆ sparsam bei ${JSON.stringify(exp)}`,
+        );
+        // (c) jeder iTerm subsumiert mindestens einen konservativen PI
+        assert.ok(
+          consTerms.some((cc) => termCovers(t, cc)),
+          `iTerm ${t} ⊉ konservativ bei ${JSON.stringify(exp)}`,
+        );
+      }
+    }
+  }
 });

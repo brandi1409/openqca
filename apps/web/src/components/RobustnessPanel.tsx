@@ -8,6 +8,7 @@ import {
 } from "@openqca/engine";
 import { useLocale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
+import { InfoHint } from "@/components/InfoHint";
 
 interface RobustnessPanelProps {
   cases: QcaCase[];
@@ -106,7 +107,12 @@ export function RobustnessPanel({
         <table style={tableStyle}>
           <thead>
             <tr>
-              <th style={thStyle(false)}>{t(locale, "rob.col.cutoff")}</th>
+              <th style={thStyle(false)}>
+                <span style={thHintStyle}>
+                  {t(locale, "rob.col.cutoff")}
+                  <InfoHint title={t(locale, "info.robustness.title")} body={t(locale, "info.robustness.body")} />
+                </span>
+              </th>
               <th style={thStyle(true)}>{t(locale, "rob.col.paths")}</th>
               <th style={thStyle(true)}>{t(locale, "rob.col.solConsistency")}</th>
               <th style={thStyle(true)}>{t(locale, "rob.col.solCoverage")}</th>
@@ -150,6 +156,12 @@ const hintStyle: React.CSSProperties = {
   fontSize: 12.5,
   color: "var(--muted)",
   margin: "8px 0 0",
+};
+
+const thHintStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
 };
 
 function thStyle(num: boolean): React.CSSProperties {
