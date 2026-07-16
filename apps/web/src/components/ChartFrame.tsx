@@ -11,6 +11,42 @@ interface ChartFrameProps {
 }
 
 /**
+ * Feste LICHT-Palette für den Export (Werte aus globals.css, Light-Theme).
+ * Publikationsgrafiken werden immer hell exportiert — unabhängig vom aktiven
+ * Theme der App, damit Text/Achsen auf dem weißen PNG-Hintergrund lesbar sind.
+ */
+const LIGHT_VARS: Record<string, string> = {
+  "--bg": "#f6f8f7",
+  "--panel": "#ffffff",
+  "--panel-2": "#fbfcfb",
+  "--ink": "#17211e",
+  "--ink-2": "#505c58",
+  "--muted": "#86918c",
+  "--line": "#e2e7e4",
+  "--line-soft": "#edf1ef",
+  "--accent": "#2a78d6",
+  "--accent-deep": "#1c5cab",
+  "--accent-wash": "rgba(42,120,214,0.09)",
+  "--brand": "#0f5c54",
+  "--brand-wash": "rgba(15,92,84,0.08)",
+  "--good": "#0ca30c",
+  "--good-text": "#006300",
+  "--warn-text": "#935600",
+  "--warn-wash": "rgba(224,150,0,0.12)",
+  "--bad": "#d03b3b",
+  "--bad-wash": "rgba(208,59,59,0.09)",
+  "--grid": "#e1e5e2",
+};
+
+/** Ersetzt alle var(--x[, fallback])-Vorkommen durch die Light-Hexwerte. */
+function resolveCssVarsToLight(value: string): string {
+  return value.replace(
+    /var\((--[a-z0-9-]+)\s*(?:,\s*([^)]+))?\)/gi,
+    (_m, name: string, fallback: string | undefined) => LIGHT_VARS[name] ?? fallback ?? "#000000",
+  );
+}
+
+/**
  * Rahmen für publikationsfähige SVG-Grafiken: rendert die Grafik und bietet
  * oben rechts zwei kleine Export-Buttons (SVG und PNG). Beim Export werden die
  * CSS-Variablen (fill/stroke/color) über getComputedStyle zu absoluten Werten
@@ -34,21 +70,19 @@ export function ChartFrame({ children, filename, caption }: ChartFrameProps) {
 
     const clone = original.cloneNode(true) as SVGSVGElement;
 
-    // CSS-Variablen auflösen: identische Traversierung über Original und Klon.
-    const originalNodes = [original, ...Array.from(original.querySelectorAll("*"))];
+    // CSS-Variablen deterministisch mit der LICHT-Palette auflösen — unabhängig
+    // vom aktiven Theme. Vorher wurde per getComputedStyle das AKTUELLE Theme
+    // eingefroren: Im Dark Mode ergab das helle Schrift auf dem weißen
+    // PNG-Hintergrund (unlesbar). Publikationsgrafiken sind hell.
     const cloneNodes = [clone, ...Array.from(clone.querySelectorAll("*"))];
-    const n = Math.min(originalNodes.length, cloneNodes.length);
-    for (let i = 0; i < n; i++) {
-      const src = originalNodes[i];
-      const dst = cloneNodes[i] as SVGElement | HTMLElement;
-      if (!(src instanceof Element)) continue;
-      const cs = getComputedStyle(src);
-      const fill = cs.getPropertyValue("fill");
-      const stroke = cs.getPropertyValue("stroke");
-      const color = cs.getPropertyValue("color");
-      if (fill && fill !== "none") dst.setAttribute("fill", fill);
-      if (stroke && stroke !== "none") dst.setAttribute("stroke", stroke);
-      if (color) (dst as HTMLElement).style.color = color;
+    for (const node of cloneNodes) {
+      if (!(node instanceof Element)) continue;
+      for (const attr of ["fill", "stroke", "stop-color", "color", "style"]) {
+        const value = node.getAttribute(attr);
+        if (value && value.includes("var(")) {
+          node.setAttribute(attr, resolveCssVarsToLight(value));
+        }
+      }
     }
 
     // width/height aus viewBox setzen.

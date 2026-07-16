@@ -14,12 +14,34 @@ interface InfoHintProps {
  * Kleines, barrierefreies Erklär-Popover für Kennzahlen und Konzepte: ein
  * dezentes ⓘ-Symbol als Button, das bei Klick eine kurze Erklärung einblendet
  * (Titel, Erklärtext, optional eine Formel in Unicode-Notation). Schließt bei
- * Klick außerhalb des Popovers oder mit Escape.
+ * Klick außerhalb, Escape oder Scrollen.
+ *
+ * Das Popover ist `position: fixed` und wird an der Button-Position verankert —
+ * so wird es NICHT von `overflow: auto`-Tabellen-Containern abgeschnitten
+ * (in kurzen Tabellen wurde das absolute Popover zuvor um bis zu 100px geclippt).
+ * Reicht der Platz unter dem Button nicht, klappt es nach oben.
  */
 export function InfoHint({ title, body, formula }: InfoHintProps) {
   const [locale] = useLocale();
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; above: boolean } | null>(null);
   const rootRef = useRef<HTMLSpanElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      const estimatedHeight = 200; // konservative Schätzung inkl. Formel + Link
+      const above = r.bottom + estimatedHeight > window.innerHeight && r.top > estimatedHeight;
+      const left = Math.min(Math.max(8, r.left - 8), Math.max(8, window.innerWidth - 312));
+      setPos({ top: above ? r.top - 6 : r.bottom + 6, left, above });
+    }
+    setOpen(true);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -31,21 +53,28 @@ export function InfoHint({ title, body, formula }: InfoHintProps) {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    function onScroll() {
+      setOpen(false);
+    }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    // capture: true, damit auch Scrollen INNERHALB von Tabellen-Containern schließt
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll, { capture: true });
     };
   }, [open]);
 
   return (
     <span ref={rootRef} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 4 }}>
       <button
+        ref={btnRef}
         type="button"
         aria-label={title}
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         style={infoButtonStyle}
         onMouseEnter={(e) => {
           e.currentTarget.style.color = "var(--accent-deep)";
@@ -56,8 +85,17 @@ export function InfoHint({ title, body, formula }: InfoHintProps) {
       >
         ⓘ
       </button>
-      {open && (
-        <div role="dialog" aria-label={title} style={popoverStyle}>
+      {open && pos && (
+        <div
+          role="dialog"
+          aria-label={title}
+          style={{
+            ...popoverStyle,
+            top: pos.top,
+            left: pos.left,
+            transform: pos.above ? "translateY(-100%)" : undefined,
+          }}
+        >
           <div style={popoverTitleStyle}>{title}</div>
           <div style={popoverBodyStyle}>{body}</div>
           {formula && (
@@ -94,10 +132,8 @@ const infoButtonStyle: React.CSSProperties = {
 };
 
 const popoverStyle: React.CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 6px)",
-  left: 0,
-  zIndex: 60,
+  position: "fixed",
+  zIndex: 70,
   width: "max-content",
   maxWidth: 300,
   background: "var(--panel)",
@@ -107,6 +143,8 @@ const popoverStyle: React.CSSProperties = {
   padding: "12px 14px",
   textTransform: "none",
   letterSpacing: "normal",
+  textAlign: "left",
+  whiteSpace: "normal",
 };
 
 const popoverTitleStyle: React.CSSProperties = {

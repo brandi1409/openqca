@@ -1028,7 +1028,7 @@ function CalibrationCurve({
         {rows.map((r, idx) => {
           const flag = r.f > 0.4 && r.f < 0.6;
           return (
-            <circle key={idx} cx={px(values[idx])} cy={py(r.f)} r={5} fill={flag ? "#b26a00" : "var(--accent)"} stroke="var(--panel)" strokeWidth={2}>
+            <circle key={idx} cx={px(values[idx])} cy={py(r.f)} r={5} fill={flag ? "var(--warn-text)" : "var(--accent)"} stroke="var(--panel)" strokeWidth={2}>
               <title>{`${r.label}: ${values[idx]} → ${r.f.toFixed(3)}`}</title>
             </circle>
           );
