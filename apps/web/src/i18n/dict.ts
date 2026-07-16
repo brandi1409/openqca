@@ -58,7 +58,7 @@ const de = {
   "landing.features.local.desc":
     "Daten bleiben im Browser, kein Upload im Gratis-Kern. Quelloffen unter MIT-Lizenz.",
 
-  "landing.steps.title": "In drei Schritten",
+  "landing.steps.title": "So funktioniert's",
   "landing.steps.step1.title": "Daten laden",
   "landing.steps.step1.desc": "CSV/XLSX importieren oder einen Beispiel-Datensatz wählen.",
   "landing.steps.step2.title": "Kalibrieren",
@@ -659,7 +659,7 @@ const en: Record<DictKey, string> = {
   "landing.features.local.desc":
     "Data stays in the browser, no upload in the free core. Open source under the MIT license.",
 
-  "landing.steps.title": "In three steps",
+  "landing.steps.title": "How it works",
   "landing.steps.step1.title": "Load data",
   "landing.steps.step1.desc": "Import CSV/XLSX or pick an example dataset.",
   "landing.steps.step2.title": "Calibrate",
