@@ -28,12 +28,13 @@ export function Glossary() {
       style={{
         background: "var(--panel-2)",
         border: "1px solid var(--line)",
-        borderRadius: 10,
+        borderRadius: 12,
         marginBottom: 16,
       }}
     >
       <button
         type="button"
+        className="oq-btn oq-btn--quiet"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         style={{
@@ -42,19 +43,12 @@ export function Glossary() {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 8,
-          font: "inherit",
           fontSize: 13.5,
-          fontWeight: 600,
-          color: "var(--ink-2)",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: "10px 14px",
           textAlign: "left",
         }}
       >
         <span>{t(locale, "gloss.toggle")}</span>
-        <span aria-hidden style={{ color: "var(--muted)", fontSize: 11 }}>
+        <span aria-hidden style={{ color: "var(--muted)", fontSize: 12 }}>
           {open ? "▲" : "▼"}
         </span>
       </button>
@@ -70,10 +64,10 @@ export function Glossary() {
           >
             {TERMS.map(({ term, def }) => (
               <div key={term}>
-                <dt style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)", margin: 0 }}>
+                <dt style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", margin: 0 }}>
                   {t(locale, term)}
                 </dt>
-                <dd style={{ fontSize: 13, color: "var(--ink-2)", margin: "2px 0 0" }}>
+                <dd style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "2px 0 0" }}>
                   {t(locale, def)}
                 </dd>
               </div>
@@ -83,7 +77,7 @@ export function Glossary() {
             <a
               href="/methodik"
               style={{
-                fontSize: 12.5,
+                fontSize: 13.5,
                 color: "var(--accent-deep)",
                 textDecoration: "none",
                 fontWeight: 600,

@@ -128,7 +128,7 @@ const titleStyle: CSSProperties = {
 
 const descStyle: CSSProperties = {
   margin: "3px 0 0",
-  fontSize: 12.5,
+  fontSize: 13.5,
   lineHeight: 1.5,
   color: "var(--ink-2)",
 };
@@ -148,7 +148,7 @@ const actionsStyle: CSSProperties = {
 };
 
 const buttonBase: CSSProperties = {
-  fontSize: 13,
+  fontSize: 13.5,
   fontWeight: 600,
   padding: "8px 16px",
   borderRadius: 8,

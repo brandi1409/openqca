@@ -76,13 +76,13 @@ const rightStyle: CSSProperties = {
 };
 
 const linkStyle: CSSProperties = {
-  fontSize: 13,
+  fontSize: 13.5,
   color: "var(--accent-deep)",
   textDecoration: "none",
 };
 
 const noteStyle: CSSProperties = {
   margin: 0,
-  fontSize: 12.5,
+  fontSize: 13.5,
   color: "var(--muted)",
 };

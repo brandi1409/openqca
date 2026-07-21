@@ -124,7 +124,7 @@ const infoButtonStyle: React.CSSProperties = {
   border: "none",
   background: "none",
   cursor: "pointer",
-  fontSize: 14,
+  fontSize: 15,
   lineHeight: 1,
   color: "var(--muted)",
   font: "inherit",
@@ -138,7 +138,7 @@ const popoverStyle: React.CSSProperties = {
   maxWidth: 300,
   background: "var(--panel)",
   border: "1px solid var(--line)",
-  borderRadius: 10,
+  borderRadius: 12,
   boxShadow: "0 4px 18px rgba(0,0,0,0.16)",
   padding: "12px 14px",
   textTransform: "none",
@@ -155,7 +155,7 @@ const popoverTitleStyle: React.CSSProperties = {
 };
 
 const popoverBodyStyle: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 13.5,
   lineHeight: 1.5,
   color: "var(--ink-2)",
   fontWeight: 400,
@@ -166,7 +166,7 @@ const popoverFormulaStyle: React.CSSProperties = {
   fontSize: 12,
   background: "var(--panel-2)",
   border: "1px solid var(--line)",
-  borderRadius: 6,
+  borderRadius: 8,
   padding: "6px 8px",
   overflowX: "auto",
   whiteSpace: "nowrap",
@@ -174,7 +174,7 @@ const popoverFormulaStyle: React.CSSProperties = {
 };
 
 const popoverLinkStyle: React.CSSProperties = {
-  fontSize: 12.5,
+  fontSize: 13.5,
   color: "var(--accent-deep)",
   textDecoration: "none",
   fontWeight: 600,

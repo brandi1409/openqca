@@ -23,12 +23,14 @@ export interface NegatedOutcomePanelProps {
 const fmt = (v: number, d = 3) =>
   v == null || Number.isNaN(v) ? "—" : v.toFixed(d).replace(".", ",");
 
-const labelStyle: React.CSSProperties = { fontSize: 12.5, color: "var(--muted)" };
+const labelStyle: React.CSSProperties = { fontSize: 12, color: "var(--muted)" };
+const textStyle: React.CSSProperties = { fontSize: 13.5, color: "var(--muted)" };
+// Formel-Boxen sitzen bereits in einer Karte mit eigenem Rand — keine
+// zusätzliche eigene Border (Verschachtelungs-Regel).
 const formulaStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-  fontSize: 14.5,
+  fontSize: 15,
   background: "var(--panel-2)",
-  border: "1px solid var(--line)",
   borderRadius: 8,
   padding: "10px 14px",
   overflowX: "auto",
@@ -41,7 +43,7 @@ function SolutionBlock({ title, sol, negOutLabel, locale }: { title: string; sol
         {title}
       </div>
       {sol === null || sol.models.length === 0 ? (
-        <p style={{ ...labelStyle, margin: 0 }}>
+        <p style={{ ...textStyle, margin: 0 }}>
           {t(locale, "neg.none", { label: negOutLabel })}
         </p>
       ) : (
@@ -87,18 +89,18 @@ export default function NegatedOutcomePanel({ cases, conditions, outcome, freqCu
   return (
     <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px", marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 8px" }}>
-        <h2 style={{ fontSize: 16, fontWeight: 650, margin: 0 }}>{t(locale, "neg.heading", { label: negOutLabel })}</h2>
+        <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{t(locale, "neg.heading", { label: negOutLabel })}</h2>
         <InfoHint
           title={t(locale, "info.negatedOutcome.title")}
           body={t(locale, "info.negatedOutcome.body")}
           formula={t(locale, "info.negatedOutcome.formula")}
         />
       </div>
-      <p style={{ ...labelStyle, margin: "0 0 4px" }}>
+      <p style={{ ...textStyle, margin: "0 0 4px" }}>
         {t(locale, "neg.intro", { label: negOutLabel })}
       </p>
       {result.error ? (
-        <p style={{ ...labelStyle, margin: "8px 0 0" }}>{t(locale, "neg.error", { label: negOutLabel, msg: result.error })}</p>
+        <p style={{ ...textStyle, margin: "8px 0 0" }}>{t(locale, "neg.error", { label: negOutLabel, msg: result.error })}</p>
       ) : (
         <>
           <SolutionBlock title={t(locale, "neg.complex")} sol={result.complex} negOutLabel={negOutLabel} locale={locale} />

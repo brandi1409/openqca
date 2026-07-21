@@ -18,11 +18,11 @@ export default function AccountPage() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "32px 26px 80px" }}>
-      <a href="/app" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "common.backToApp")}</a>
-      <h1 style={{ fontSize: 24, fontWeight: 680, margin: "14px 0 6px" }}>{t(locale, "account.title")}</h1>
+      <a href="/app" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "common.backToApp")}</a>
+      <h1 style={{ fontSize: 20, fontWeight: 700, margin: "14px 0 6px" }}>{t(locale, "account.title")}</h1>
 
       {checkout === "success" && (
-        <p style={{ fontSize: 14, color: "var(--good-text)", fontWeight: 600 }}>
+        <p style={{ fontSize: 15, color: "var(--good-text)", fontWeight: 600 }}>
           {t(locale, "account.checkoutSuccess")}
         </p>
       )}

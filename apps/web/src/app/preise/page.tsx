@@ -33,8 +33,8 @@ export default function PricingPage() {
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "32px 26px 80px" }}>
-      <a href="/app" style={{ fontSize: 13, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "common.backToApp")}</a>
-      <h1 style={{ fontSize: 26, fontWeight: 680, letterSpacing: "-0.01em", margin: "14px 0 6px" }}>{t(locale, "pricing.title")}</h1>
+      <a href="/app" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "common.backToApp")}</a>
+      <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em", margin: "14px 0 6px" }}>{t(locale, "pricing.title")}</h1>
       <p style={{ color: "var(--ink-2)", maxWidth: "60ch", marginTop: 0 }}>
         {t(locale, "pricing.intro")}
       </p>
@@ -55,13 +55,13 @@ export default function PricingPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
             {stripeEnabledClient ? (
               <>
-                <button onClick={() => checkout("monthly")} disabled={busy} style={cta(true)}>{t(locale, "pricing.cta.monthly")}</button>
-                <button onClick={() => checkout("institution")} disabled={busy} style={cta(false)}>{t(locale, "pricing.cta.institution")}</button>
+                <button onClick={() => checkout("monthly")} disabled={busy} className="oq-btn oq-btn--primary" style={ctaSize}>{t(locale, "pricing.cta.monthly")}</button>
+                <button onClick={() => checkout("institution")} disabled={busy} className="oq-btn oq-btn--secondary" style={ctaSize}>{t(locale, "pricing.cta.institution")}</button>
               </>
             ) : (
               <>
-                <button disabled style={{ ...cta(true), opacity: 0.55, cursor: "default" }}>{t(locale, "pricing.cta.soon")}</button>
-                <p style={{ fontSize: 12.5, color: "var(--muted)", margin: 0 }}>
+                <button disabled className="oq-btn oq-btn--primary" style={ctaSize}>{t(locale, "pricing.cta.soon")}</button>
+                <p style={{ fontSize: 13.5, color: "var(--muted)", margin: 0 }}>
                   {t(locale, "pricing.soonNote")}
                 </p>
               </>
@@ -70,7 +70,7 @@ export default function PricingPage() {
         </Tier>
       </div>
 
-      {note && <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 12 }}>{note}</p>}
+      {note && <p style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 12 }}>{note}</p>}
     </div>
   );
 }
@@ -81,29 +81,18 @@ function Tier({ tag, name, price, highlight, children }: { tag: string; name: st
       style={{
         border: highlight ? "1px solid color-mix(in srgb, var(--accent) 35%, transparent)" : "1px solid var(--line)",
         boxShadow: highlight ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent)" : "none",
-        borderRadius: 13,
+        borderRadius: 12,
         padding: "18px 20px",
         background: "var(--panel)",
       }}
     >
       <div style={{ fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700, color: highlight ? "var(--accent-deep)" : "var(--good-text)" }}>{tag}</div>
-      <h2 style={{ fontSize: 17, fontWeight: 650, margin: "4px 0 3px" }}>{name}</h2>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>{price}</div>
+      <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: "4px 0 3px" }}>{name}</h2>
+      <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 12 }}>{price}</div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 7, fontSize: 13.5 }}>{children}</ul>
     </div>
   );
 }
 
-function cta(primary: boolean): React.CSSProperties {
-  return {
-    font: "inherit",
-    fontWeight: 600,
-    fontSize: 13.5,
-    borderRadius: 8,
-    padding: "9px 14px",
-    cursor: "pointer",
-    border: primary ? "1px solid var(--accent)" : "1px solid var(--line)",
-    background: primary ? "var(--accent)" : "var(--panel-2)",
-    color: primary ? "#fff" : "var(--ink)",
-  };
-}
+// Sondermaß für die CTA-Größe der Preiskarte; Basisstil kommt aus .oq-btn(--primary/--secondary).
+const ctaSize: React.CSSProperties = { fontSize: 13.5, padding: "9px 14px" };

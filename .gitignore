@@ -12,3 +12,7 @@ coverage/
 src-tauri/target/
 .vercel
 .env*
+
+# Playwright-E2E-Artefakte
+apps/web/test-results/
+apps/web/playwright-report/

@@ -7,28 +7,22 @@ import { useLocale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
 
 const mutedBadge: React.CSSProperties = {
-  fontSize: 11.5,
+  fontSize: 12,
   color: "var(--muted)",
   border: "1px solid var(--line)",
-  borderRadius: 20,
+  borderRadius: 999,
   padding: "3px 11px",
 };
-const btn: React.CSSProperties = {
-  font: "inherit",
-  fontSize: 13,
-  fontWeight: 600,
-  borderRadius: 7,
+// Sondermaß für die kompakten Kopfzeilen-Buttons; Basisstil kommt aus .oq-btn.
+const btnSize: React.CSSProperties = {
+  fontSize: 13.5,
   padding: "5px 12px",
-  cursor: "pointer",
-  border: "1px solid var(--line)",
-  background: "var(--panel)",
-  color: "var(--ink)",
 };
 const input: React.CSSProperties = {
   font: "inherit",
-  fontSize: 13,
+  fontSize: 13.5,
   border: "1px solid var(--line)",
-  borderRadius: 7,
+  borderRadius: 8,
   padding: "5px 9px",
   background: "var(--panel-2)",
   color: "var(--ink)",
@@ -68,8 +62,8 @@ export function AccountButton() {
   if (user) {
     return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{user.email}</span>
-        <button style={btn} onClick={() => getSupabase()?.auth.signOut()}>{t(locale, "cloud.signOut")}</button>
+        <span style={{ fontSize: 13.5, color: "var(--ink-2)" }}>{user.email}</span>
+        <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={() => getSupabase()?.auth.signOut()}>{t(locale, "cloud.signOut")}</button>
       </span>
     );
   }
@@ -81,12 +75,12 @@ export function AccountButton() {
     setSent(true);
   }
 
-  if (!open) return <button style={btn} onClick={() => setOpen(true)}>{t(locale, "cloud.signIn")}</button>;
-  if (sent) return <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{t(locale, "cloud.linkSent", { email })}</span>;
+  if (!open) return <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={() => setOpen(true)}>{t(locale, "cloud.signIn")}</button>;
+  if (sent) return <span style={{ fontSize: 13.5, color: "var(--ink-2)" }}>{t(locale, "cloud.linkSent", { email })}</span>;
   return (
     <span style={{ display: "inline-flex", gap: 6 }}>
       <input style={input} type="email" placeholder={t(locale, "cloud.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} />
-      <button style={btn} onClick={sendLink}>{t(locale, "cloud.magicLink")}</button>
+      <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={sendLink}>{t(locale, "cloud.magicLink")}</button>
     </span>
   );
 }
@@ -111,7 +105,7 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
 
   if (!cloudEnabled) return null;
   if (!user)
-    return <p style={{ fontSize: 12.5, color: "var(--muted)", margin: "8px 0 0" }}>{t(locale, "cloud.saveLoadHint")}</p>;
+    return <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "8px 0 0" }}>{t(locale, "cloud.saveLoadHint")}</p>;
 
   async function save() {
     const sb = getSupabase();
@@ -131,7 +125,7 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 10 }}>
-      <button style={btn} onClick={save}>{t(locale, "cloud.saveBtn")}</button>
+      <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={save}>{t(locale, "cloud.saveBtn")}</button>
       {projects.length > 0 && (
         <select
           style={input}

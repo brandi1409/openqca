@@ -27,3 +27,11 @@ jobs:
 
       - name: Web — production build
         run: npm run build --workspace web
+
+      - name: E2E — install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E — Playwright suite (QUALITY-SPEC A2–A4)
+        run: npm run test:e2e --workspace web
+        env:
+          CI: "true"

@@ -224,7 +224,8 @@ function HeroVisual() {
         padding: 20,
       }}
     >
-      <svg viewBox="0 0 440 340" width="100%" height="auto" style={{ display: "block" }}>
+      {/* height gehört bei SVG nicht als Attribut ("auto" ist kein <length>) — via CSS. */}
+      <svg viewBox="0 0 440 340" style={{ display: "block", width: "100%", height: "auto" }}>
         {/* Achsen */}
         <line x1={20} y1={122} x2={420} y2={122} stroke="var(--line)" strokeWidth={1} />
         <line x1={20} y1={8} x2={20} y2={122} stroke="var(--line)" strokeWidth={1} />

@@ -86,7 +86,7 @@ const containerStyle: React.CSSProperties = {
 const tableStyle: React.CSSProperties = {
   borderCollapse: "collapse",
   width: "100%",
-  fontSize: 13,
+  fontSize: 13.5,
 };
 
 function thStyle(num: boolean): React.CSSProperties {

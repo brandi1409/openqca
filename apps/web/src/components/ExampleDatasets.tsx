@@ -204,7 +204,7 @@ const cardHeadStyle: React.CSSProperties = {
 };
 
 const titleStyle: React.CSSProperties = {
-  fontSize: 14.5,
+  fontSize: 15,
   fontWeight: 700,
   color: "var(--ink)",
 };
@@ -225,7 +225,7 @@ const badgeStyle: React.CSSProperties = {
 
 const descStyle: React.CSSProperties = {
   margin: 0,
-  fontSize: 12.5,
+  fontSize: 13.5,
   lineHeight: 1.5,
   color: "var(--ink-2)",
 };
@@ -258,6 +258,6 @@ const syntheticStyle: React.CSSProperties = {
 
 const errorStyle: React.CSSProperties = {
   margin: "10px 0 0",
-  fontSize: 12.5,
+  fontSize: 13.5,
   color: "var(--bad)",
 };

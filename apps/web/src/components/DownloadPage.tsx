@@ -68,7 +68,7 @@ export function DownloadPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 24 }}>
         <Card title={t(locale, "download.install.title")}>
           {!installed && deferredPrompt ? (
-            <button type="button" onClick={handleInstall} style={installButtonStyle}>
+            <button type="button" onClick={handleInstall} className="oq-btn oq-btn--primary">
               {t(locale, "download.install.button")}
             </button>
           ) : (
@@ -137,15 +137,15 @@ const pageStyle: CSSProperties = {
 
 const backLinkStyle: CSSProperties = {
   display: "inline-block",
-  fontSize: 13,
+  fontSize: 13.5,
   color: "var(--accent-deep)",
   textDecoration: "none",
   marginBottom: 18,
 };
 
 const titleStyle: CSSProperties = {
-  fontSize: 26,
-  fontWeight: 680,
+  fontSize: 20,
+  fontWeight: 700,
   letterSpacing: "-0.01em",
   margin: "0 0 10px",
 };
@@ -161,40 +161,28 @@ const introStyle: CSSProperties = {
 const cardStyle: CSSProperties = {
   background: "var(--panel)",
   border: "1px solid var(--line)",
-  borderRadius: 13,
+  borderRadius: 12,
   padding: "20px 22px",
 };
 
 const cardTitleStyle: CSSProperties = {
-  fontSize: 17,
-  fontWeight: 660,
+  fontSize: 16.5,
+  fontWeight: 600,
   margin: "0 0 12px",
 };
 
 const cardBodyStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 15,
   lineHeight: 1.55,
   color: "var(--ink-2)",
   margin: 0,
 };
 
 const noteStyle: CSSProperties = {
-  fontSize: 13,
+  fontSize: 13.5,
   color: "var(--muted)",
   marginTop: 14,
   marginBottom: 0,
-};
-
-const installButtonStyle: CSSProperties = {
-  font: "inherit",
-  fontWeight: 600,
-  fontSize: 14.5,
-  borderRadius: 8,
-  padding: "10px 18px",
-  cursor: "pointer",
-  border: "1px solid var(--accent)",
-  background: "var(--accent)",
-  color: "#fff",
 };
 
 const statusBadgeStyle: CSSProperties = {
@@ -219,7 +207,7 @@ const detailsStyle: CSSProperties = {
 };
 
 const summaryStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 15,
   fontWeight: 600,
   color: "var(--ink)",
   cursor: "pointer",
