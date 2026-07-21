@@ -1,16 +1,86 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { calibrateDirect, buildTruthTable, intermediateSolution } from "@openqca/engine";
+import { DEMO } from "@/lib/demo";
 import { useLocale } from "@/i18n/locale";
 import { t, type DictKey } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
 
 /**
- * Öffentliche Landing-Page (Route „/"). Rein präsentativ, zweisprachig über
- * `useLocale` + `t`; alle Texte kommen aus den `landing.*`-Schlüsseln. Das
- * Analyse-Werkzeug lebt unter „/app". Design folgt den CSS-Variablen aus
- * globals.css, damit Light/Dark automatisch greifen.
+ * Öffentliche Landing-Page (Route „/"). Zweisprachig über `useLocale` + `t`.
+ *
+ * Designidee: Die Seite beweist statt zu behaupten. Der Hero zeigt die echte
+ * Ableitung Rohdaten → Kalibrierung → Truth Table → Lösungsformel — und zwar
+ * nicht als Dekoration, sondern LIVE mit der Engine gerechnet (Modul-Scope,
+ * Demo-Datensatz). Die Zahlen auf der Landing können damit nie von der App
+ * abweichen. Typografie: Serif-Display (Journal-Anmutung, reiner System-Stack)
+ * + Mono für Formeln/Zahlen; Farben bleiben die Tokens aus globals.css.
+ *
+ * Die Landing unterliegt bewusst NICHT der strengen A4-Skala (QUALITY-SPEC:
+ * nur /app, /preise, /download, /konto) — sie nutzt eine eigene Display-Typo.
  */
+
+const DISPLAY_FONT = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif';
+const MONO_FONT = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+
+/* ---------- Hero-Daten: echte Zahlen, live aus der Engine ---------- */
+
+const HERO_CONDS = ["wohlstand", "urban", "bildung", "stabil"] as const;
+const HERO_OUTCOME = "demo_ueberleben";
+
+function computeHeroData() {
+  const cases = DEMO.rows.map((r) => {
+    const values: Record<string, number> = {};
+    for (const c of [...HERO_CONDS, HERO_OUTCOME]) {
+      const [fullOut, crossover, fullIn] = DEMO.anchors[c];
+      values[c] = calibrateDirect(Number(r[c]), fullOut, crossover, fullIn);
+    }
+    return { label: String(r[DEMO.caseCol]), values };
+  });
+  const tt = buildTruthTable({
+    cases,
+    conditions: [...HERO_CONDS],
+    outcome: HERO_OUTCOME,
+    freqCut: 1,
+    consCut: 0.8,
+  });
+  const inter = intermediateSolution(tt, cases, {
+    wohlstand: "present",
+    urban: "present",
+    bildung: "present",
+    stabil: "present",
+  });
+  const model = inter.models[0] ?? null;
+  // Truth-Table-Ausschnitt: die beiden positiven Zeilen + eine widersprüchliche als Kontrast.
+  const shown = tt.rows
+    .filter((r) => r.n > 0)
+    .sort((a, b) => b.consistency - a.consistency)
+    .slice(0, 3);
+  const rawW = DEMO.rows.map((r) => Number(r.wohlstand));
+  const calW = cases.map((c) => c.values.wohlstand);
+  return { model, shown, rawW, calW, anchorsW: DEMO.anchors.wohlstand };
+}
+
+const HERO = computeHeroData();
+
+/** Bits eines Terms („1-11") → Literale in Anzeigeform (WOHLSTAND, ~URBAN …). */
+function termToText(bits: string): string {
+  const parts: string[] = [];
+  bits.split("").forEach((b, i) => {
+    if (b === "1") parts.push(HERO_CONDS[i].toUpperCase());
+    else if (b === "0") parts.push("~" + HERO_CONDS[i].toUpperCase());
+  });
+  return parts.join("·");
+}
+
+const HERO_FORMULA = HERO.model ? HERO.model.terms.map(termToText).join(" + ") + " → DEMOKRATIE" : "";
+
+/** Zahl im deutschen Format mit 3 Dezimalen (0,972). */
+function fmt3(x: number): string {
+  return x.toFixed(3).replace(".", ",");
+}
+
 export function Landing() {
   const [locale] = useLocale();
   return (
@@ -18,7 +88,10 @@ export function Landing() {
       <LandingNav />
       <main>
         <Hero />
-        <Features />
+        <Deliverables />
+        <Rigor />
+        <Compare />
+        <FeatureList />
         <Steps />
         <Privacy />
         <PricingTeaser />
@@ -74,265 +147,386 @@ function NavLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-/* ---------- Hero ---------- */
+/* ---------- Hero: These + Beweis-Streifen ---------- */
 
 function Hero() {
   const [locale] = useLocale();
   return (
-    <section style={{ ...sectionStyle, paddingTop: 64, paddingBottom: 20 }}>
+    <section style={{ ...sectionStyle, paddingTop: 58, paddingBottom: 28 }}>
       <style>{`
-        .hero-layout {
-          display: grid;
-          grid-template-columns: 1fr;
-          align-items: center;
-          gap: 36px;
+        @keyframes oq-draw { from { stroke-dashoffset: 240; } to { stroke-dashoffset: 0; } }
+        @keyframes oq-fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+        .oq-anim-curve { stroke-dasharray: 240; animation: oq-draw 900ms ease-out 250ms both; }
+        .oq-anim-dot { animation: oq-fade 400ms ease-out both; }
+        .oq-anim-late { animation: oq-fade 600ms ease-out 1000ms both; }
+        @media (prefers-reduced-motion: reduce) {
+          .oq-anim-curve, .oq-anim-dot, .oq-anim-late { animation: none; }
         }
-        .hero-visual-slot {
-          display: flex;
-          justify-content: center;
-        }
-        .hero-visual-slot > div {
-          width: 100%;
-          max-width: 380px;
-        }
-        @media (min-width: 900px) {
-          .hero-layout {
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 40px;
-          }
-          .hero-visual-slot {
-            justify-content: flex-end;
-          }
-          .hero-visual-slot > div {
-            max-width: 460px;
-          }
+        .oq-strip { display: flex; align-items: stretch; gap: 0; }
+        .oq-strip-svg { display: block; width: 100%; max-width: 220px; height: auto; }
+        /* Unterhalb Desktop-Breite umbrechen statt scrollen — die Lösungsformel
+           (die Pointe des Streifens) muss immer ohne Scrollen sichtbar sein. */
+        @media (max-width: 1020px) {
+          .oq-strip { flex-wrap: wrap; gap: 18px 26px; }
+          .oq-arrow { display: none; }
         }
       `}</style>
-      <div className="hero-layout">
-        <div style={{ textAlign: "center" }}>
-          <span
-            style={{
-              display: "inline-block",
-              fontSize: 12.5,
-              fontWeight: 600,
-              letterSpacing: "0.02em",
-              color: "var(--accent-deep)",
-              background: "var(--accent-wash)",
-              border: "1px solid var(--line)",
-              borderRadius: 999,
-              padding: "5px 13px",
-            }}
-          >
-            {t(locale, "landing.hero.badge")}
-          </span>
-          <h1 style={{ fontSize: 40, lineHeight: 1.1, fontWeight: 720, letterSpacing: "-0.02em", margin: "20px auto 0", maxWidth: "16ch" }}>
-            {t(locale, "landing.hero.title")}
-          </h1>
-          <p style={{ color: "var(--ink-2)", fontSize: 17, lineHeight: 1.55, maxWidth: "56ch", margin: "18px auto 0" }}>
-            {t(locale, "landing.hero.subline")}
-          </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
-            <CtaButton href="/app" primary large>{t(locale, "landing.hero.ctaPrimary")}</CtaButton>
-            <CtaButton href="/app" large>{t(locale, "landing.hero.ctaSecondary")}</CtaButton>
+
+      <p style={{ fontFamily: MONO_FONT, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--brand)", fontWeight: 600, margin: 0 }}>
+        {t(locale, "landing.h.eyebrow")}
+      </p>
+      <h1
+        style={{
+          fontFamily: DISPLAY_FONT,
+          fontSize: "clamp(34px, 5.4vw, 52px)",
+          lineHeight: 1.08,
+          fontWeight: 700,
+          letterSpacing: "-0.01em",
+          margin: "14px 0 0",
+          maxWidth: "22ch",
+        }}
+      >
+        {t(locale, "landing.h.title")}
+      </h1>
+      <p style={{ color: "var(--ink-2)", fontSize: 17, lineHeight: 1.6, maxWidth: "62ch", margin: "16px 0 0" }}>
+        {t(locale, "landing.h.sub")}
+      </p>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24 }}>
+        <CtaButton href="/app?demo=1" primary large>{t(locale, "landing.h.ctaDemo")}</CtaButton>
+        <CtaButton href="/app" large>{t(locale, "landing.h.ctaOwn")}</CtaButton>
+      </div>
+
+      <ProofStrip />
+
+      <p style={{ fontFamily: MONO_FONT, fontSize: 12, lineHeight: 1.7, color: "var(--muted)", margin: "14px 0 0" }}>
+        {t(locale, "landing.h.proof")}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * Der Beweis-Streifen: vier Stationen der echten Demo-Analyse. Alle Zahlen
+ * stammen aus `computeHeroData()` (Engine, Modul-Scope) — nichts ist gemalt.
+ */
+function ProofStrip() {
+  const [locale] = useLocale();
+  return (
+    <figure
+      aria-label={t(locale, "landing.h.stripAria")}
+      style={{
+        margin: "30px 0 0",
+        background: "var(--panel)",
+        border: "1px solid var(--line)",
+        borderRadius: 12,
+        boxShadow: "0 1px 2px rgba(0,0,0,0.05), 0 10px 28px rgba(0,0,0,0.06)",
+        padding: "16px 18px 12px",
+      }}
+    >
+      <div className="oq-strip">
+        <StripPanel label={t(locale, "landing.h.s1")}>
+          <RawDots />
+        </StripPanel>
+        <StripArrow />
+        <StripPanel label={t(locale, "landing.h.s2")}>
+          <CalibCurve />
+        </StripPanel>
+        <StripArrow />
+        <StripPanel label={t(locale, "landing.h.s3")}>
+          <TruthRows />
+        </StripPanel>
+        <StripArrow />
+        <StripPanel label={t(locale, "landing.h.s4")} grow>
+          <div className="oq-anim-late" style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: "100%", gap: 8 }}>
+            <div style={{ fontFamily: MONO_FONT, fontSize: "clamp(14px, 1.8vw, 17px)", fontWeight: 600, color: "var(--ink)", lineHeight: 1.5, overflowWrap: "anywhere" }}>
+              {HERO_FORMULA}
+            </div>
+            {HERO.model && (
+              <div style={{ fontFamily: MONO_FONT, fontSize: 12, color: "var(--muted)" }}>
+                {t(locale, "landing.h.consistency")} {fmt3(HERO.model.solutionConsistency)} · {t(locale, "landing.h.coverage")} {fmt3(HERO.model.solutionCoverage)}
+              </div>
+            )}
           </div>
-          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 18 }}>
-            {t(locale, "landing.hero.facts")}
-          </p>
-        </div>
-        <div className="hero-visual-slot">
-          <HeroVisual />
-        </div>
+        </StripPanel>
+      </div>
+      <figcaption style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.55, marginTop: 12, borderTop: "1px solid var(--line-soft)", paddingTop: 10 }}>
+        {t(locale, "landing.h.stripCaption")}
+      </figcaption>
+    </figure>
+  );
+}
+
+function StripPanel({ label, grow, children }: { label: string; grow?: boolean; children: ReactNode }) {
+  return (
+    <div style={{ flex: grow ? "2 1 250px" : "1 1 172px", minWidth: grow ? 240 : 150, display: "flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ fontFamily: MONO_FONT, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>
+        {label}
+      </span>
+      <div style={{ flex: 1 }}>{children}</div>
+    </div>
+  );
+}
+
+function StripArrow() {
+  return (
+    <span aria-hidden className="oq-arrow" style={{ alignSelf: "center", color: "var(--muted)", fontSize: 16, padding: "0 12px", flex: "none" }}>
+      →
+    </span>
+  );
+}
+
+/** Station 1 — die 18 rohen Wohlstandswerte auf einer Achse. */
+function RawDots() {
+  const min = 260;
+  const max = 1160;
+  return (
+    <svg viewBox="0 0 172 84" className="oq-strip-svg" aria-hidden>
+      <line x1={6} y1={70} x2={166} y2={70} stroke="var(--line)" />
+      {HERO.rawW.map((v, i) => (
+        <circle
+          key={i}
+          className="oq-anim-dot"
+          style={{ animationDelay: `${i * 30}ms` }}
+          cx={6 + ((v - min) / (max - min)) * 160}
+          cy={62 - (i % 4) * 11}
+          r={3.4}
+          fill="var(--ink-2)"
+          opacity={0.75}
+        />
+      ))}
+      <text x={6} y={82} fontSize={9} fill="var(--muted)" fontFamily={MONO_FONT}>320</text>
+      <text x={166} y={82} fontSize={9} fill="var(--muted)" textAnchor="end" fontFamily={MONO_FONT}>1098</text>
+    </svg>
+  );
+}
+
+/** Station 2 — die echte Kalibrierkurve (Anker 400/550/900) mit den 18 Fällen. */
+function CalibCurve() {
+  const [fullOut, crossover, fullIn] = HERO.anchorsW;
+  const xMin = 260;
+  const xMax = 1160;
+  const px = (v: number) => 6 + ((v - xMin) / (xMax - xMin)) * 160;
+  const py = (m: number) => 70 - m * 60;
+  let d = "";
+  for (let k = 0; k <= 60; k++) {
+    const v = xMin + (k / 60) * (xMax - xMin);
+    d += (k ? "L" : "M") + px(v).toFixed(1) + " " + py(calibrateDirect(v, fullOut, crossover, fullIn)).toFixed(1);
+  }
+  return (
+    <svg viewBox="0 0 172 84" className="oq-strip-svg" aria-hidden>
+      <line x1={6} y1={70} x2={166} y2={70} stroke="var(--line)" />
+      <line x1={6} y1={py(0.5)} x2={166} y2={py(0.5)} stroke="var(--line-soft)" strokeDasharray="3 4" />
+      <text x={166} y={py(0.5) - 3} fontSize={9} fill="var(--muted)" textAnchor="end" fontFamily={MONO_FONT}>0,5</text>
+      <path className="oq-anim-curve" d={d} pathLength={240} fill="none" stroke="var(--accent)" strokeWidth={2.2} />
+      {HERO.rawW.map((v, i) => {
+        const m = HERO.calW[i];
+        return (
+          <circle
+            key={i}
+            className="oq-anim-dot"
+            style={{ animationDelay: `${300 + i * 30}ms` }}
+            cx={px(v)}
+            cy={py(m)}
+            r={3.2}
+            fill={Math.abs(m - 0.5) < 0.1 ? "var(--warn-text)" : "var(--accent)"}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Station 3 — echte Truth-Table-Zeilen (Konsistenz, Fallzahl, Cutoff-Entscheid). */
+function TruthRows() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, justifyContent: "center", height: "100%" }} aria-hidden>
+      <div style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: "var(--muted)", display: "flex", gap: 10 }}>
+        <span style={{ width: 46 }}>{HERO_CONDS.map((c) => c[0].toUpperCase()).join(" ")}</span>
+        <span style={{ width: 14, textAlign: "right" }}>n</span>
+        <span style={{ width: 38, textAlign: "right" }}>incl.</span>
+      </div>
+      {HERO.shown.map((row) => {
+        const pass = row.output === 1;
+        return (
+          <div key={row.bits} style={{ fontFamily: MONO_FONT, fontSize: 12, display: "flex", gap: 10, color: "var(--ink-2)" }}>
+            <span style={{ width: 46, letterSpacing: "0.22em" }}>{row.bits}</span>
+            <span style={{ width: 14, textAlign: "right" }}>{row.n}</span>
+            <span style={{ width: 38, textAlign: "right" }}>{fmt3(row.consistency)}</span>
+            <span style={{ color: pass ? "var(--good-text)" : "var(--muted)", fontWeight: 600 }}>{pass ? "✓" : "✗"}</span>
+          </div>
+        );
+      })}
+      <div style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: "var(--muted)" }}>incl. ≥ 0,80 →</div>
+    </div>
+  );
+}
+
+/* ---------- Das nehmen Sie mit ---------- */
+
+function Deliverables() {
+  const [locale] = useLocale();
+  const items: [string, DictKey, DictKey][] = [
+    ["BERICHT.PDF", "landing.deliver.pdf.title", "landing.deliver.pdf.desc"],
+    ["ANALYSE.R", "landing.deliver.r.title", "landing.deliver.r.desc"],
+    ["PROTOKOLL.JSON", "landing.deliver.json.title", "landing.deliver.json.desc"],
+  ];
+  return (
+    <section style={sectionStyle}>
+      <SectionHeading>{t(locale, "landing.deliver.title")}</SectionHeading>
+      <p style={{ color: "var(--ink-2)", fontSize: 15, maxWidth: "62ch", margin: "10px 0 0" }}>
+        {t(locale, "landing.deliver.sub")}
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginTop: 22 }}>
+        {items.map(([tag, title, desc]) => (
+          <div key={tag} style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
+            <span
+              style={{
+                display: "inline-block",
+                fontFamily: MONO_FONT,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                color: "var(--brand)",
+                background: "var(--brand-wash)",
+                border: "1px solid var(--line)",
+                borderRadius: 999,
+                padding: "3px 10px",
+              }}
+            >
+              {tag}
+            </span>
+            <h3 style={{ fontSize: 16, fontWeight: 650, margin: "12px 0 6px" }}>{t(locale, title)}</h3>
+            <p style={{ fontSize: 14, lineHeight: 1.55, color: "var(--ink-2)", margin: 0 }}>{t(locale, desc)}</p>
+          </div>
+        ))}
       </div>
     </section>
   );
 }
 
-/* ---------- Hero-Produktvisual (dekorativ) ---------- */
+/* ---------- Methodenstrenge ---------- */
 
-/** Catmull-Rom → kubische Bézier-Konvertierung für eine glatte Kurve durch Punkte. */
-function smoothPath(points: { x: number; y: number }[]): string {
-  if (points.length < 2) return "";
-  const segments: string[] = [`M ${points[0].x},${points[0].y}`];
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i === 0 ? 0 : i - 1];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = p2.y - (p3.y - p1.y) / 6;
-    segments.push(`C ${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`);
-  }
-  return segments.join(" ");
-}
-
-type CurvePoint = { x: number; y: number; edge?: boolean };
-
-const CURVE_POINTS: CurvePoint[] = [
-  { x: 30, y: 112 },
-  { x: 77.5, y: 108 },
-  { x: 125, y: 98 },
-  { x: 172.5, y: 78, edge: true },
-  { x: 220, y: 55, edge: true },
-  { x: 267.5, y: 35 },
-  { x: 315, y: 20 },
-  { x: 362.5, y: 14 },
-  { x: 410, y: 10 },
-];
-
-const CURVE_PATH = smoothPath(CURVE_POINTS);
-const ANCHOR_X = [125, 220, 315];
-
-type TableCell = "0" | "1" | null;
-
-const TABLE_DATA: TableCell[][] = [
-  ["1", "1", "0", "1"],
-  ["1", "0", "0", "1"],
-  ["0", "1", "1", null],
-  ["1", null, "1", null],
-  [null, null, "0", "1"],
-];
-const TABLE_HIGHLIGHT_ROW = 1;
-
-const TABLE_X = 24;
-const TABLE_Y = 152;
-const TABLE_W = 392;
-const TABLE_H = 144;
-const TABLE_COLS = 4;
-const TABLE_ROWS = 5;
-const TABLE_GAP_X = 8;
-const TABLE_GAP_Y = 6;
-const CELL_W = (TABLE_W - TABLE_GAP_X * (TABLE_COLS - 1)) / TABLE_COLS;
-const CELL_H = (TABLE_H - TABLE_GAP_Y * (TABLE_ROWS - 1)) / TABLE_ROWS;
-
-/**
- * Dekoratives Mini-Produktvisual: Kalibrierungs-S-Kurve, Truth-Table-Ausschnitt
- * und Lösungsformel. Rein illustrativ (aria-hidden), keine echten Daten.
- */
-function HeroVisual() {
-  return (
-    <div
-      aria-hidden="true"
-      role="presentation"
-      style={{
-        width: "100%",
-        background: "var(--panel)",
-        border: "1px solid var(--line)",
-        borderRadius: 12,
-        boxShadow: "0 1px 2px rgba(0,0,0,0.05), 0 10px 28px rgba(0,0,0,0.07)",
-        padding: 20,
-      }}
-    >
-      {/* height gehört bei SVG nicht als Attribut ("auto" ist kein <length>) — via CSS. */}
-      <svg viewBox="0 0 440 340" style={{ display: "block", width: "100%", height: "auto" }}>
-        {/* Achsen */}
-        <line x1={20} y1={122} x2={420} y2={122} stroke="var(--line)" strokeWidth={1} />
-        <line x1={20} y1={8} x2={20} y2={122} stroke="var(--line)" strokeWidth={1} />
-
-        {/* Anker-Vertikalen */}
-        {ANCHOR_X.map((x) => (
-          <line
-            key={x}
-            x1={x}
-            y1={8}
-            x2={x}
-            y2={122}
-            stroke="var(--muted)"
-            strokeWidth={1}
-            strokeDasharray="4 4"
-            strokeOpacity={0.6}
-          />
-        ))}
-
-        {/* Kalibrierungs-S-Kurve */}
-        <path d={CURVE_PATH} fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" />
-        {CURVE_POINTS.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={4} fill={p.edge ? "var(--warn-text)" : "var(--accent)"} />
-        ))}
-
-        {/* Mini Truth-Table */}
-        {TABLE_DATA.map((row, r) =>
-          row.map((cell, c) => {
-            const x = TABLE_X + c * (CELL_W + TABLE_GAP_X);
-            const y = TABLE_Y + r * (CELL_H + TABLE_GAP_Y);
-            const highlighted = r === TABLE_HIGHLIGHT_ROW;
-            return (
-              <g key={`${r}-${c}`}>
-                <rect
-                  x={x}
-                  y={y}
-                  width={CELL_W}
-                  height={CELL_H}
-                  rx={4}
-                  fill={highlighted ? "var(--accent-wash)" : "var(--panel-2)"}
-                  stroke="var(--line)"
-                  strokeWidth={1}
-                />
-                {cell !== null && (
-                  <text
-                    x={x + CELL_W / 2}
-                    y={y + CELL_H / 2}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontFamily="ui-monospace, SF Mono, Menlo, Consolas, monospace"
-                    fontSize={12}
-                    fill="var(--ink-2)"
-                  >
-                    {cell}
-                  </text>
-                )}
-              </g>
-            );
-          }),
-        )}
-
-        {/* Lösungsformel */}
-        <text
-          x={220}
-          y={320}
-          textAnchor="middle"
-          fontFamily="ui-monospace, SF Mono, Menlo, Consolas, monospace"
-          fontSize={16}
-          fontWeight={600}
-        >
-          <tspan fill="var(--ink)">A</tspan>
-          <tspan fill="var(--accent-deep)">*</tspan>
-          <tspan fill="var(--ink)">B</tspan>
-          <tspan fill="var(--accent-deep)"> + </tspan>
-          <tspan fill="var(--accent-deep)">~</tspan>
-          <tspan fill="var(--ink)">C</tspan>
-          <tspan fill="var(--accent-deep)"> → </tspan>
-          <tspan fill="var(--ink)">Y</tspan>
-        </text>
-      </svg>
-    </div>
-  );
-}
-
-/* ---------- Feature-Grid ---------- */
-
-function Features() {
+function Rigor() {
   const [locale] = useLocale();
-  const cards: [DictKey, DictKey][] = [
-    ["landing.features.calib.title", "landing.features.calib.desc"],
-    ["landing.features.truth.title", "landing.features.truth.desc"],
-    ["landing.features.robust.title", "landing.features.robust.desc"],
-    ["landing.features.repro.title", "landing.features.repro.desc"],
-    ["landing.features.report.title", "landing.features.report.desc"],
-    ["landing.features.local.title", "landing.features.local.desc"],
+  const rows: [string, DictKey][] = [
+    ["12/12", "landing.rigor.r1"],
+    ["m(c) = 0,500", "landing.rigor.r2"],
+    ["3", "landing.rigor.r3"],
+    ["MIT", "landing.rigor.r4"],
   ];
   return (
-    <section id="funktionen" style={sectionStyle}>
-      <SectionHeading>{t(locale, "landing.features.title")}</SectionHeading>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, marginTop: 22 }}>
-        {cards.map(([title, desc]) => (
-          <div key={title} style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
-            <h3 style={{ fontSize: 16, fontWeight: 650, margin: "0 0 8px" }}>{t(locale, title)}</h3>
-            <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", margin: 0 }}>{t(locale, desc)}</p>
+    <section style={sectionStyle}>
+      <SectionHeading>{t(locale, "landing.rigor.title")}</SectionHeading>
+      <div style={{ marginTop: 18, borderTop: "1px solid var(--line)" }}>
+        {rows.map(([value, textKey]) => (
+          <div
+            key={value}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(120px, 160px) 1fr",
+              gap: 18,
+              alignItems: "baseline",
+              padding: "14px 2px",
+              borderBottom: "1px solid var(--line)",
+            }}
+          >
+            <span style={{ fontFamily: MONO_FONT, fontSize: 17, fontWeight: 600, color: "var(--brand)", whiteSpace: "nowrap" }}>{value}</span>
+            <span style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink-2)" }}>{t(locale, textKey)}</span>
           </div>
         ))}
       </div>
+      <p style={{ marginTop: 14, fontSize: 14.5 }}>
+        <a href="/methodik" style={{ ...inlineLinkStyle, fontWeight: 600 }}>{t(locale, "landing.rigor.linkMethodik")} →</a>
+        <span style={{ color: "var(--muted)" }}>{"  ·  "}</span>
+        <a href="https://github.com/brandi1409/openqca" target="_blank" rel="noreferrer" style={{ ...inlineLinkStyle, fontWeight: 600 }}>
+          {t(locale, "landing.rigor.linkCode")} →
+        </a>
+      </p>
+    </section>
+  );
+}
+
+/* ---------- Vergleich ---------- */
+
+function Compare() {
+  const [locale] = useLocale();
+  const head = ["", "openQCA", "fsQCA 4", t(locale, "landing.compare.colR")];
+  const rows: [DictKey, string, string, string][] = [
+    ["landing.compare.install", t(locale, "landing.compare.install.a"), t(locale, "landing.compare.install.b"), t(locale, "landing.compare.install.c")],
+    ["landing.compare.coach", "✓", "—", "—"],
+    ["landing.compare.calib", t(locale, "landing.compare.calib.a"), "✓", t(locale, "landing.compare.calib.c")],
+    ["landing.compare.esa", "✓", "✓", "✓"],
+    ["landing.compare.export", t(locale, "landing.compare.export.a"), "—", t(locale, "landing.compare.export.c")],
+    ["landing.compare.oss", "MIT", t(locale, "landing.compare.oss.b"), "GPL"],
+  ];
+  const cellStyle: CSSProperties = { padding: "10px 14px", fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", borderBottom: "1px solid var(--line)", textAlign: "left", verticalAlign: "top" };
+  return (
+    <section style={sectionStyle}>
+      <SectionHeading>{t(locale, "landing.compare.title")}</SectionHeading>
+      <div style={{ marginTop: 18, overflowX: "auto", border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
+          <thead>
+            <tr>
+              {head.map((h, i) => (
+                <th key={i} scope="col" style={{ ...cellStyle, fontWeight: 700, color: i === 1 ? "var(--brand)" : "var(--ink)", background: "var(--panel-2)" }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([labelKey, a, b, c]) => (
+              <tr key={labelKey}>
+                <th scope="row" style={{ ...cellStyle, fontWeight: 600, color: "var(--ink)" }}>{t(locale, labelKey)}</th>
+                <td style={{ ...cellStyle, fontWeight: 600, color: "var(--ink)" }}>{a}</td>
+                <td style={cellStyle}>{b}</td>
+                <td style={cellStyle}>{c}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55, marginTop: 12, maxWidth: "70ch" }}>
+        {t(locale, "landing.compare.note")}
+      </p>
+    </section>
+  );
+}
+
+/* ---------- Funktionsliste (kompakt) ---------- */
+
+function FeatureList() {
+  const [locale] = useLocale();
+  const items: DictKey[] = [
+    "landing.fl.i1",
+    "landing.fl.i2",
+    "landing.fl.i3",
+    "landing.fl.i4",
+    "landing.fl.i5",
+    "landing.fl.i6",
+    "landing.fl.i7",
+    "landing.fl.i8",
+  ];
+  return (
+    <section id="funktionen" style={sectionStyle}>
+      <SectionHeading>{t(locale, "landing.fl.title")}</SectionHeading>
+      <ul
+        style={{
+          listStyle: "none",
+          margin: "18px 0 0",
+          padding: 0,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: "10px 26px",
+        }}
+      >
+        {items.map((key) => (
+          <li key={key} style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 14.5, lineHeight: 1.55, color: "var(--ink-2)" }}>
+            <span aria-hidden style={{ color: "var(--good-text)", fontWeight: 700 }}>✓</span>
+            <span>{t(locale, key)}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -388,7 +582,7 @@ function Privacy() {
     <section style={sectionStyle}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 26, alignItems: "start", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "24px 24px" }}>
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 690, letterSpacing: "-0.01em", margin: "0 0 12px" }}>
+          <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 24, fontWeight: 700, letterSpacing: "-0.005em", margin: "0 0 12px" }}>
             {t(locale, "landing.privacy.title")}
           </h2>
           <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--ink-2)", margin: 0 }}>
@@ -413,7 +607,7 @@ function Privacy() {
 function PrivacyItem({ children }: { children: ReactNode }) {
   return (
     <li style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 14.5, color: "var(--ink-2)" }}>
-      <span aria-hidden style={{ color: "var(--good-text)", fontWeight: 800, lineHeight: 1.5 }}>✓</span>
+      <span aria-hidden style={{ color: "var(--good-text)", fontWeight: 700, lineHeight: 1.5 }}>✓</span>
       <span>{children}</span>
     </li>
   );
@@ -442,7 +636,7 @@ function PricingTeaser() {
 function MiniCard({ name, desc }: { name: string; desc: string }) {
   return (
     <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
-      <h3 style={{ fontSize: 17, fontWeight: 680, margin: "0 0 8px" }}>{name}</h3>
+      <h3 style={{ fontSize: 17, fontWeight: 650, margin: "0 0 8px" }}>{name}</h3>
       <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", margin: 0 }}>{desc}</p>
     </div>
   );
@@ -456,7 +650,7 @@ function DownloadTeaser() {
     <section style={sectionStyle}>
       <div style={{ background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 14, padding: "24px 24px", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ maxWidth: "56ch" }}>
-          <h2 style={{ fontSize: 22, fontWeight: 680, letterSpacing: "-0.01em", margin: "0 0 8px" }}>
+          <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 22, fontWeight: 700, letterSpacing: "-0.005em", margin: "0 0 8px" }}>
             {t(locale, "landing.download.title")}
           </h2>
           <p style={{ fontSize: 15, lineHeight: 1.55, color: "var(--ink-2)", margin: 0 }}>
@@ -476,11 +670,11 @@ function CtaBand() {
   return (
     <section style={{ background: "var(--brand-wash)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", marginTop: 20 }}>
       <div style={{ ...sectionStyle, paddingTop: 48, paddingBottom: 48, textAlign: "center" }}>
-        <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.015em", margin: "0 auto", maxWidth: "22ch" }}>
+        <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 30, fontWeight: 700, letterSpacing: "-0.008em", margin: "0 auto", maxWidth: "26ch" }}>
           {t(locale, "landing.cta.title")}
         </h2>
         <div style={{ marginTop: 22 }}>
-          <CtaButton href="/app" primary large>{t(locale, "landing.cta.button")}</CtaButton>
+          <CtaButton href="/app?demo=1" primary large>{t(locale, "landing.h.ctaDemo")}</CtaButton>
         </div>
       </div>
     </section>
@@ -494,7 +688,11 @@ const sectionStyle: CSSProperties = { maxWidth: 1080, margin: "0 auto", padding:
 const inlineLinkStyle: CSSProperties = { color: "var(--accent-deep)", textDecoration: "none" };
 
 function SectionHeading({ children }: { children: ReactNode }) {
-  return <h2 style={{ fontSize: 26, fontWeight: 690, letterSpacing: "-0.015em", margin: 0 }}>{children}</h2>;
+  return (
+    <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 28, fontWeight: 700, letterSpacing: "-0.008em", margin: 0 }}>
+      {children}
+    </h2>
+  );
 }
 
 function CtaButton({ href, children, primary, large }: { href: string; children: ReactNode; primary?: boolean; large?: boolean }) {

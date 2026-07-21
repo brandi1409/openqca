@@ -38,6 +38,80 @@ const de = {
   "landing.hero.ctaSecondary": "Beispiel ansehen",
   "landing.hero.facts": "Engine kreuzvalidiert gegen das R-Paket QCA · R-Skript-Export · PDF-Bericht",
 
+  // -- Landing: Hero mit Beweis-Streifen -----------------------------------------
+  "landing.h.eyebrow": "Qualitative Comparative Analysis · Open Source",
+  "landing.h.title": "Von den Fällen zur Formel.",
+  "landing.h.sub":
+    "openQCA führt Sie von Rohdaten über Kalibrierung und Truth Table zur belastbaren Lösungsformel — für Masterarbeit, Dissertation und Paper. Mit exakt den Formeln aus Ragin (2008) und einer Engine, die gegen das R-Paket QCA kreuzvalidiert ist. Kostenlos, quelloffen, Ihre Daten bleiben im Browser.",
+  "landing.h.ctaDemo": "Beispiel-Analyse öffnen",
+  "landing.h.ctaOwn": "Mit eigenen Daten starten",
+  "landing.h.proof":
+    "Kreuzvalidiert gegen das R-Paket QCA — 12/12 Szenarien identisch · Kalibrierung & Kennzahlen exakt nach Ragin (2008) · MIT-Lizenz",
+  "landing.h.stripAria": "Ablauf einer QCA: Rohdaten, Kalibrierung, Truth Table, Lösungsformel",
+  "landing.h.stripCaption":
+    "Keine Illustration: Diese Zahlen rechnet die openQCA-Engine beim Laden der Seite live aus dem Demo-Datensatz (synthetisch, angelehnt an Lipset 1959) — mit denselben Formeln wie in der App.",
+  "landing.h.s1": "18 Fälle · Rohwerte",
+  "landing.h.s2": "Kalibrierung",
+  "landing.h.s3": "Truth Table",
+  "landing.h.s4": "Lösung",
+  "landing.h.consistency": "Konsistenz",
+  "landing.h.coverage": "Abdeckung",
+
+  // -- Landing: Ergebnisse, Methodenstrenge, Vergleich ---------------------------
+  "landing.deliver.title": "Das nehmen Sie mit.",
+  "landing.deliver.sub":
+    "Am Ende der Analyse stehen drei Artefakte — zitierfähig, prüfbar und replizierbar.",
+  "landing.deliver.pdf.title": "Druckfertiger Analysebericht",
+  "landing.deliver.pdf.desc":
+    "Alle Kennzahlen, Kalibrierungsentscheidungen und Lösungen als sauber formatierter Bericht für Anhang oder Betreuer:in.",
+  "landing.deliver.r.title": "R-Skript zur Replikation",
+  "landing.deliver.r.desc":
+    "Ein lauffähiges Skript für das R-Paket QCA, das Ihre Analyse unabhängig reproduziert — auch für Reviewer.",
+  "landing.deliver.json.title": "Vollständiges Protokoll",
+  "landing.deliver.json.desc":
+    "Jede Einstellung — Anker, Cutoffs, Erwartungen — als JSON. Laden Sie es später und die Analyse ist exakt wieder da.",
+
+  "landing.rigor.title": "Methodenstrenge, nachprüfbar.",
+  "landing.rigor.r1":
+    "Szenarien identisch mit dem R-Paket QCA — Kalibrierung, Konsistenz, PRI, Coverage und alle drei Lösungstypen kreuzvalidiert.",
+  "landing.rigor.r2":
+    "Fixpunkte der direkten Kalibrierung exakt (m(i) ≈ 0,953 · m(e) ≈ 0,047), nach Ragin (2008) — nicht genähert.",
+  "landing.rigor.r3":
+    "Lösungstypen, sauber getrennt: komplex, intermediär mit Richtungserwartungen (ESA nach Schneider & Wagemann 2012), sparsam.",
+  "landing.rigor.r4":
+    "Quelloffen unter MIT-Lizenz — jede Formel ist im Code und auf der Methodik-Seite nachlesbar.",
+  "landing.rigor.linkMethodik": "Alle Formeln auf der Methodik-Seite",
+  "landing.rigor.linkCode": "Quellcode auf GitHub",
+
+  "landing.compare.title": "openQCA, fsQCA oder R?",
+  "landing.compare.colR": "R-Paket QCA",
+  "landing.compare.install": "Installation",
+  "landing.compare.install.a": "keine — läuft im Browser",
+  "landing.compare.install.b": "Desktop-Installer",
+  "landing.compare.install.c": "R + Paketinstallation",
+  "landing.compare.coach": "Geführter Ablauf mit Fehler-Coach",
+  "landing.compare.calib": "Direkte Kalibrierung (Ragin 2008)",
+  "landing.compare.calib.a": "✓ R-validiert",
+  "landing.compare.calib.c": "✓ Referenz",
+  "landing.compare.esa": "Intermediäre Lösung (ESA)",
+  "landing.compare.export": "Protokoll + R-Skript-Export",
+  "landing.compare.export.a": "✓ beides",
+  "landing.compare.export.c": "eigene Skripte",
+  "landing.compare.oss": "Open Source",
+  "landing.compare.oss.b": "— (Freeware)",
+  "landing.compare.note":
+    "Ehrlich gesagt: Das R-Paket QCA bleibt die Referenz für Spezialfälle jenseits des openQCA-Funktionsumfangs. Genau deshalb exportieren Sie Ihr R-Skript mit einem Klick — und arbeiten dort nahtlos weiter.",
+
+  "landing.fl.title": "Alles drin für eine vollständige QCA.",
+  "landing.fl.i1": "Geführte Kalibrierung mit Coach für Schiefe, 0,5-Problem und Grenzfälle",
+  "landing.fl.i2": "Crisp- und Fuzzy-Sets — automatisch erkannt, nie doppelt kalibriert",
+  "landing.fl.i3": "Notwendigkeitsanalyse vor der Truth Table (Schneider & Wagemann)",
+  "landing.fl.i4": "Truth Table mit Konsistenz-, PRI- und Häufigkeits-Cutoffs",
+  "landing.fl.i5": "Robustheitsprüfung: Konsistenz-Cutoff-Sweep",
+  "landing.fl.i6": "Separate Analyse des negierten Outcomes (~Y)",
+  "landing.fl.i7": "Import aus CSV und Excel (XLSX), Diagramm-Export als SVG/PNG",
+  "landing.fl.i8": "Zweisprachig (DE/EN), als PWA offline installierbar",
+
   "landing.features.title": "Funktionen",
   "landing.features.calib.title": "Geführte Kalibrierung",
   "landing.features.calib.desc":
@@ -680,6 +754,80 @@ const en: Record<DictKey, string> = {
   "landing.hero.ctaPrimary": "Analyze for free",
   "landing.hero.ctaSecondary": "See an example",
   "landing.hero.facts": "Engine cross-validated against the R package QCA · R-script export · PDF report",
+
+  // -- Landing: hero with proof strip --------------------------------------------
+  "landing.h.eyebrow": "Qualitative Comparative Analysis · Open Source",
+  "landing.h.title": "From cases to formula.",
+  "landing.h.sub":
+    "openQCA takes you from raw data through calibration and truth table to a defensible solution formula — for your Master's thesis, dissertation or paper. With the exact formulas from Ragin (2008) and an engine cross-validated against the R package QCA. Free, open source, and your data stays in the browser.",
+  "landing.h.ctaDemo": "Open the example analysis",
+  "landing.h.ctaOwn": "Start with your own data",
+  "landing.h.proof":
+    "Cross-validated against the R package QCA — 12/12 scenarios identical · Calibration & measures exactly per Ragin (2008) · MIT license",
+  "landing.h.stripAria": "A QCA workflow: raw data, calibration, truth table, solution formula",
+  "landing.h.stripCaption":
+    "Not an illustration: the openQCA engine computes these numbers live from the demo dataset (synthetic, inspired by Lipset 1959) when this page loads — using the same formulas as the app.",
+  "landing.h.s1": "18 cases · raw values",
+  "landing.h.s2": "Calibration",
+  "landing.h.s3": "Truth table",
+  "landing.h.s4": "Solution",
+  "landing.h.consistency": "Consistency",
+  "landing.h.coverage": "Coverage",
+
+  // -- Landing: deliverables, rigor, comparison -----------------------------------
+  "landing.deliver.title": "What you walk away with.",
+  "landing.deliver.sub":
+    "Every analysis ends with three artifacts — citable, checkable and replicable.",
+  "landing.deliver.pdf.title": "Print-ready analysis report",
+  "landing.deliver.pdf.desc":
+    "All measures, calibration decisions and solutions as a cleanly formatted report for your appendix or supervisor.",
+  "landing.deliver.r.title": "R script for replication",
+  "landing.deliver.r.desc":
+    "A runnable script for the R package QCA that independently reproduces your analysis — reviewers included.",
+  "landing.deliver.json.title": "Complete protocol",
+  "landing.deliver.json.desc":
+    "Every setting — anchors, cutoffs, expectations — as JSON. Load it later and the analysis is back, exactly.",
+
+  "landing.rigor.title": "Methodological rigor, verifiable.",
+  "landing.rigor.r1":
+    "Scenarios identical with the R package QCA — calibration, consistency, PRI, coverage and all three solution types cross-validated.",
+  "landing.rigor.r2":
+    "Fixed points of direct calibration exact (m(i) ≈ 0.953 · m(e) ≈ 0.047), per Ragin (2008) — not approximated.",
+  "landing.rigor.r3":
+    "Solution types, cleanly separated: complex, intermediate with directional expectations (ESA per Schneider & Wagemann 2012), parsimonious.",
+  "landing.rigor.r4":
+    "Open source under the MIT license — every formula is readable in the code and on the methodology page.",
+  "landing.rigor.linkMethodik": "All formulas on the methodology page",
+  "landing.rigor.linkCode": "Source code on GitHub",
+
+  "landing.compare.title": "openQCA, fsQCA, or R?",
+  "landing.compare.colR": "R package QCA",
+  "landing.compare.install": "Installation",
+  "landing.compare.install.a": "none — runs in the browser",
+  "landing.compare.install.b": "desktop installer",
+  "landing.compare.install.c": "R + package installation",
+  "landing.compare.coach": "Guided workflow with mistake coach",
+  "landing.compare.calib": "Direct calibration (Ragin 2008)",
+  "landing.compare.calib.a": "✓ R-validated",
+  "landing.compare.calib.c": "✓ reference",
+  "landing.compare.esa": "Intermediate solution (ESA)",
+  "landing.compare.export": "Protocol + R-script export",
+  "landing.compare.export.a": "✓ both",
+  "landing.compare.export.c": "own scripts",
+  "landing.compare.oss": "Open source",
+  "landing.compare.oss.b": "— (freeware)",
+  "landing.compare.note":
+    "Honestly: the R package QCA remains the reference for special cases beyond openQCA's scope. That is exactly why you export your R script with one click — and continue there seamlessly.",
+
+  "landing.fl.title": "Everything you need for a complete QCA.",
+  "landing.fl.i1": "Guided calibration with a coach for skew, the 0.5 problem and borderline cases",
+  "landing.fl.i2": "Crisp and fuzzy sets — auto-detected, never calibrated twice",
+  "landing.fl.i3": "Necessity analysis before the truth table (Schneider & Wagemann)",
+  "landing.fl.i4": "Truth table with consistency, PRI and frequency cutoffs",
+  "landing.fl.i5": "Robustness check: consistency cutoff sweep",
+  "landing.fl.i6": "Separate analysis of the negated outcome (~Y)",
+  "landing.fl.i7": "Import from CSV and Excel (XLSX), chart export as SVG/PNG",
+  "landing.fl.i8": "Bilingual (DE/EN), installable offline as a PWA",
 
   "landing.features.title": "Features",
   "landing.features.calib.title": "Guided calibration",

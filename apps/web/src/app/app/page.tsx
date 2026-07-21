@@ -202,6 +202,18 @@ export default function Home() {
     setTourStep(null);
   }
 
+  // Deep-Link von der Landing: /app?demo=1 lädt sofort den Demo-Datensatz.
+  // Der Parameter wird danach entfernt, damit ein Reload nicht erneut lädt.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("demo") !== "1") return;
+    applyDataset(DEMO);
+    params.delete("demo");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function importCsv(file: File) {
     const reader = new FileReader();
     reader.onload = () => {
