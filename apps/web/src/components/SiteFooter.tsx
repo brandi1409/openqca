@@ -11,16 +11,23 @@ interface FooterLink {
 }
 
 const LINKS: readonly FooterLink[] = [
+  { href: "/app", labelKey: "footer.app" },
+  { href: "/download", labelKey: "footer.download" },
+  { href: "/preise", labelKey: "footer.preise" },
+  { href: "/konto", labelKey: "footer.konto" },
   { href: "/methodik", labelKey: "footer.methodik" },
   { href: "/rechtliches/impressum", labelKey: "footer.impressum" },
   { href: "/rechtliches/datenschutz", labelKey: "footer.datenschutz" },
   { href: "/rechtliches/agb", labelKey: "footer.agb" },
 ];
 
+const GITHUB_URL = "https://github.com/brandi1409/openqca";
+
 /**
  * Schlichter Seiten-Footer (Client-Komponente wegen Sprachumschalter).
- * Verlinkt Methodik und die Rechtstexte, weist auf den Open-Source-Charakter
- * hin und trägt einen DE/EN-Umschalter. Die verlinkten Ziele bleiben deutsch;
+ * Verlinkt Produkt (App, Download, Preise, Konto), Methodik, die Rechtstexte
+ * und das GitHub-Repository, weist auf den Open-Source-Charakter hin und
+ * trägt einen DE/EN-Umschalter. Die verlinkten Ziele bleiben deutsch;
  * die EN-Linktexte kennzeichnen das mit „(German)“. Oben eine Trennlinie
  * (var(--line)); gestylt ausschließlich über die CSS-Variablen aus globals.css.
  */
@@ -37,6 +44,9 @@ export function SiteFooter() {
               {t(locale, link.labelKey)}
             </a>
           ))}
+          <a href={GITHUB_URL} target="_blank" rel="noreferrer" style={linkStyle}>
+            GitHub
+          </a>
         </nav>
         <div style={rightStyle}>
           <p style={noteStyle}>{t(locale, "footer.note", { year })}</p>

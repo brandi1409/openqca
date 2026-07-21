@@ -3,13 +3,9 @@ import { dismissConsent } from "./helpers";
 
 /**
  * A4 — Konsistenz des Design-Systems, geprüft in 4 Matrizen: Light/Dark ×
- * Desktop(1280)/Mobile(390).
- *
- * HINWEIS: A4.1 und A4.2 sind mit `test.fixme` markiert, solange der
- * Konsistenz-Restpass (Welle W1: cloud.tsx, /konto, /preise, DownloadPage,
- * Glossary, GuidedTour, NegatedOutcomePanel, SectionNav) noch aussteht. Die
- * Prüf-Logik ist bereits vollständig — nach W1-Abschluss genügt das Entfernen
- * der `test.fixme`-Zeile, um die Kriterien scharf zu schalten.
+ * Desktop(1280)/Mobile(390). Alle Kriterien sind scharf; die strenge Skala
+ * gilt bewusst nur für die Tool-Seiten in A4_ROUTES — Landing, Methodik und
+ * Rechtstexte nutzen ihre eigene Dokument-Typografie (QUALITY-SPEC A4.4).
  */
 
 const SCHEMES = ["light", "dark"] as const;

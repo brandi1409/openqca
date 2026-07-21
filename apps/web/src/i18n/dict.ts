@@ -467,9 +467,17 @@ const de = {
   "cloud.saveError": "Fehler beim Speichern.",
   "cloud.saveOk": "Gespeichert.",
   "cloud.loadPlaceholder": "Projekt laden…",
+  "cloud.saveConfirmBtn": "Speichern",
+  "cloud.saveCancelBtn": "Abbrechen",
+  "cloud.overwriteBtn": "Überschreiben",
+  "cloud.manageProjectsLink": "Projekte verwalten →",
 
   // -- Footer -----------------------------------------------------------------
-  "footer.navAria": "Rechtliches und Dokumentation",
+  "footer.navAria": "Produkt, Rechtliches und Dokumentation",
+  "footer.app": "App",
+  "footer.download": "Download",
+  "footer.preise": "Preise",
+  "footer.konto": "Konto",
   "footer.methodik": "Methodik",
   "footer.impressum": "Impressum",
   "footer.datenschutz": "Datenschutz",
@@ -521,6 +529,40 @@ const de = {
   "account.viewPricing": "Tarife ansehen →",
   "account.signInPrompt":
     "Melde dich an, um Projekte in der Cloud zu speichern und KI-Funktionen zu nutzen.",
+
+  // -- Konto: Abo, Projekte, DSGVO ---------------------------------------------
+  "account.checkoutCancel": "Checkout abgebrochen — es wurde nichts abgebucht.",
+  "account.tier.loading": "Lädt …",
+  "account.tier.free": "Gratis",
+  "account.tier.cloud": "Cloud",
+
+  "account.subscription.title": "Abo & Zahlung",
+  "account.subscription.manageBtn": "Abo verwalten",
+  "account.subscription.error": "Abo konnte nicht geöffnet werden.",
+
+  "account.projects.title": "Meine Projekte",
+  "account.projects.loading": "Projekte werden geladen …",
+  "account.projects.empty":
+    "Noch keine gespeicherten Projekte. Projekte, die du in der App in der Cloud speicherst, erscheinen hier.",
+  "account.projects.col.name": "Name",
+  "account.projects.col.updated": "Zuletzt geändert",
+  "account.projects.renameBtn": "Umbenennen",
+  "account.projects.saveBtn": "Speichern",
+  "account.projects.cancelBtn": "Abbrechen",
+  "account.projects.deleteBtn": "Löschen",
+  "account.projects.deleteConfirm": "Projekt „{name}“ endgültig löschen?",
+  "account.projects.renameError": "Umbenennen fehlgeschlagen.",
+  "account.projects.deleteError": "Löschen fehlgeschlagen.",
+  "account.projects.exportAllBtn": "Alle Projekte exportieren (JSON)",
+  "account.projects.exportError": "Export fehlgeschlagen.",
+
+  "account.danger.title": "Daten & Konto (DSGVO)",
+  "account.danger.body":
+    "Du kannst alle deine Projekte jederzeit oben als JSON exportieren. Das endgültige Löschen deines Kontos entfernt dein Profil und alle gespeicherten Projekte unwiderruflich aus der Cloud.",
+  "account.danger.deleteBtn": "Konto endgültig löschen",
+  "account.danger.confirmMsg":
+    "Dein Konto und alle gespeicherten Projekte werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden. Wirklich fortfahren?",
+  "account.danger.error": "Kontolöschung fehlgeschlagen.",
 
   // -- Erklär-Popover (InfoHint) ------------------------------------------------
   "info.moreLink": "Mehr in der Methodik →",
@@ -1068,9 +1110,17 @@ const en: Record<DictKey, string> = {
   "cloud.saveError": "Error saving.",
   "cloud.saveOk": "Saved.",
   "cloud.loadPlaceholder": "Load project…",
+  "cloud.saveConfirmBtn": "Save",
+  "cloud.saveCancelBtn": "Cancel",
+  "cloud.overwriteBtn": "Overwrite",
+  "cloud.manageProjectsLink": "Manage projects →",
 
   // -- Footer -----------------------------------------------------------------
-  "footer.navAria": "Legal and documentation",
+  "footer.navAria": "Product, legal and documentation",
+  "footer.app": "App",
+  "footer.download": "Download",
+  "footer.preise": "Pricing",
+  "footer.konto": "Account",
   "footer.methodik": "Methodology (German)",
   "footer.impressum": "Imprint (German)",
   "footer.datenschutz": "Privacy policy (German)",
@@ -1122,6 +1172,40 @@ const en: Record<DictKey, string> = {
   "account.viewPricing": "View pricing →",
   "account.signInPrompt":
     "Sign in to save projects in the cloud and use the AI features.",
+
+  // -- Account: subscription, projects, GDPR -----------------------------------
+  "account.checkoutCancel": "Checkout cancelled — nothing was charged.",
+  "account.tier.loading": "Loading …",
+  "account.tier.free": "Free",
+  "account.tier.cloud": "Cloud",
+
+  "account.subscription.title": "Subscription & billing",
+  "account.subscription.manageBtn": "Manage subscription",
+  "account.subscription.error": "Could not open the subscription portal.",
+
+  "account.projects.title": "My projects",
+  "account.projects.loading": "Loading projects …",
+  "account.projects.empty":
+    "No saved projects yet. Projects you save to the cloud in the app will appear here.",
+  "account.projects.col.name": "Name",
+  "account.projects.col.updated": "Last changed",
+  "account.projects.renameBtn": "Rename",
+  "account.projects.saveBtn": "Save",
+  "account.projects.cancelBtn": "Cancel",
+  "account.projects.deleteBtn": "Delete",
+  "account.projects.deleteConfirm": "Permanently delete project “{name}”?",
+  "account.projects.renameError": "Rename failed.",
+  "account.projects.deleteError": "Delete failed.",
+  "account.projects.exportAllBtn": "Export all projects (JSON)",
+  "account.projects.exportError": "Export failed.",
+
+  "account.danger.title": "Data & account (GDPR)",
+  "account.danger.body":
+    "You can export all your projects as JSON at any time above. Permanently deleting your account irreversibly removes your profile and all saved projects from the cloud.",
+  "account.danger.deleteBtn": "Permanently delete account",
+  "account.danger.confirmMsg":
+    "Your account and all saved projects will be permanently deleted. This action cannot be undone. Continue?",
+  "account.danger.error": "Account deletion failed.",
 
   // -- Explainer popover (InfoHint) --------------------------------------------
   "info.moreLink": "More in the methodology →",

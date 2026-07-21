@@ -1,10 +1,33 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_MODELS } from "@/lib/config";
+import { getServiceSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
 const API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
+const REQUIRE_CLOUD_TIER = process.env.AI_REQUIRE_CLOUD_TIER === "true";
+
+/** Liest den Supabase-Access-Token aus dem Authorization-Header und prüft ihn per Service-Client. */
+async function requireUser(request: Request) {
+  const serviceClient = getServiceSupabase();
+  if (!serviceClient) {
+    return {
+      error: NextResponse.json({ error: "Tarifprüfung nicht konfiguriert." }, { status: 501 }),
+    } as const;
+  }
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  const { data, error } = await serviceClient.auth.getUser(token);
+  if (error || !data.user) {
+    return {
+      error: NextResponse.json(
+        { error: "Bitte anmelden — die KI-Helfer gehören zum Cloud-Tarif." },
+        { status: 401 },
+      ),
+    } as const;
+  }
+  return { serviceClient, user: data.user } as const;
+}
 
 type AssistTask = "anchors" | "skew" | "methods";
 
@@ -66,6 +89,23 @@ export async function POST(request: Request) {
     body = (await request.json()) as AssistBody;
   } catch {
     return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+  }
+
+  if (REQUIRE_CLOUD_TIER) {
+    const auth = await requireUser(request);
+    if ("error" in auth) return auth.error;
+    const { serviceClient, user } = auth;
+    const { data: profile } = await serviceClient
+      .from("profiles")
+      .select("tier")
+      .eq("user_id", user.id)
+      .single();
+    if (profile?.tier !== "cloud") {
+      return NextResponse.json(
+        { error: "Die KI-Helfer gehören zum Cloud-Tarif. Details unter /preise." },
+        { status: 402 },
+      );
+    }
   }
 
   try {

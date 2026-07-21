@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useLocale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
+import { getSupabase } from "@/lib/supabase";
 
 type AssistTask = "anchors" | "skew" | "methods";
 
@@ -32,9 +33,14 @@ export function AiAssist({
     setResult(null);
     setNote(null);
     try {
+      const sb = getSupabase();
+      const { data } = (await sb?.auth.getSession()) ?? { data: null };
+      const token = data?.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch("/api/ai/assist", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ task, context, data: getData() }),
       });
       const json = await res.json();

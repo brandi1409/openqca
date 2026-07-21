@@ -62,7 +62,7 @@ export function AccountButton() {
   if (user) {
     return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 13.5, color: "var(--ink-2)" }}>{user.email}</span>
+        <a href="/konto" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{user.email}</a>
         <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={() => getSupabase()?.auth.signOut()}>{t(locale, "cloud.signOut")}</button>
       </span>
     );
@@ -91,6 +91,10 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
   const user = useUser();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [status, setStatus] = useState<string>("");
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  // Zuletzt geladenes Projekt (id + Name) — ermöglicht „Überschreiben“ statt Neuanlage.
+  const [loaded, setLoaded] = useState<{ id: string; name: string } | null>(null);
 
   const refresh = useCallback(async () => {
     const sb = getSupabase();
@@ -107,25 +111,49 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
   if (!user)
     return <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "8px 0 0" }}>{t(locale, "cloud.saveLoadHint")}</p>;
 
+  function openSaveInput() {
+    setSaveName(t(locale, "cloud.projectNameDefault"));
+    setShowSaveInput(true);
+  }
   async function save() {
     const sb = getSupabase();
-    if (!sb || !user) return;
-    const name = window.prompt(t(locale, "cloud.projectNamePrompt"), t(locale, "cloud.projectNameDefault"));
-    if (!name) return;
-    const { error } = await sb.from("projects").insert({ user_id: user.id, name, data: getState() });
+    if (!sb || !user || !saveName.trim()) return;
+    const { error } = await sb.from("projects").insert({ user_id: user.id, name: saveName.trim(), data: getState() });
     setStatus(error ? t(locale, "cloud.saveError") : t(locale, "cloud.saveOk"));
+    setShowSaveInput(false);
     void refresh();
   }
   async function load(id: string) {
     const sb = getSupabase();
     if (!sb) return;
-    const { data } = await sb.from("projects").select("data").eq("id", id).single();
-    if (data?.data) onLoad(data.data);
+    const { data } = await sb.from("projects").select("data,name").eq("id", id).single();
+    if (data?.data) {
+      onLoad(data.data);
+      setLoaded({ id, name: (data.name as string) ?? "" });
+    }
+  }
+  async function overwrite() {
+    const sb = getSupabase();
+    if (!sb || !loaded) return;
+    const { error } = await sb.from("projects").update({ data: getState(), name: loaded.name }).eq("id", loaded.id);
+    setStatus(error ? t(locale, "cloud.saveError") : t(locale, "cloud.saveOk"));
+    void refresh();
   }
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 10 }}>
-      <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={save}>{t(locale, "cloud.saveBtn")}</button>
+      {showSaveInput ? (
+        <span style={{ display: "inline-flex", gap: 6 }}>
+          <input style={input} value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder={t(locale, "cloud.projectNamePrompt")} autoFocus />
+          <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={save}>{t(locale, "cloud.saveConfirmBtn")}</button>
+          <button className="oq-btn oq-btn--quiet" style={btnSize} onClick={() => setShowSaveInput(false)}>{t(locale, "cloud.saveCancelBtn")}</button>
+        </span>
+      ) : (
+        <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={openSaveInput}>{t(locale, "cloud.saveBtn")}</button>
+      )}
+      {loaded && (
+        <button className="oq-btn oq-btn--secondary" style={btnSize} onClick={overwrite}>{t(locale, "cloud.overwriteBtn")}</button>
+      )}
       {projects.length > 0 && (
         <select
           style={input}
@@ -141,6 +169,7 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
         </select>
       )}
       {status && <span style={{ fontSize: 12, color: "var(--muted)" }}>{status}</span>}
+      <a href="/konto" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "cloud.manageProjectsLink")}</a>
     </div>
   );
 }
