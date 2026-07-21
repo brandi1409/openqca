@@ -88,17 +88,26 @@ function placeLabels(points: XyPoint[], shown: number[]): PlacedLabel[] {
       textAnchor: (rightHalf ? "end" : "start") as "start" | "end",
     };
   });
-  items.sort((a, b) => a.anchorY - b.anchorY);
-  // Zwei Durchläufe: benachbarte Labels in derselben Spalte (< 90px x-Abstand)
-  // vertikal auf mindestens 13px Abstand drücken.
-  // 16px Mindestabstand: berücksichtigt die 3px-Kontur (paint-order:stroke),
-  // die die Label-Boxhöhe gegenüber der reinen Glyphenhöhe vergrößert.
-  for (let pass = 0; pass < 2; pass++) {
+  // Box-basierte Kollisionsauflösung: Zwei Labels kollidieren, wenn sie vertikal
+  // näher als 16px liegen (10px-Font + 3px-Kontur) UND sich ihre horizontalen
+  // TEXTBOX-Intervalle überschneiden — nicht bloß, wenn die Punkte nah liegen.
+  // (Der frühere Punkt-Abstands-Test übersah lange Nachbarlabels wie
+  // „Griechenland" neben „Spanien".)
+  const estWidth = (s: string) => s.length * 6 + 10;
+  const intervalOf = (l: (typeof items)[number]): [number, number] =>
+    l.textAnchor === "start"
+      ? [l.anchorX, l.anchorX + estWidth(l.text)]
+      : [l.anchorX - estWidth(l.text), l.anchorX];
+  for (let pass = 0; pass < 3; pass++) {
+    items.sort((a, b) => a.anchorY - b.anchorY);
     for (let k = 1; k < items.length; k++) {
-      const cur = items[k];
-      const prev = items[k - 1];
-      if (cur.anchorY - prev.anchorY < 16 && Math.abs(cur.pointX - prev.pointX) < 90) {
-        cur.anchorY = prev.anchorY + 16;
+      for (let j = 0; j < k; j++) {
+        const cur = items[k];
+        const prev = items[j];
+        if (Math.abs(cur.anchorY - prev.anchorY) >= 16) continue;
+        const [a0, a1] = intervalOf(prev);
+        const [b0, b1] = intervalOf(cur);
+        if (b0 < a1 && a0 < b1) cur.anchorY = prev.anchorY + 16;
       }
     }
   }

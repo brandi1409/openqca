@@ -13,7 +13,10 @@ export function PwaRegister() {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
     try {
-      navigator.serviceWorker.register("/sw.js").catch(function () {
+      // Build-Version in der SW-URL (QUALITY-SPEC A5.1): neue Version ⇒ neue
+      // URL ⇒ Browser installiert den neuen Worker, alte Caches werden geräumt.
+      const version = process.env.NEXT_PUBLIC_BUILD_TS ?? "dev";
+      navigator.serviceWorker.register(`/sw.js?v=${version}`).catch(function () {
         // Registrierung fehlgeschlagen ist unkritisch — App funktioniert
         // weiterhin ohne Offline-Unterstützung.
       });

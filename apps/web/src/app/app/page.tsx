@@ -977,13 +977,23 @@ function CalibrationCurve({
       textAnchor: (rightHalf ? "end" : "start") as "start" | "end",
     };
   });
-  placed.sort((a2, b2) => a2.anchorY - b2.anchorY);
-  for (let pass = 0; pass < 2; pass++) {
+  // Box-basierte Kollisionsauflösung (wie XyPlot): vertikal < 16px UND
+  // horizontale Textbox-Intervalle überschneiden sich → nach unten staffeln.
+  const estLabelWidth = (s: string) => s.length * 6 + 10;
+  const labelInterval = (l: (typeof placed)[number]): [number, number] =>
+    l.textAnchor === "start"
+      ? [l.anchorX, l.anchorX + estLabelWidth(l.label)]
+      : [l.anchorX - estLabelWidth(l.label), l.anchorX];
+  for (let pass = 0; pass < 3; pass++) {
+    placed.sort((a2, b2) => a2.anchorY - b2.anchorY);
     for (let k = 1; k < placed.length; k++) {
-      const cur = placed[k];
-      const prev = placed[k - 1];
-      if (cur.anchorY - prev.anchorY < 16 && Math.abs(cur.pointX - prev.pointX) < 90) {
-        cur.anchorY = prev.anchorY + 16;
+      for (let j = 0; j < k; j++) {
+        const cur = placed[k];
+        const prev = placed[j];
+        if (Math.abs(cur.anchorY - prev.anchorY) >= 16) continue;
+        const [a0, a1] = labelInterval(prev);
+        const [b0, b1] = labelInterval(cur);
+        if (b0 < a1 && a0 < b1) cur.anchorY = prev.anchorY + 16;
       }
     }
   }

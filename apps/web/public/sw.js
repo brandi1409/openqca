@@ -12,7 +12,20 @@
  *    Worker darf niemals einen Fehler werfen, der die Seite blockiert.
  */
 
-var CACHE_NAME = "openqca-v1";
+/*
+ * Cache-Name trägt die Build-Version (QUALITY-SPEC A5.1): PwaRegister
+ * registriert "/sw.js?v=<BUILD_TS>" — jede neue Version ergibt eine neue
+ * SW-URL, der neue Worker übernimmt (skipWaiting + claim) und räumt beim
+ * Aktivieren alle alten "openqca-*"-Caches weg. So kann kein Deploy-Stand
+ * tagelang aus einem veralteten Cache bedient werden.
+ */
+var VERSION = "dev";
+try {
+  VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
+} catch (err) {
+  // URL-Parsing fehlgeschlagen → "dev" als Fallback.
+}
+var CACHE_NAME = "openqca-" + VERSION;
 var CACHE_PREFIX = "openqca-";
 
 self.addEventListener("install", function (event) {
