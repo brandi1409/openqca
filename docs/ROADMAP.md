@@ -47,19 +47,54 @@ https://doi.org/10.1177/00491241211036158
 ## P2: Methodenerweiterung und Reichweite
 
 - Vier-Werte- und Multi-Value-Methoden erst nach klarer UI-Semantik, eigener Evidenzführung und unabhängiger Validierung in den geführten Ablauf aufnehmen.
-- Englische Methodikseite und englischer Bericht.
-- Performance-Analyse für große Datensätze und gegebenenfalls Web Worker.
 - Zeitreihen- und Panel-Ansätze zunächst als Machbarkeitsprüfung, nicht als stiller Standardfall.
+- Die englische Methodikseite und die englische Berichtslokalisierung sind umgesetzt. Der fokussierte Rohdaten-/Bericht-Flow wird in `npm run test:e2e --workspace web -- --grep "A2.12"` geprüft.
 
-**Feasibilitätsstand (lokal geprüft):** Truth Tables und Robustheitsraster sind
-exponentiell in der Zahl der Bedingungen; die Engine begrenzt Bedingungen auf
-12 und das kombinierte Robustheitsraster standardmäßig auf 5.000 Zellen.
+### Performance-Evidenz (2026-07-22)
+
+Reproduzierbarer Lauf: `npm run benchmark:performance` (Node `v22.23.1`,
+Darwin arm64, Apple M4 Max, drei Messwiederholungen je Szenario).
+
+| Szenario | Truth-Table-Zeilen | Fälle | Median |
+|---|---:|---:|---:|
+| 8 Bedingungen × 1.000 Fälle | 256 | 1.000 | 30 ms |
+| 10 Bedingungen × 1.000 Fälle | 1.024 | 1.000 | 147 ms |
+| 12 Bedingungen × 1.000 Fälle | 4.096 | 1.000 | 722 ms |
+| 12 Bedingungen × 5.000 Fälle | 4.096 | 5.000 | 3.608 ms |
+
+Die Messung deckt den vollständigen `buildTruthTable`-Pfad ab und prüft
+Zeilenanzahl, Fallzahl und Fallzuordnung. Sie ist Node-/Hardware-Evidenz, kein
+Browser-UX-Nachweis. Die Laufzeit wächst ungefähr mit
+`2^Bedingungen × Fälle × Bedingungen`; bei 12 Bedingungen und 5.000 Fällen
+liegt ein einzelner Lauf bereits im Sekundenbereich. Deshalb werden die
+aktuellen Grenzen (maximal 12 Bedingungen, Robustheitsraster standardmäßig
+5.000 Zellen) nicht stillschweigend angehoben. Vor höheren Grenzen, virtuellen
+Falltabellen oder einer interaktiven Großdatenanalyse braucht es einen
+Browser-Hauptthread-/Worker-Benchmark.
+
 Import, Kalibrierung, Falltabellen und Minimierung laufen derzeit im
 Browser-Hauptthread; Falltabellen werden vollständig gerendert. Der
 `RawDataset`-Vertrag kennt nur Fälle und Spalten, keine Zeit- oder
 Panel-Identität. Ein Worker/virtuelle Tabellen und ein Panel-Datenmodell
 brauchen daher eigene Benchmarks und reproduzierbare Semantik; sie werden
 nicht stillschweigend in den lokalen Analysepfad eingeschoben.
+
+## Dokumentierte externe und semantische Blocker
+
+- **Vier-Werte-Kalibrierung:** `calibrateFourValue` ist im Engine vorhanden,
+  aber noch nicht extern validiert. Das installierte R-Paket `QCA::calibrate()`
+  akzeptiert `type = "crisp"` oder `type = "fuzzy"`; mit drei Crisp-Schwellen
+  erzeugt es die ordinalen Codes `0, 1, 2, 3`, nicht die Engine-Mitgliedschaften
+  `0, 0.33, 0.67, 1`. Das ist kein unabhängiger numerischer Oracle für die
+  aktuelle Funktion. Vor einer Aufnahme in den geführten Workflow braucht es
+  eine dokumentierte Multi-Value-/Vier-Werte-Semantik, ein passendes externes
+  Beispiel oder eine unabhängige Referenzimplementierung und eigene Tests.
+- **Zeitreihen/Panel:** Der aktuelle `RawDataset`-Vertrag kennt nur Fälle und
+  Spalten. Zeit-/Panel-Identität, Aggregation, lagged conditions, Einheiten und
+  die zulässige Truth-Table-Zuordnung sind nicht definiert. Ein Panel darf
+  deshalb nicht stillschweigend als gewöhnlicher Querschnitt importiert werden.
+  Eine Erweiterung braucht zuerst ein Datenmodell, eine methodische Entscheidung
+  über zeitliche QCA und reproduzierbare Testdaten.
 
 ## Eigentümer- oder Fachfreigabe erforderlich
 
