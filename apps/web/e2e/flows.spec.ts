@@ -276,6 +276,14 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   expect(markdownText).toContain("A Robustness Test for Qualitative Comparative Analysis (QCA)");
   expect(markdownFile.suggestedFilename()).toBe("openqca-calibration-protocol.md");
 
+  const germanReportPopup = page.waitForEvent("popup");
+  await page.getByRole("button", { name: "Bericht erzeugen (Druck/PDF)" }).click();
+  const germanReportPage = await germanReportPopup;
+  await germanReportPage.waitForLoadState();
+  await expect(germanReportPage.locator("html")).toHaveAttribute("lang", "de");
+  await expect(germanReportPage.locator("body")).toContainText("openQCA — Analysebericht");
+  await germanReportPage.close();
+
   await page.getByRole("banner").getByRole("button", { name: "EN", exact: true }).click();
   const reportPopup = page.waitForEvent("popup");
   await page.getByRole("button", { name: /Generate report/i }).click();
