@@ -244,10 +244,10 @@ Der Umgang mit **Remaindern** (`?`) unterscheidet drei Lösungen:
   vereinbar sind. In der Praxis wird meist sie interpretiert.
 
 > **Stand im openQCA-Rechenkern:** Der Kern berechnet aktuell die **komplexe**
-> (`complexSolution`) und die **sparsame** (`parsimoniousSolution`) Lösung. Eine
-> eigene Funktion für die **intermediäre** Lösung existiert derzeit **noch nicht**
-> – siehe [`engine-notes.md`](./engine-notes.md). Konzeptuell ist sie oben
-> beschrieben.
+> (`complexSolution`), die **sparsame** (`parsimoniousSolution`) und die
+> **intermediäre** (`intermediateSolution`) Lösung. Die intermediäre Lösung nutzt
+> nur Remainder, die zu den festgelegten Richtungserwartungen passen (Enhanced
+> Standard Analysis). Siehe [`engine-notes.md`](./engine-notes.md).
 
 ### Durchgerechnetes Beispiel (aus den Datensätzen)
 

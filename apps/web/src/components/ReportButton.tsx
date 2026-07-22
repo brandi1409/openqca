@@ -22,7 +22,7 @@ export function ReportButton({
       return;
     }
     setMsg(null);
-    const html = generateReportHtml(input);
+    const html = generateReportHtml({ ...input, locale });
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");

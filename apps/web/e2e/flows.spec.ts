@@ -273,8 +273,19 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   expect(markdownText).toContain("Protokoll bereit");
   expect(markdownText).not.toContain("Unit:");
   expect(markdownText).not.toContain("Protocol ready");
-  expect(markdownText).toContain("A Robustness Test Protocol for Applied QCA");
+  expect(markdownText).toContain("A Robustness Test for Qualitative Comparative Analysis (QCA)");
   expect(markdownFile.suggestedFilename()).toBe("openqca-calibration-protocol.md");
+
+  await page.getByRole("banner").getByRole("button", { name: "EN", exact: true }).click();
+  const reportPopup = page.waitForEvent("popup");
+  await page.getByRole("button", { name: /Generate report/i }).click();
+  const reportPage = await reportPopup;
+  await reportPage.waitForLoadState();
+  await expect(reportPage.locator("html")).toHaveAttribute("lang", "en");
+  await expect(reportPage.locator("body")).toContainText("openQCA — Analysis report");
+  await expect(reportPage.locator("body")).not.toContainText("Analysebericht");
+  await reportPage.close();
+  await page.getByRole("banner").getByRole("button", { name: "DE", exact: true }).click();
 
   await page.getByRole("button", { name: "Projekt lokal speichern" }).click();
   await expect(page.getByText("Lokal gespeichert.")).toBeVisible();

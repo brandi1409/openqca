@@ -378,7 +378,7 @@ const de = {
   "calib.set.highIsIn": "Höherer Rohwert = mehr Zugehörigkeit",
   "calib.outcome.hintTitle": "Outcome ist ein eigenes Set",
   "calib.outcome.hintBody":
-    "Die Kalibrierung des Outcomes ist eine Forschungsentscheidung und nicht dasselbe wie Frequenz-, Konsistenz- oder PRI-Cutoffs der Truth Table bzw. Lösungskennzahlen. Quellen: Ragin (2008); Schneider & Wagemann (2012); Oana & Schneider (2021), DOI 10.1177/00491241211036158.",
+    "Die Kalibrierung des Outcomes ist eine Forschungsentscheidung und nicht dasselbe wie Frequenz-, Konsistenz- oder PRI-Cutoffs der Truth Table bzw. Lösungskennzahlen. Quellen: Ragin (2008); Schneider & Wagemann (2012); Oana & Schneider (2022), DOI 10.1177/00491241211036158.",
   "calib.outcome.blurb":
     "Es gibt keinen universellen „guten Outcome-Wert“. Outcome-Zugehörigkeit ≠ Analyse-Cutoffs.",
   "calib.method.title": "2. Kalibrierungsmethode",
@@ -1360,7 +1360,7 @@ const en: Record<DictKey, string> = {
   "calib.set.highIsIn": "Higher raw value = more membership",
   "calib.outcome.hintTitle": "Outcome is its own set",
   "calib.outcome.hintBody":
-    "Outcome calibration is a research-design choice and is not the same as truth-table frequency, consistency, or PRI cutoffs or solution fit metrics. Sources: Ragin (2008); Schneider & Wagemann (2012); Oana & Schneider (2021), DOI 10.1177/00491241211036158.",
+    "Outcome calibration is a research-design choice and is not the same as truth-table frequency, consistency, or PRI cutoffs or solution fit metrics. Sources: Ragin (2008); Schneider & Wagemann (2012); Oana & Schneider (2022), DOI 10.1177/00491241211036158.",
   "calib.outcome.blurb":
     "There is no universal “good outcome value”. Outcome membership ≠ analysis cutoffs.",
   "calib.method.title": "2. Calibration method",
