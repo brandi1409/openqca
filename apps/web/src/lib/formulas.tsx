@@ -24,7 +24,6 @@ export function Formula({ tex, display = false }: { tex: string; display?: boole
     return (
       <div
         style={{ margin: "14px 0", overflowX: "auto", textAlign: "center" }}
-        // eslint-disable-next-line react/no-danger -- siehe Kommentar oben: nur eigene Konstanten, kein Nutzerinput
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );
@@ -32,7 +31,6 @@ export function Formula({ tex, display = false }: { tex: string; display?: boole
 
   return (
     <span
-      // eslint-disable-next-line react/no-danger -- siehe Kommentar oben: nur eigene Konstanten, kein Nutzerinput
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

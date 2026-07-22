@@ -17,7 +17,7 @@ export type CalibrationDecisionStatus =
   | "sourced"
   | "externally_checked";
 
-export type RawCalibrationMethod = "direct" | "crisp";
+export type RawCalibrationMethod = "direct" | "linear" | "crisp";
 
 export type VarType = "raw" | "fuzzy" | "crisp";
 
@@ -91,6 +91,7 @@ export interface CalibrationSpec {
   set: SetDefinition;
   method?: RawCalibrationMethod;
   direct?: DirectAnchors;
+  linear?: DirectAnchors;
   crisp?: CrispThreshold;
   alreadyCalibratedProvenance?: string;
   missing: MissingPolicy;
@@ -223,7 +224,9 @@ function evidenceSupports(spec: CalibrationSpec, target: EvidenceTarget): boolea
 
 export function requiredEvidenceTargets(spec: CalibrationSpec, varType: VarType): EvidenceTarget[] {
   if (varType !== "raw") return ["set", "method"];
-  if (spec.method === "direct") return ["set", "method", "fullOut", "crossover", "fullIn"];
+  if (spec.method === "direct" || spec.method === "linear") {
+    return ["set", "method", "fullOut", "crossover", "fullIn"];
+  }
   if (spec.method === "crisp") return ["set", "method", "threshold"];
   return ["set", "method"];
 }
@@ -236,8 +239,9 @@ function computationalFields(spec: CalibrationSpec | undefined, varType: VarType
   if (spec.missing.kind === "leave_unresolved") missing.push("missingPolicy");
 
   if (varType === "raw") {
-    if (spec.method === "direct") {
-      if (!finiteDirectAnchors(spec.direct, spec.set.highIsMembership)) missing.push("directAnchors");
+    if (spec.method === "direct" || spec.method === "linear") {
+      const anchors = spec.method === "direct" ? spec.direct : spec.linear;
+      if (!finiteDirectAnchors(anchors, spec.set.highIsMembership)) missing.push("directAnchors");
     } else if (spec.method === "crisp") {
       if (!spec.crisp || !Number.isFinite(spec.crisp.threshold)) missing.push("crispThreshold");
     } else {
@@ -254,8 +258,9 @@ function sensitivityVariantSignature(
   alternative: SensitivityAlternative,
 ): string | null {
   if (!Number.isFinite(alternative.delta)) return null;
-  if (spec.method === "direct" && spec.direct) {
-    const base = directThresholds(spec.direct, spec.set.highIsMembership);
+  if (spec.method === "direct" || spec.method === "linear") {
+    const anchors = spec.method === "direct" ? spec.direct : spec.linear;
+    const base = directThresholds(anchors, spec.set.highIsMembership);
     if (!base) return null;
     const gap = Math.max(Math.abs(base[2] - base[0]) * 1e-6, 1e-9);
     const crossover = Math.min(
@@ -326,10 +331,11 @@ export function calibrationReadiness(
   if (!nonEmpty(spec.set.unit)) missingFields.push("unit");
   if (!nonEmpty(spec.set.scopePopulation)) missingFields.push("scopePopulation");
   if (!nonEmpty(spec.set.timePeriod)) missingFields.push("timePeriod");
-  if (varType === "raw" && spec.method === "direct") {
-    if (!nonEmpty(spec.direct?.meaningFullOut)) missingFields.push("meaningFullOut");
-    if (!nonEmpty(spec.direct?.meaningCrossover)) missingFields.push("meaningCrossover");
-    if (!nonEmpty(spec.direct?.meaningFullIn)) missingFields.push("meaningFullIn");
+  if (varType === "raw" && (spec.method === "direct" || spec.method === "linear")) {
+    const anchors = spec.method === "direct" ? spec.direct : spec.linear;
+    if (!nonEmpty(anchors?.meaningFullOut)) missingFields.push("meaningFullOut");
+    if (!nonEmpty(anchors?.meaningCrossover)) missingFields.push("meaningCrossover");
+    if (!nonEmpty(anchors?.meaningFullIn)) missingFields.push("meaningFullIn");
   }
   if (varType === "raw" && spec.method === "crisp" && !nonEmpty(spec.crisp?.meaningInclusion)) {
     missingFields.push("meaningInclusion");
@@ -429,14 +435,13 @@ export function decisionBadge(status: CalibrationDecisionStatus): {
   }
 }
 
-/** Mirror direct numeric anchors into legacy ascending-threshold state. */
+/** Mirror raw fuzzy numeric anchors into legacy ascending-threshold state. */
 export function anchorsFromSpecs(specs: CalibSpecs): Record<string, [number, number, number]> {
   const out: Record<string, [number, number, number]> = {};
   for (const [col, spec] of Object.entries(specs)) {
-    const thresholds =
-      spec.method === "direct"
-        ? directThresholds(spec.direct, spec.set.highIsMembership)
-        : undefined;
+    const anchors =
+      spec.method === "direct" ? spec.direct : spec.method === "linear" ? spec.linear : undefined;
+    const thresholds = directThresholds(anchors, spec.set.highIsMembership);
     if (thresholds) out[col] = thresholds;
   }
   return out;

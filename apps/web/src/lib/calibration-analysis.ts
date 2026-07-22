@@ -1,10 +1,12 @@
 import {
+  buildCasesFromVariant,
   calibrateValue,
   runCalibrationSensitivity,
   type AnchorVariant,
   type CalibrationSensitivityResult,
   type CalibrationMethod,
   type QcaCase,
+  type RobustnessScenario,
 } from "@openqca/engine";
 import type { RawDataset } from "@/lib/demo";
 import { cellToNumber, numericColumns } from "@/lib/dataset-columns";
@@ -73,9 +75,11 @@ function roundMembership(value: number, type: VarType): number {
 }
 
 function rawBoundary(raw: number, spec: CalibrationSpec): boolean {
+  const anchors =
+    spec.method === "direct" ? spec.direct : spec.method === "linear" ? spec.linear : undefined;
   const thresholds =
-    spec.method === "direct" && spec.direct
-      ? (directThresholds(spec.direct, spec.set.highIsMembership) ?? [])
+    spec.method === "direct" || spec.method === "linear"
+      ? (directThresholds(anchors, spec.set.highIsMembership) ?? [])
       : spec.method === "crisp" && spec.crisp
         ? [spec.crisp.threshold]
         : [];
@@ -103,10 +107,15 @@ function evaluateCell(
   if (!spec) return { membership: null, flags: ["unresolved", "missing-spec"] };
   let membership: number;
   try {
-    if (type === "raw" && spec.method === "direct" && spec.direct) {
+    if (
+      type === "raw" &&
+      (spec.method === "direct" || spec.method === "linear") &&
+      (spec.method === "direct" ? spec.direct : spec.linear)
+    ) {
+      const anchors = spec.method === "direct" ? spec.direct : spec.linear;
       membership = calibrateValue(raw, {
-        method: "direct",
-        thresholds: directThresholds(spec.direct, spec.set.highIsMembership) ?? [],
+        method: spec.method,
+        thresholds: directThresholds(anchors, spec.set.highIsMembership) ?? [],
         highIsMembership: spec.set.highIsMembership,
         onMissing: missingToOnMissing(spec.missing),
       });
@@ -211,8 +220,10 @@ function baseVariant(
     const spec = calibSpecs[column];
     highIsMembershipByCondition[column] = spec?.set.highIsMembership ?? true;
     missingByCondition[column] = spec ? missingToOnMissing(spec.missing) : "NaN";
-    if (spec.method === "direct" && spec.direct) {
-      const thresholds = directThresholds(spec.direct, spec.set.highIsMembership);
+    if (!spec) return;
+    if (spec.method === "direct" || spec.method === "linear") {
+      const anchors = spec.method === "direct" ? spec.direct : spec.linear;
+      const thresholds = directThresholds(anchors, spec.set.highIsMembership);
       if (!thresholds) return;
       methodsByCondition[column] = spec.method;
       thresholdsByCondition[column] = thresholds;
@@ -235,8 +246,13 @@ function baseVariant(
 }
 
 function diagnosticDeltas(type: VarType, spec: CalibrationSpec, values: number[]): number[] {
-  if (type === "raw" && spec.method === "direct" && spec.direct) {
-    const span = Math.abs(spec.direct.fullIn - spec.direct.fullOut);
+  if (
+    type === "raw" &&
+    (spec.method === "direct" || spec.method === "linear") &&
+    (spec.method === "direct" ? spec.direct : spec.linear)
+  ) {
+    const anchors = spec.method === "direct" ? spec.direct : spec.linear;
+    const span = Math.abs(anchors!.fullIn - anchors!.fullOut);
     return [-span * 0.05, span * 0.05].map((delta) => +delta.toFixed(4));
   }
   const finite = values.filter(Number.isFinite);
@@ -270,7 +286,7 @@ function alternativeVariants(
     );
     const current = thresholdsByCondition[column];
     const rawDelta = Number.isFinite(alternative.delta) ? alternative.delta : 0;
-    if (spec.method === "direct" && spec.direct) {
+    if (spec.method === "direct" || spec.method === "linear") {
       const low = current[0];
       const high = current[2];
       const gap = Math.max(Math.abs(high - low) * 1e-6, 1e-9);
@@ -378,4 +394,76 @@ export function buildSensitivityBundle(args: {
   });
 
   return { resultsByColumn, variantsByColumn };
+}
+
+/**
+ * Build the calibrated case scenarios used by the combined robustness grid.
+ *
+ * Only explicitly recorded substantive alternatives are included. Distribution-
+ * based diagnostic deltas remain visible in the calibration workbench, but are
+ * not silently promoted to a robustness claim.
+ */
+export function buildRobustnessScenarios(args: {
+  ds: RawDataset;
+  varMeta: Record<string, CalibrationVarMeta>;
+  calibSpecs: CalibSpecs;
+  conditions: string[];
+  outcome: string;
+}): RobustnessScenario[] {
+  const columns = activeColumns(args.ds, args.varMeta);
+  const base = baseVariant(columns, args.varMeta, args.calibSpecs);
+  const valuesByColumn: Record<string, number[]> = Object.fromEntries(
+    columns.map((column) => [
+      column,
+      args.ds.rows.map((row) => {
+        const value = cellToNumber(row[column]);
+        return value === null ? NaN : value;
+      }),
+    ]),
+  );
+  const caseLabels = args.ds.rows.map((row, rowIndex) =>
+    JSON.stringify([String(row[args.ds.caseCol] ?? ""), rowIndex]),
+  );
+  const calibrateColumns = columns.filter(
+    (column) => args.varMeta[column].type === "raw" && !!base.methodsByCondition[column],
+  );
+  const variantArgs = {
+    caseLabels,
+    valuesByColumn,
+    calibrateColumns,
+    conditions: args.conditions,
+    outcome: args.outcome,
+  };
+  const toScenario = (variant: AnchorVariant): RobustnessScenario => ({
+    id: variant.id,
+    label: variant.label,
+    cases: buildCasesFromVariant(variantArgs, variant),
+  });
+  const scenarios: RobustnessScenario[] = [
+    {
+      id: "base",
+      label: "Basis-Kalibrierung",
+      cases: buildCasesFromVariant(variantArgs, base),
+    },
+  ];
+  const seenIds = new Set(scenarios.map((scenario) => scenario.id));
+
+  columns.forEach((column) => {
+    const spec = args.calibSpecs[column];
+    if (!spec?.sensitivity?.alternatives?.length) return;
+    const variants = alternativeVariants(
+      column,
+      args.varMeta[column].type,
+      spec,
+      base,
+      valuesByColumn[column],
+    ).filter((variant) => !variant.isDiagnostic);
+    variants.forEach((variant) => {
+      if (seenIds.has(variant.id)) return;
+      seenIds.add(variant.id);
+      scenarios.push(toScenario(variant));
+    });
+  });
+
+  return scenarios;
 }

@@ -14,7 +14,24 @@ direct_logistic <- as.numeric(calibrate(
   logistic = TRUE
 ))
 
+engine_idm <- 1 / (1 + exp(-3))
+direct_logistic_engine_idm <- as.numeric(calibrate(
+  xs_direct,
+  type = "fuzzy",
+  thresholds = c(e = e, c = c_pt, i = i),
+  logistic = TRUE,
+  idm = engine_idm
+))
+
 xs_crisp <- c(84.9, 85, 85.1)
+
+xs_linear <- c(300, 450, 600, 750, 1000)
+linear_piecewise <- as.numeric(calibrate(
+  xs_linear,
+  type = "fuzzy",
+  thresholds = c(e = e, c = c_pt, i = i),
+  logistic = FALSE
+))
 crisp <- as.numeric(calibrate(xs_crisp, type = "crisp", thresholds = 85))
 
 fmt_num <- function(v) sprintf("%.16g", v)
@@ -32,10 +49,21 @@ json <- paste0(
   '    "thresholds": { "e": 300, "c": 600, "i": 1000 },\n',
   '    "membership": ', arr(direct_logistic), '\n',
   "  },\n",
+  '  "directLogisticEngineIdm": {\n',
+  '    "idm": ', fmt_num(engine_idm), ',\n',
+  '    "x": ', arr(xs_direct), ',\n',
+  '    "thresholds": { "e": 300, "c": 600, "i": 1000 },\n',
+  '    "membership": ', arr(direct_logistic_engine_idm), '\n',
+  "  },\n",
   '  "crisp": {\n',
   '    "x": ', arr(xs_crisp), ',\n',
   '    "threshold": 85,\n',
   '    "membership": ', arr(crisp), '\n',
+  "  },\n",
+  '  "linearPiecewise": {\n',
+  '    "x": ', arr(xs_linear), ',\n',
+  '    "thresholds": { "e": 300, "c": 600, "i": 1000 },\n',
+  '    "membership": ', arr(linear_piecewise), '\n',
   "  }\n",
   "}\n"
 )

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { calibrateDirect } from "@openqca/engine";
+import { calibrateDirect, calibrateLinear } from "@openqca/engine";
 import type { RawDataset } from "@/lib/demo";
 import {
   anchorsAscending,
@@ -16,6 +16,7 @@ import {
   specIsProtocolReady,
   type CalibSpecs,
   type CalibrationSpec,
+  type DirectAnchors,
   type EvidenceType,
   type SensitivityAlternative,
   type VarType,
@@ -108,16 +109,15 @@ function substepStatusKey(status: SubstepStatus): DictKey {
 
 function hasImportPlaceholder(spec: CalibrationSpec, varType?: VarType): boolean {
   const texts = [spec.set.definition];
-  if (varType === "raw") {
-    if (spec.method === "direct") {
-      texts.push(
-        spec.direct?.meaningFullOut ?? "",
-        spec.direct?.meaningCrossover ?? "",
-        spec.direct?.meaningFullIn ?? "",
-      );
-    } else if (spec.method === "crisp") {
-      texts.push(spec.crisp?.meaningInclusion ?? "");
-    }
+  if (varType === "raw" && (spec.method === "direct" || spec.method === "linear")) {
+    const anchors = spec.method === "direct" ? spec.direct : spec.linear;
+    texts.push(
+      anchors?.meaningFullOut ?? "",
+      anchors?.meaningCrossover ?? "",
+      anchors?.meaningFullIn ?? "",
+    );
+  } else if (varType === "raw" && spec.method === "crisp") {
+    texts.push(spec.crisp?.meaningInclusion ?? "");
   } else if (varType === "fuzzy" || varType === "crisp") {
     texts.push(spec.alreadyCalibratedProvenance ?? "");
   } else {
@@ -126,6 +126,9 @@ function hasImportPlaceholder(spec: CalibrationSpec, varType?: VarType): boolean
       spec.direct?.meaningFullOut ?? "",
       spec.direct?.meaningCrossover ?? "",
       spec.direct?.meaningFullIn ?? "",
+      spec.linear?.meaningFullOut ?? "",
+      spec.linear?.meaningCrossover ?? "",
+      spec.linear?.meaningFullIn ?? "",
       spec.crisp?.meaningInclusion ?? "",
     );
   }
@@ -319,6 +322,7 @@ export function CalibrationWorkbench({
         : prev.sensitivity,
     };
     if (patch.direct) nextSpec.direct = { ...prev.direct!, ...patch.direct };
+    if (patch.linear) nextSpec.linear = { ...prev.linear!, ...patch.linear };
     if (patch.crisp) nextSpec.crisp = { ...prev.crisp!, ...patch.crisp };
     if (
       nextSpec.provisionalDefaults &&
@@ -368,26 +372,33 @@ export function CalibrationWorkbench({
     spec.set.highIsMembership
       ? (["fullOut", "crossover", "fullIn"] as const)
       : (["fullIn", "crossover", "fullOut"] as const);
-  const directCurveAnchors = spec.direct
-    ? (directCurveKeys.map((key) => spec.direct![key]) as [number, number, number])
+  const fuzzyAnchors =
+    spec.method === "direct" ? spec.direct : spec.method === "linear" ? spec.linear : undefined;
+  const directCurveAnchors = fuzzyAnchors
+    ? (directCurveKeys.map((key) => fuzzyAnchors[key]) as [number, number, number])
     : null;
-  const directEngineAnchors = directThresholds(spec.direct, spec.set.highIsMembership);
+  const directEngineAnchors = directThresholds(fuzzyAnchors, spec.set.highIsMembership);
 
   const rawValues = ds.rows.map((r) => cellToNumber(r[v]) ?? Number.NaN);
-  function selectRawMethod(method: "direct" | "crisp") {
-    if (method === "direct") {
+  function selectRawMethod(method: "direct" | "linear" | "crisp") {
+    if (method === "direct" || method === "linear") {
+      const source = method === "direct"
+        ? activeSpec.direct ?? activeSpec.linear
+        : activeSpec.linear ?? activeSpec.direct;
       const a = anchors[v] ?? ds.anchors[v] ?? [0, 0.5, 1];
+      const fuzzy = {
+        fullOut: source?.fullOut ?? (activeSpec.set.highIsMembership ? a[0] : a[2]),
+        crossover: source?.crossover ?? a[1],
+        fullIn: source?.fullIn ?? (activeSpec.set.highIsMembership ? a[2] : a[0]),
+        meaningFullOut: source?.meaningFullOut ?? "",
+        meaningCrossover: source?.meaningCrossover ?? "",
+        meaningFullIn: source?.meaningFullIn ?? "",
+      };
       patchSpec(v, {
         method,
         methodConfirmed: false,
-        direct: {
-          fullOut: activeSpec.set.highIsMembership ? a[0] : a[2],
-          crossover: a[1],
-          fullIn: activeSpec.set.highIsMembership ? a[2] : a[0],
-          meaningFullOut: activeSpec.direct?.meaningFullOut ?? "",
-          meaningCrossover: activeSpec.direct?.meaningCrossover ?? "",
-          meaningFullIn: activeSpec.direct?.meaningFullIn ?? "",
-        },
+        direct: method === "direct" ? fuzzy : undefined,
+        linear: method === "linear" ? fuzzy : undefined,
         crisp: undefined,
         sensitivity: { ...activeSpec.sensitivity, alternatives: [], notes: "", reviewed: false },
       });
@@ -400,12 +411,48 @@ export function CalibrationWorkbench({
       method,
       methodConfirmed: false,
       direct: undefined,
+      linear: undefined,
       crisp: {
         threshold: activeSpec.crisp?.threshold ?? median,
         meaningInclusion: activeSpec.crisp?.meaningInclusion ?? "",
       },
       sensitivity: { ...activeSpec.sensitivity, alternatives: [], notes: "", reviewed: false },
     });
+  }
+
+  function patchFuzzyAnchors(patch: Partial<DirectAnchors>) {
+    if (!fuzzyAnchors) return;
+    if (activeSpec.method === "direct") {
+      patchSpec(v, { direct: { ...fuzzyAnchors, ...patch } });
+    } else if (activeSpec.method === "linear") {
+      patchSpec(v, { linear: { ...fuzzyAnchors, ...patch } });
+    }
+  }
+
+  function setDirection(highIsMembership: boolean) {
+    if (activeSpec.method === "direct" && activeSpec.direct) {
+      patchSpec(v, {
+        set: { ...activeSpec.set, highIsMembership },
+        direct: {
+          ...activeSpec.direct,
+          fullOut: activeSpec.direct.fullIn,
+          fullIn: activeSpec.direct.fullOut,
+        },
+      });
+      return;
+    }
+    if (activeSpec.method === "linear" && activeSpec.linear) {
+      patchSpec(v, {
+        set: { ...activeSpec.set, highIsMembership },
+        linear: {
+          ...activeSpec.linear,
+          fullOut: activeSpec.linear.fullIn,
+          fullIn: activeSpec.linear.fullOut,
+        },
+      });
+      return;
+    }
+    patchSpec(v, { set: { ...activeSpec.set, highIsMembership } });
   }
   const columnCells = evaluation.cells.filter((cell) => cell.column === v);
   const memberships = columnCells.map((cell) => cell.membership ?? undefined);
@@ -446,7 +493,7 @@ export function CalibrationWorkbench({
   const mappingFields =
     meta.type !== "raw"
       ? ["alreadyCalibratedProvenance", "missingPolicy"]
-      : spec.method === "direct"
+      : spec.method === "direct" || spec.method === "linear"
         ? ["directAnchors", "meaningFullOut", "meaningCrossover", "meaningFullIn", "missingPolicy"]
         : spec.method === "crisp"
           ? ["crispThreshold", "meaningInclusion", "missingPolicy"]
@@ -502,9 +549,11 @@ export function CalibrationWorkbench({
       ? t(locale, "calib.guide.mode.already")
       : spec.method === "direct"
         ? t(locale, "calib.guide.mode.direct")
-        : spec.method === "crisp"
-          ? t(locale, "calib.guide.mode.crisp")
-          : t(locale, "calib.guide.mode.unselected");
+        : spec.method === "linear"
+          ? t(locale, "calib.guide.mode.linear")
+          : spec.method === "crisp"
+            ? t(locale, "calib.guide.mode.crisp")
+            : t(locale, "calib.guide.mode.unselected");
   const directionLabel = t(
     locale,
     spec.set.highIsMembership ? "calib.guide.direction.high" : "calib.guide.direction.low",
@@ -871,9 +920,7 @@ export function CalibrationWorkbench({
             data-testid="calibration-direction"
             type="checkbox"
             checked={spec.set.highIsMembership}
-            onChange={(e) =>
-              patchSpec(v, { set: { ...spec.set, highIsMembership: e.target.checked } })
-            }
+            onChange={(e) => setDirection(e.target.checked)}
           />
           {t(locale, "calib.set.highIsIn")}
         </label>
@@ -889,6 +936,7 @@ export function CalibrationWorkbench({
             {(
               [
                 ["direct", "calib.method.direct"],
+                ["linear", "calib.method.linear"],
                 ["crisp", "calib.method.crisp"],
               ] as const
             ).map(([id, key]) => (
@@ -931,14 +979,21 @@ export function CalibrationWorkbench({
                   ? "calib.method.directHelp"
                   : "calib.method.directHelpInverted",
               )
-            : meta.type === "raw" && spec.method === "crisp"
+            : meta.type === "raw" && spec.method === "linear"
               ? t(
                   locale,
                   spec.set.highIsMembership
-                    ? "calib.method.crispHelp"
-                    : "calib.method.crispHelpInverted",
+                    ? "calib.method.linearHelp"
+                    : "calib.method.linearHelpInverted",
                 )
-              : t(locale, "calib.method.alreadyHelp")}
+              : meta.type === "raw" && spec.method === "crisp"
+                ? t(
+                    locale,
+                    spec.set.highIsMembership
+                      ? "calib.method.crispHelp"
+                      : "calib.method.crispHelpInverted",
+                  )
+                : t(locale, "calib.method.alreadyHelp")}
         </p>
         <button
           type="button"
@@ -954,99 +1009,97 @@ export function CalibrationWorkbench({
       </section>
 
       {/* 3. Anchors / threshold */}
-      {meta.type === "raw" && spec.method === "direct" && spec.direct && (
-        <section id="calibration-substep-mapping" data-testid="calibration-mapping-direct" style={{ marginBottom: 18 }}>
-          <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-            {t(locale, "calib.anchors.title")}
-          </h3>
-          <p style={{ fontSize: 13.5, color: "var(--ink-2)", marginTop: 0 }}>
-            {t(locale, "calib.anchors.qualFirst")}
-          </p>
-          {(
-            [
-              ["meaningFullOut", "fullOut", "calib.anchorOut"],
-              ["meaningCrossover", "crossover", "calib.anchorCross"],
-              ["meaningFullIn", "fullIn", "calib.anchorIn"],
-            ] as const
-          ).map(([meaningKey, numKey, labKey]) => (
-            <div
-              key={numKey}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 140px",
-                gap: 10,
-                marginBottom: 8,
-              }}
-            >
-              <Field label={`${t(locale, labKey)} — ${t(locale, "calib.anchors.meaning")}`}>
-                <input
-                  data-testid={`calibration-anchor-meaning-${numKey}`}
-                  style={inputStyle}
-                  value={spec.direct![meaningKey]}
-                  onChange={(e) =>
-                    patchSpec(v, {
-                      direct: { ...spec.direct!, [meaningKey]: e.target.value },
-                    })
-                  }
-                />
-              </Field>
-              <Field label={t(locale, "calib.anchors.raw")}>
-                <input
-                  data-testid={`calibration-anchor-value-${numKey}`}
-                  type="number"
-                  step="any"
-                  style={inputStyle}
-                  value={spec.direct![numKey]}
-                  onChange={(e) =>
-                    patchSpec(v, {
-                      direct: { ...spec.direct!, [numKey]: Number(e.target.value) },
-                    })
-                  }
-                />
-              </Field>
-            </div>
-          ))}
-          {spec.direct && [spec.direct.fullOut, spec.direct.crossover, spec.direct.fullIn].some((value) => !Number.isFinite(value)) && (
-            <Diag kind="bad">{t(locale, "calib.anchor.invalid")}</Diag>
-          )}
-          {spec.direct &&
-            new Set([spec.direct.fullOut, spec.direct.crossover, spec.direct.fullIn]).size < 3 && (
+      {meta.type === "raw" &&
+        (spec.method === "direct" || spec.method === "linear") &&
+        fuzzyAnchors && (
+          <section
+            id="calibration-substep-mapping"
+            data-testid={spec.method === "linear" ? "calibration-mapping-linear" : "calibration-mapping-direct"}
+            style={{ marginBottom: 18 }}
+          >
+            <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
+              {t(locale, "calib.anchors.title")}
+            </h3>
+            <p style={{ fontSize: 13.5, color: "var(--ink-2)", marginTop: 0 }}>
+              {t(locale, "calib.anchors.qualFirst")}
+            </p>
+            {(
+              [
+                ["meaningFullOut", "fullOut", "calib.anchorOut"],
+                ["meaningCrossover", "crossover", "calib.anchorCross"],
+                ["meaningFullIn", "fullIn", "calib.anchorIn"],
+              ] as const
+            ).map(([meaningKey, numKey, labKey]) => (
+              <div
+                key={numKey}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 140px",
+                  gap: 10,
+                  marginBottom: 8,
+                }}
+              >
+                <Field label={`${t(locale, labKey)} — ${t(locale, "calib.anchors.meaning")}`}>
+                  <input
+                    data-testid={`calibration-anchor-meaning-${numKey}`}
+                    style={inputStyle}
+                    value={fuzzyAnchors[meaningKey]}
+                    onChange={(e) =>
+                      patchFuzzyAnchors({ [meaningKey]: e.target.value } as Partial<DirectAnchors>)
+                    }
+                  />
+                </Field>
+                <Field label={t(locale, "calib.anchors.raw")}>
+                  <input
+                    data-testid={`calibration-anchor-value-${numKey}`}
+                    type="number"
+                    step="any"
+                    style={inputStyle}
+                    value={fuzzyAnchors[numKey]}
+                    onChange={(e) =>
+                      patchFuzzyAnchors({ [numKey]: Number(e.target.value) } as Partial<DirectAnchors>)
+                    }
+                  />
+                </Field>
+              </div>
+            ))}
+            {[fuzzyAnchors.fullOut, fuzzyAnchors.crossover, fuzzyAnchors.fullIn].some(
+              (value) => !Number.isFinite(value),
+            ) && <Diag kind="bad">{t(locale, "calib.anchor.invalid")}</Diag>}
+            {new Set([fuzzyAnchors.fullOut, fuzzyAnchors.crossover, fuzzyAnchors.fullIn]).size < 3 && (
               <Diag kind="bad">{t(locale, "calib.anchor.duplicate")}</Diag>
             )}
-          {anchorsAscending(spec.direct, spec.set.highIsMembership) ? (
-            <CalibrationCurve
-              variable={v}
-              anchors={directCurveAnchors!}
-              anchorLabelKeys={
-                spec.set.highIsMembership
-                  ? ["calib.handle.out", "calib.handle.cross", "calib.handle.in"]
-                  : ["calib.handle.in", "calib.handle.cross", "calib.handle.out"]
-              }
-              values={rawValues}
-              highIsMembership={spec.set.highIsMembership}
-              rows={caseRows.map((r) => ({
-                label: r.label,
-                f: Number.isFinite(r.m)
-                  ? (r.m as number)
-                  : (() => {
-                      const mapped = calibrateDirect(
-                        r.raw ?? Number.NaN,
-                        ...directEngineAnchors!,
-                      );
-                      return spec.set.highIsMembership ? mapped : 1 - mapped;
-                    })(),
-              }))}
-              onAnchorChange={(index, val) => {
-                patchSpec(v, {
-                  direct: { ...spec.direct!, [directCurveKeys[index]]: val },
-                });
-              }}
-            />
-          ) : (
-            <Diag kind="bad">{t(locale, "calib.badOrder")}</Diag>
-          )}
-        </section>
-      )}
+            {anchorsAscending(fuzzyAnchors, spec.set.highIsMembership) ? (
+              <CalibrationCurve
+                variable={v}
+                anchors={directCurveAnchors!}
+                method={spec.method}
+                anchorLabelKeys={
+                  spec.set.highIsMembership
+                    ? ["calib.handle.out", "calib.handle.cross", "calib.handle.in"]
+                    : ["calib.handle.in", "calib.handle.cross", "calib.handle.out"]
+                }
+                values={rawValues}
+                highIsMembership={spec.set.highIsMembership}
+                rows={caseRows.map((r) => ({
+                  label: r.label,
+                  f: Number.isFinite(r.m)
+                    ? (r.m as number)
+                    : (() => {
+                        const mapper = spec.method === "linear" ? calibrateLinear : calibrateDirect;
+                        const mapped = mapper(r.raw ?? Number.NaN, ...directEngineAnchors!);
+                        return spec.set.highIsMembership ? mapped : 1 - mapped;
+                      })(),
+                }))}
+                onAnchorChange={(index, val) =>
+                  patchFuzzyAnchors({ [directCurveKeys[index]]: val } as Partial<DirectAnchors>)
+                }
+              />
+            ) : (
+              <Diag kind="bad">{t(locale, "calib.badOrder")}</Diag>
+            )}
+          </section>
+        )}
 
       {meta.type === "raw" && spec.method === "crisp" && spec.crisp && (
         <section id="calibration-substep-mapping" data-testid="calibration-mapping-crisp" style={{ marginBottom: 18 }}>
@@ -1453,8 +1506,8 @@ export function CalibrationWorkbench({
         <CaseMembershipTable
           rows={caseRows}
           anchors={
-            spec.method === "direct" && spec.direct
-              ? [spec.direct.fullOut, spec.direct.crossover, spec.direct.fullIn]
+            (spec.method === "direct" || spec.method === "linear") && fuzzyAnchors
+              ? [fuzzyAnchors.fullOut, fuzzyAnchors.crossover, fuzzyAnchors.fullIn]
               : spec.method === "crisp" && spec.crisp
                 ? [spec.crisp.threshold]
                 : []
@@ -1535,8 +1588,10 @@ export function CalibrationWorkbench({
 
       {/* 6. Sensitivity */}
       {meta.type === "raw" && conditions.length > 0 && outcome ? (
-        spec.method === "direct" && anchorsAscending(spec.direct, spec.set.highIsMembership) ||
-        (spec.method === "crisp" && !!spec.crisp && Number.isFinite(spec.crisp.threshold)) ? (
+        (((spec.method === "direct" || spec.method === "linear") &&
+          !!fuzzyAnchors &&
+          anchorsAscending(fuzzyAnchors, spec.set.highIsMembership)) ||
+          (spec.method === "crisp" && !!spec.crisp && Number.isFinite(spec.crisp.threshold))) ? (
           <AnchorSensitivityPanel
             id="calibration-substep-sensitivity"
             focusCol={v}
@@ -1642,8 +1697,8 @@ export function CalibrationWorkbench({
             getData={() => ({
               variable: v,
               anchors:
-                spec.direct
-                  ? `${spec.direct.fullOut} / ${spec.direct.crossover} / ${spec.direct.fullIn}`
+                fuzzyAnchors
+                  ? `${fuzzyAnchors.fullOut} / ${fuzzyAnchors.crossover} / ${fuzzyAnchors.fullIn}`
                   : String(spec.crisp?.threshold ?? ""),
               total: caseRows.length,
               inside: caseRows.filter((r) => (r.m as number) > 0.5).length,
@@ -1918,6 +1973,7 @@ function AnchorSensitivityPanel({
             </Field>
             <Field label={t(locale, "calib.sens.delta")}>
               <input
+                data-testid={`calibration-sensitivity-delta-${index}`}
                 type="number"
                 step="any"
                 style={inputStyle}
@@ -2147,6 +2203,7 @@ function CalibrationCurve({
   highIsMembership,
   rows,
   onAnchorChange,
+  method,
 }: {
   variable: string;
   anchors: [number, number, number];
@@ -2155,6 +2212,7 @@ function CalibrationCurve({
   highIsMembership: boolean;
   rows: { label: string; f: number }[];
   onAnchorChange: (index: number, value: number) => void;
+  method: "direct" | "linear";
 }) {
   const [locale] = useLocale();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -2211,11 +2269,12 @@ function CalibrationCurve({
   let curve = "";
   for (let s = 0; s <= 140; s++) {
     const x = domainLo + (s / 140) * (domainHi - domainLo);
+    const mapped = method === "linear" ? calibrateLinear(x, o, c, i) : calibrateDirect(x, o, c, i);
     curve +=
       (s ? "L" : "M") +
       px(x).toFixed(1) +
       "," +
-      py(highIsMembership ? calibrateDirect(x, o, c, i) : 1 - calibrateDirect(x, o, c, i)).toFixed(1);
+      py(highIsMembership ? mapped : 1 - mapped).toFixed(1);
   }
 
   const anchorMeta = [

@@ -2,9 +2,11 @@
 
 import { useMemo } from "react";
 import {
-  consistencyThresholdSweep,
-  type QcaCase,
+  runCombinedRobustnessGrid,
+  type CombinedRobustnessResult,
   type ConsistencySweepEntry,
+  type QcaCase,
+  type RobustnessScenario,
 } from "@openqca/engine";
 import { useLocale, type Locale } from "@/i18n/locale";
 import { t } from "@/i18n/dict";
@@ -13,10 +15,13 @@ import { ChartFrame } from "@/components/ChartFrame";
 
 interface RobustnessPanelProps {
   cases: QcaCase[];
+  scenarios: RobustnessScenario[];
   conditions: string[];
   outcome: string;
   freqCut: number;
   currentConsCut: number;
+  expectations: Record<string, "present" | "absent" | "either">;
+  robustness?: CombinedRobustnessResult | null;
 }
 
 const fmt = (v: number): string =>
@@ -24,9 +29,7 @@ const fmt = (v: number): string =>
 
 /** Entfernt das "fs_"-Präfix und wandelt in Großbuchstaben, wie im Rest der App. */
 const cleanExpr = (expr: string): string => expr.replace(/fs_/g, "").toUpperCase();
-
-/** Verbindet die Pfad-Ausdrücke einer Lösung zu einer lesbaren Formel. */
-function solutionFormula(entry: ConsistencySweepEntry): string {
+function solutionFormula(entry: { expressions: string[] }): string {
   if (entry.expressions.length === 0) return "—";
   return entry.expressions.map(cleanExpr).join(" + ");
 }
@@ -38,46 +41,128 @@ function firstChangePoint(entries: ConsistencySweepEntry[]): number | null {
   }
   return null;
 }
+function displayCaseLabel(label: string): string {
+  try {
+    const parsed = JSON.parse(label) as unknown;
+    return Array.isArray(parsed) && typeof parsed[0] === "string" ? parsed[0] : label;
+  } catch {
+    return label;
+  }
+}
 
 /**
- * Robustheits-Panel: zeigt, wie stabil die sparsame Lösung gegenüber der Wahl
- * des Konsistenz-Cutoffs ist (Sweep über einen Cutoff-Bereich), inklusive
- * einer automatisch erzeugten Interpretation.
+ * Robustheits-Panel: verbindet explizite Kalibrierungsalternativen mit einem
+ * Raster aus Frequency-, Consistency- und PRI-Cutoffs. Die Basisreihe bleibt
+ * als Diagramm sichtbar; die vollständige Kreuztabelle liegt progressiv offen.
  */
 export function RobustnessPanel({
   cases,
+  scenarios,
   conditions,
   outcome,
   freqCut,
   currentConsCut,
+  expectations,
+  robustness,
 }: RobustnessPanelProps) {
   const [locale] = useLocale();
-  const { entries, error } = useMemo((): {
-    entries: ConsistencySweepEntry[];
+  const freqCuts = useMemo(
+    () => [...new Set([Math.max(1, freqCut - 1), freqCut, freqCut + 1])].sort((a, b) => a - b),
+    [freqCut],
+  );
+  const consCuts = useMemo(
+    () =>
+      [...new Set([0.7, 0.8, 0.9, 0.95, currentConsCut])]
+        .filter((cut) => cut >= 0 && cut <= 1)
+        .sort((a, b) => a - b),
+    [currentConsCut],
+  );
+  const priCuts = useMemo(() => [null, 0.5, 0.75] as Array<number | null>, []);
+  const computed = useMemo((): {
+    result: CombinedRobustnessResult | null;
     error: string | null;
   } => {
+    if (robustness !== undefined) return { result: null, error: null };
+    const activeScenarios = scenarios.length
+      ? scenarios
+      : cases.length
+        ? [{ id: "base", label: "Basis-Kalibrierung", cases }]
+        : [];
+    if (!activeScenarios.length || !conditions.length || !outcome) {
+      return { result: null, error: null };
+    }
     try {
-      const result = consistencyThresholdSweep(cases, conditions, outcome, {
-        from: 0.7,
-        to: 0.95,
-        step: 0.05,
-        freqCut,
-      });
-      return { entries: result, error: null };
+      return {
+        result: runCombinedRobustnessGrid({
+          scenarios: activeScenarios,
+          conditions,
+          outcome,
+          freqCuts,
+          consCuts,
+          priCuts,
+          baseline: {
+            scenarioId: activeScenarios[0].id,
+            freqCut,
+            consCut: currentConsCut,
+            priCut: null,
+          },
+          expectations,
+        }),
+        error: null,
+      };
     } catch (e) {
       return {
-        entries: [],
+        result: null,
         error: e instanceof Error ? e.message : t(locale, "rob.sweepFailed"),
       };
     }
-  }, [cases, conditions, outcome, freqCut, locale]);
+  }, [
+    cases,
+    conditions,
+    consCuts,
+    currentConsCut,
+    expectations,
+    freqCut,
+    freqCuts,
+    locale,
+    outcome,
+    priCuts,
+    scenarios,
+    robustness,
+  ]);
+  const result = robustness === undefined ? computed.result : robustness;
+  const error = robustness === undefined ? computed.error : null;
 
   if (error) {
-    return (
-      <p style={hintStyle}>{t(locale, "rob.error", { msg: error })}</p>
-    );
+    return <p style={hintStyle}>{t(locale, "rob.error", { msg: error })}</p>;
+  }
+  if (!result) {
+    return <p style={hintStyle}>{t(locale, "rob.noResults")}</p>;
   }
 
+  const baselineScenarioId = result.baseline.scenarioId;
+  const chartEntries: ConsistencySweepEntry[] = result.cells
+    .filter(
+      (cell) =>
+        cell.scenarioId === baselineScenarioId &&
+        cell.freqCut === freqCut &&
+        cell.priCut === null,
+    )
+    .sort((a, b) => a.consCut - b.consCut)
+    .map((cell) => ({
+      cutoff: cell.consCut,
+      pathCount: cell.solutions.parsimonious.pathCount,
+      solutionConsistency: cell.solutions.parsimonious.consistency,
+      solutionCoverage: cell.solutions.parsimonious.coverage,
+      expressions: cell.solutions.parsimonious.expressions,
+    }));
+  const entries = chartEntries.length ? chartEntries : result.cells.slice(0, 1).map((cell) => ({
+    cutoff: cell.consCut,
+    pathCount: cell.solutions.parsimonious.pathCount,
+    solutionConsistency: cell.solutions.parsimonious.consistency,
+    solutionCoverage: cell.solutions.parsimonious.coverage,
+    expressions: cell.solutions.parsimonious.expressions,
+  }));
   if (entries.length === 0) {
     return <p style={hintStyle}>{t(locale, "rob.noResults")}</p>;
   }
@@ -91,7 +176,6 @@ export function RobustnessPanel({
       nearestIndex = i;
     }
   });
-
   const changeIndex = firstChangePoint(entries);
   const interpretation =
     changeIndex === null
@@ -101,9 +185,16 @@ export function RobustnessPanel({
           from: solutionFormula(entries[changeIndex - 1]),
           to: solutionFormula(entries[changeIndex]),
         });
+  const changedCases = result.caseStability.filter((item) => item.changedCells > 0);
 
   return (
-    <div>
+    <div data-testid="robustness-grid">
+      <p style={hintStyle}>{t(locale, "rob.combined.explainer")}</p>
+      <p style={{ ...hintStyle, marginTop: 4 }}>
+        {t(locale, "rob.combined.scenarios", {
+          count: String(scenarios.length || 1),
+        })}
+      </p>
       <ChartFrame filename="robustheit-sweep">
         <SweepChart
           entries={entries}
@@ -145,6 +236,82 @@ export function RobustnessPanel({
         </table>
       </div>
       <p style={hintStyle}>{interpretation}</p>
+
+      <div style={{ ...containerStyle, marginTop: 18 }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: 15.5 }}>{t(locale, "rob.combined.stabilityTitle")}</h3>
+        <p style={{ ...hintStyle, marginTop: 0 }}>{t(locale, "rob.combined.stabilityHint")}</p>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle(false)}>{t(locale, "rob.combined.solutionType")}</th>
+              <th style={thStyle(false)}>{t(locale, "rob.combined.expression")}</th>
+              <th style={thStyle(true)}>{t(locale, "rob.combined.cells")}</th>
+              <th style={thStyle(true)}>{t(locale, "rob.combined.share")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.solutionStability.slice(0, 9).map((item) => (
+              <tr key={`${item.type}-${item.expression}`}>
+                <td style={tdStyle(false)}>{item.type}</td>
+                <td style={tdStyle(false)} className="mono">{item.expression ? cleanExpr(item.expression) : "—"}</td>
+                <td style={tdStyle(true)}>{item.cells}/{result.totalCells}</td>
+                <td style={tdStyle(true)}>{fmt(item.share)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {changedCases.length > 0 && (
+        <div style={{ ...containerStyle, marginTop: 18 }}>
+          <h3 style={{ margin: "0 0 8px", fontSize: 15.5 }}>{t(locale, "rob.combined.caseTitle")}</h3>
+          <p style={{ ...hintStyle, marginTop: 0 }}>{t(locale, "rob.combined.caseHint")}</p>
+          <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13.5, lineHeight: 1.55 }}>
+            {changedCases.slice(0, 8).map((item) => (
+              <li key={item.caseLabel}>
+                <strong>{displayCaseLabel(item.caseLabel)}</strong>: {item.changedCells}/{item.observedCells}{" "}
+                {t(locale, "rob.combined.caseChanged")}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <details style={{ marginTop: 18 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+          {t(locale, "rob.combined.fullGrid", { count: String(result.totalCells) })}
+        </summary>
+        <div style={{ ...containerStyle, marginTop: 10, overflowX: "auto" }}>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle(false)}>{t(locale, "rob.combined.scenario")}</th>
+                <th style={thStyle(true)}>n</th>
+                <th style={thStyle(true)}>cons.</th>
+                <th style={thStyle(true)}>PRI</th>
+                <th style={thStyle(false)}>Parsimonious</th>
+                <th style={thStyle(true)}>{t(locale, "rob.combined.caseChanges")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.cells.map((cell) => (
+                <tr key={`${cell.scenarioId}-${cell.freqCut}-${cell.consCut}-${cell.priCut ?? "none"}`}>
+                  <td style={tdStyle(false)}>{cell.scenarioLabel}</td>
+                  <td style={tdStyle(true)}>{cell.freqCut}</td>
+                  <td style={tdStyle(true)}>{fmt(cell.consCut)}</td>
+                  <td style={tdStyle(true)}>{cell.priCut === null ? "—" : fmt(cell.priCut)}</td>
+                  <td style={tdStyle(false)} className="mono">
+                    {cell.solutions.parsimonious.expression
+                      ? cleanExpr(cell.solutions.parsimonious.expression)
+                      : "—"}
+                  </td>
+                  <td style={tdStyle(true)}>{cell.caseClassificationChanges.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

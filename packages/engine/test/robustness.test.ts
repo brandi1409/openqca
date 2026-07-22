@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calibrateDirect, consistencyThresholdSweep, type QcaCase } from "../src/index.ts";
+import {
+  calibrateDirect,
+  consistencyThresholdSweep,
+  runCombinedRobustnessGrid,
+  type QcaCase,
+} from "../src/index.ts";
 
 const approx = (a: number, b: number, eps = 1e-6) =>
   assert.ok(Math.abs(a - b) < eps, `erwartet ~${b}, erhalten ${a}`);
@@ -87,4 +92,61 @@ test("Sweep: einzelner Cutoff (from === to) liefert genau einen Eintrag", () => 
 test("Sweep: ungültige Optionen werfen (step ≤ 0, to < from)", () => {
   assert.throws(() => consistencyThresholdSweep(buildCases(), CONDS, OUTCOME, { from: 0.7, to: 0.9, step: 0, freqCut: 1 }));
   assert.throws(() => consistencyThresholdSweep(buildCases(), CONDS, OUTCOME, { from: 0.9, to: 0.7, step: 0.05, freqCut: 1 }));
+});
+
+test("Combined robustness: PRI-Cutoff ändert positive Zeilen und Fallklassifikation", () => {
+  const cases: QcaCase[] = [
+    { label: "A", values: { condition: 1, outcome: 1 } },
+    { label: "B", values: { condition: 1, outcome: 0 } },
+    { label: "C", values: { condition: 0, outcome: 0 } },
+  ];
+  const result = runCombinedRobustnessGrid({
+    scenarios: [{ id: "base", label: "Basis", cases }],
+    conditions: ["condition"],
+    outcome: "outcome",
+    freqCuts: [1],
+    consCuts: [0.4],
+    priCuts: [0, 0.6],
+  });
+
+  assert.equal(result.totalCells, 2);
+  assert.equal(result.cells[0].positiveRows, 1);
+  assert.equal(result.cells[1].positiveRows, 0);
+  assert.deepEqual(
+    result.cells[1].caseClassificationChanges.map((change) => change.caseLabel),
+    ["A", "B"],
+  );
+  assert.equal(result.caseStability.find((item) => item.caseLabel === "A")?.status, "possible-change");
+});
+
+test("Combined robustness: explicit baseline selects the current analysis cell", () => {
+  const cases: QcaCase[] = [
+    { label: "A", values: { condition: 1, outcome: 1 } },
+    { label: "B", values: { condition: 1, outcome: 0 } },
+  ];
+  const result = runCombinedRobustnessGrid({
+    scenarios: [{ id: "base", label: "Basis", cases }],
+    conditions: ["condition"],
+    outcome: "outcome",
+    freqCuts: [1, 2],
+    consCuts: [0.4, 0.8],
+    priCuts: [null],
+    baseline: { scenarioId: "base", freqCut: 2, consCut: 0.8, priCut: null },
+  });
+
+  assert.deepEqual(result.baseline, {
+    scenarioId: "base",
+    freqCut: 2,
+    consCut: 0.8,
+    priCut: null,
+  });
+  assert.equal(
+    result.cells.find(
+      (cell) =>
+        cell.freqCut === 2 &&
+        cell.consCut === 0.8 &&
+        cell.priCut === null,
+    )?.caseClassificationChanges.length,
+    0,
+  );
 });

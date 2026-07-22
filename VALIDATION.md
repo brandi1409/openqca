@@ -91,7 +91,7 @@ ersetzt (`packages/engine/src/solutions.ts`, `intermediateSolution`).
 
 ## Kalibrierungs-Kreuzvalidierung
 
-Drei getrennte Evidenzebenen:
+Vier getrennte Evidenzebenen:
 
 1. **Ragin-Fixpunkte (Implementierungsverifikation):** `calibrateDirect` bildet den
    Kreuzungspunkt exakt auf 0,5 und die Anker auf \(1/(1+e^{\pm 3})\) ≈ 0,0474 / 0,9526
@@ -105,9 +105,13 @@ Drei getrennte Evidenzebenen:
    Crisp-Kalibrierung muss exakt übereinstimmen (Toleranz `1e-6`). Die logistische
    Direktmethode im R-Paket zielt an den Ankern auf ≈ 0,05 / 0,95; openQCA folgt
    Ragin mit ≈ 0,0474 / 0,9526. Die Differenz auf dem Prüfgitter bleibt unter 0,01
-   und wird als **dokumentiertes Residual** akzeptiert — die Engine wird nicht an
-   R angepasst, und das Orakel wird nicht „zurechtgebogen“.
-3. **Noch nicht extern validiert:** `calibrateLinear`, `calibrateFourValue`.
+   und wird als **dokumentiertes Residual** akzeptiert — die Engine wird nicht an R
+   angepasst, und das Orakel wird nicht „zurechtgebogen“.
+3. **Lineare Fuzzy-Kalibrierung (externe Gegenüberstellung):** `calibrateLinear`
+   stimmt auf dem unabhängigen R-QCA-Prüfgitter mit `QCA::calibrate(logistic = FALSE)`
+   innerhalb `1e-6` überein. Das belegt Implementierungsübereinstimmung, nicht die
+   substantielle Gültigkeit der gewählten Anker.
+4. **Noch nicht extern validiert:** `calibrateFourValue`.
 
 Substantive Gültigkeit von Ankern und Robustheit gegenüber Ankerwahl sind
 Forschungsurteile bzw. Sensitivitätsanalysen — keine reine Implementierungsfrage.

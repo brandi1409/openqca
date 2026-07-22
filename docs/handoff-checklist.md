@@ -4,7 +4,7 @@ Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft 
 
 ## 0. Grundlage
 - [ ] Repo auf GitHub anlegen und pushen (`openqca`).
-- [ ] Lokal prüfen: `npm install`, dann `npm test --workspace @openqca/engine` (38/38) und `npm run build --workspace web`.
+- [ ] Lokal prüfen: `npm install`, dann `npm test --workspace @openqca/engine` (43/43) und `npm run build --workspace web`.
 
 ## 1. Supabase (Konto & Datenbank — P3)
 - [x] Konto auf **supabase.com**, neues Projekt anlegen. Region wählen (EU für DSGVO). → OpenQCA `yuhsxueaafugixeiausy` eu-central-1

@@ -85,6 +85,12 @@ Neben der logistischen gibt es eine **lineare** Variante (gleiche Anker,
 gerade statt s-förmig), eine **Crisp-Kalibrierung** (eine Schwelle → 0/1) und
 eine **Vier-Werte-Kalibrierung** (drei Schwellen → 0 / 0,33 / 0,67 / 1).
 
+Die lineare Variante verbindet die Anker stückweise: bis zum Anker `e` ergibt
+sie 0, zwischen `e` und `c` steigt sie bis 0,5, zwischen `c` und `i` bis 1,
+danach bleibt sie bei 1. Sie entspricht im R-Paket `QCA`
+`calibrate(..., logistic = FALSE)`. Auch hier stammen die Anker aus einer
+substantiven Set-Definition, nicht automatisch aus Medianen oder Quantilen.
+
 ### Das 0,5-Problem
 
 Der Wert **0,5 ist heikel**: Ein Fall mit exakt 0,5 ist weder "eher drinnen" noch

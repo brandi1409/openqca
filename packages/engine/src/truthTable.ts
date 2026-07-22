@@ -24,6 +24,7 @@ export interface TruthTableResult {
   outcome: string;
   freqCut: number;
   consCut: number;
+  priCut?: number;
   rows: TruthTableRow[];
   assignedCaseCount: number; // Fälle, die einer beobachteten Konfiguration zugeordnet wurden
   totalCaseCount: number;
@@ -35,8 +36,9 @@ export function buildTruthTable(params: {
   outcome: string;
   freqCut: number;
   consCut: number;
+  priCut?: number;
 }): TruthTableResult {
-  const { cases, conditions, outcome, freqCut, consCut } = params;
+  const { cases, conditions, outcome, freqCut, consCut, priCut } = params;
   if (conditions.length < 1 || conditions.length > 12) {
     throw new Error(`Anzahl Bedingungen muss zwischen 1 und 12 liegen (erhalten: ${conditions.length}).`);
   }
@@ -78,7 +80,8 @@ export function buildTruthTable(params: {
     const priDen = sumM - sumMinMYnY;
     const pri = priDen > 0 ? (sumMinMY - sumMinMYnY) / priDen : NaN;
     const n = members.length;
-    const output: 0 | 1 | "?" = n >= freqCut ? (consistency >= consCut ? 1 : 0) : "?";
+    const priSatisfied = priCut === undefined || (Number.isFinite(pri) && pri >= priCut);
+    const output: 0 | 1 | "?" = n >= freqCut && consistency >= consCut && priSatisfied ? 1 : n >= freqCut ? 0 : "?";
 
     rows.push({
       index: m,
@@ -97,6 +100,7 @@ export function buildTruthTable(params: {
     outcome,
     freqCut,
     consCut,
+    ...(priCut === undefined ? {} : { priCut }),
     rows,
     assignedCaseCount: assigned.size,
     totalCaseCount: cases.length,

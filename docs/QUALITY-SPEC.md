@@ -33,8 +33,8 @@ Stand: 2026-07-22 · Ausführung: lokale Implementierung, deterministische Prüf
 | A2.9 | **ⓘ-Popover**: öffnet vollständig im Viewport (auch in der kürzesten Tabelle), schließt per Escape | `interactions.spec` |
 | A2.10 | **Anker per Tastatur**: Pfeiltaste am Kurven-Griff ändert das Zahlenfeld synchron | `interactions.spec` |
 | A2.11 | **Rohdaten-Checkliste**: Rohdaten laden, vier Lehr-Seed-Spalten übernehmen, Definition/Methode/Anker/Evidenz/Fallprüfung/Sensitivität sichtbar | `flows.spec.ts` |
-| A2.12 | **Raw calibration milestone**: `rohwerte-demokratie.csv` supports at least one crisp condition, two direct-fuzzy conditions, and one direct-fuzzy outcome with substantive evidence coverage, case-level diagnostics, unlocked analysis, sensitivity fit/case effects, and JSON/Markdown/R exports | `flows.spec.ts` |
-| A2.13 | **Evidence and method gate**: empirical diagnostics do not satisfy substantive evidence; switching direct/crisp removes incompatible mapping state and invalidates method/sensitivity confirmations | `flows.spec.ts` |
+| A2.12 | **Raw calibration milestone**: `rohwerte-demokratie.csv` supports at least one crisp condition, one direct-fuzzy condition, one piecewise-linear fuzzy condition, and one direct-fuzzy outcome with substantive evidence coverage, case-level diagnostics, unlocked analysis, sensitivity fit/case effects, and JSON/Markdown/R exports | `flows.spec.ts` |
+| A2.13 | **Evidence and method gate**: empirical diagnostics do not satisfy substantive evidence; switching direct/linear/crisp removes incompatible mapping state and invalidates method/sensitivity confirmations | `flows.spec` |
 
 ### A3 — Visuelle Integrität (E2E, generisch — findet auch künftige Fälle)
 Geprüft in **4 Matrizen**: Light/Dark × Desktop (1280) / Mobile (390).

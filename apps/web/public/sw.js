@@ -22,13 +22,13 @@
 var VERSION = "dev";
 try {
   VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
-} catch (err) {
+} catch {
   // URL-Parsing fehlgeschlagen → "dev" als Fallback.
 }
 var CACHE_NAME = "openqca-" + VERSION;
 var CACHE_PREFIX = "openqca-";
 
-self.addEventListener("install", function (event) {
+self.addEventListener("install", function () {
   self.skipWaiting();
 });
 
@@ -47,7 +47,7 @@ self.addEventListener("activate", function (event) {
               return caches.delete(key);
             }),
         );
-      } catch (err) {
+      } catch {
         // Aufräumen fehlgeschlagen ist unkritisch — Worker bleibt aktiv.
       }
     })(),
@@ -83,7 +83,7 @@ self.addEventListener("fetch", function (event) {
       event.respondWith(cacheFirstWithRevalidate(request));
       return;
     }
-  } catch (err) {
+  } catch {
     // Bei unerwarteten Fehlern: nichts tun, Browser macht den normalen Fetch.
   }
 });
@@ -94,18 +94,18 @@ async function networkFirstNavigate(request) {
     try {
       var cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
-    } catch (err) {
+    } catch {
       // Cache-Schreibfehler ignorieren, Antwort trotzdem ausliefern.
     }
     return response;
-  } catch (err) {
+  } catch {
     try {
       var cache2 = await caches.open(CACHE_NAME);
       var cached = await cache2.match(request);
       if (cached) return cached;
       var appFallback = await cache2.match("/app");
       if (appFallback) return appFallback;
-    } catch (err2) {
+    } catch {
       // Cache-Zugriff fehlgeschlagen — es bleibt nur der Fehler unten.
     }
     return new Response("Offline und keine gecachte Version verfügbar.", {
@@ -125,7 +125,7 @@ async function cacheFirstWithRevalidate(request) {
       .then(function (response) {
         try {
           cache.put(request, response.clone());
-        } catch (err) {
+        } catch {
           // Cache-Schreibfehler ignorieren.
         }
         return response;
@@ -137,17 +137,17 @@ async function cacheFirstWithRevalidate(request) {
     if (cached) {
       // Stale-while-revalidate light: Cache sofort liefern, im Hintergrund
       // nachladen (Fehler dort werden bewusst verschluckt, s.o.).
-      networkFetch;
+      void networkFetch;
       return cached;
     }
 
     var fresh = await networkFetch;
     if (fresh) return fresh;
     return new Response("", { status: 504, statusText: "Offline" });
-  } catch (err) {
+  } catch {
     try {
       return await fetch(request);
-    } catch (err2) {
+    } catch {
       return new Response("", { status: 504, statusText: "Offline" });
     }
   }

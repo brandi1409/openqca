@@ -18,7 +18,7 @@ openqca/
 
 ```bash
 npm install                    # Abhängigkeiten (Monorepo)
-npm test --workspace @openqca/engine   # Engine-Tests (38/38)
+npm test --workspace @openqca/engine   # Engine-Tests (43/43)
 npm run dev --workspace web    # Web-App auf http://localhost:3000
 ```
 
@@ -26,10 +26,10 @@ npm run dev --workspace web    # Web-App auf http://localhost:3000
 
 **Live:** https://openqca.vercel.app
 
-- **Engine** komplett & getestet (38 Tests): Kalibrierung (direkt/linear/crisp/4-Werte), Konsistenz/Coverage/PRI, Truth Table, Quine-McCluskey-Minimierung, komplexe + **intermediäre** (directional expectations) + sparsame Lösung, Notwendigkeitsanalyse, **Robustheits-Sweep**. Referenz-Suite: `node scripts/reference-check.mjs` (siehe `VALIDATION.md`).
+- **Engine** komplett & getestet (43 Tests): Kalibrierung (direkt/linear/crisp/4-Werte), Konsistenz/Coverage/PRI, Truth Table, Quine-McCluskey-Minimierung, komplexe + **intermediäre** (directional expectations) + sparsame Lösung, Notwendigkeitsanalyse, **Robustheits-Sweep**. Referenz-Suite: `node scripts/reference-check.mjs` (siehe `VALIDATION.md`).
 - **Web-App** (deployt): geführte Kalibrierung mit Live-Coach, Truth Table, alle drei Lösungstypen, Notwendigkeit, **Analyse des negierten Outcomes (~Y)**, Robustheits-Panel, XY-Plot, Deskriptivstatistik, CSV/**XLSX**-Import, Beispieldatensätze, Protokoll-Export (JSON + R-Skript), **druckfähiger Bericht (PDF)**, **DE/EN-Umschalter**. Der kostenlose Kern rechnet vollständig lokal im Browser.
 - **Cloud (optional):** Konto (Supabase Magic Link) + Projekt-Speicherung; KI-Assistenten (Anthropic) und Zahlungen (Stripe) sind im Code fertig und werden rein über Env-Variablen zugeschaltet.
-- **Offen:** Desktop-Build (Tauri, braucht Rust + Signierung), weitere externe Kalibrierungsvalidierung für lineare/4-Werte-Methoden, juristische Prüfung der `[PRÜFEN]`-Punkte in `legal/`, öffentliches Repository, eigene Domain.
+- **Offen:** Desktop-Build (Tauri, braucht Rust + Signierung), weitere externe Kalibrierungsvalidierung für Vier-Werte-Methoden, juristische Prüfung der `[PRÜFEN]`-Punkte in `legal/`, öffentliches Repository, eigene Domain.
 
 Details und der vollständige Bauplan: `prototypes/03-goldplan.html` · Übergabe: `docs/handoff-checklist.md`.
 

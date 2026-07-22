@@ -218,6 +218,12 @@ const de = {
 
   // -- Datenbereich (mit geladenem Datensatz) ---------------------------------
   "data.reloadBtn": "Anderen Datensatz laden (CSV/XLSX)",
+  "data.saveLocal": "Projekt lokal speichern",
+  "data.loadLocal": "Lokales Projekt laden",
+  "data.localSaved": "Lokal gespeichert.",
+  "data.localRestored": "Lokales Projekt geladen.",
+  "data.localMissing": "Kein lokales Projekt gefunden.",
+  "data.localSaveFailed": "Lokales Speichern nicht möglich (Speicherlimit oder Privatmodus).",
   "data.title": "Daten · {n} Fälle",
   "descriptives.title": "Deskriptive Statistik (kalibrierte Sets)",
 
@@ -267,7 +273,7 @@ const de = {
   "step.intro.2":
     "QCA arbeitet mit Mengen („Sets“): Jeder Fall gehört zu jeder Eigenschaft irgendwo zwischen 0 (klar nicht dabei) und 1 (klar dabei). Hier legen Sie fest, welche Spalten Bedingungen sind, welche das Ergebnis (Outcome) ist — und ob die Werte schon Zugehörigkeiten sind oder erst übersetzt werden müssen.",
   "step.intro.3":
-    "Kalibrieren heißt: Konzept und Zielmenge definieren, Methode wählen (crisp / direkte Fuzzy / vorab kalibriert), Anker inhaltlich begründen, Fälle prüfen und plausible Alternativen testen. Rohwerte allein sind noch keine Zugehörigkeit.",
+    "Kalibrieren heißt: Konzept und Zielmenge definieren, Methode wählen (Crisp / direkte oder lineare Fuzzy-Kalibrierung / vorab kalibriert), Anker inhaltlich begründen, Fälle prüfen und plausible Alternativen testen. Rohwerte allein sind noch keine Zugehörigkeit.",
   "step.intro.4":
     "Bevor wir Kombinationen prüfen: Gibt es eine Bedingung, ohne die das Outcome (fast) nie vorkommt? Das wäre eine notwendige Bedingung — sie wird separat berichtet.",
   "step.intro.5":
@@ -378,12 +384,17 @@ const de = {
   "calib.method.title": "2. Kalibrierungsmethode",
   "calib.method.direct": "Direkt (fuzzy, logistisch)",
   "calib.method.crisp": "Crisp (eine Einschlussschwelle)",
+  "calib.method.linear": "Linear (fuzzy, stückweise)",
   "calib.method.provenance": "Herkunft der bereits kalibrierten Werte",
   "calib.method.provenancePh": "z. B. aus Paper X, Anhang Tabelle 2; Skala 0–1 …",
   "calib.method.directHelp":
     "Drei qualitative Anker (voll draußen / Kreuzung / voll drinnen) werden auf Rohwerte gemappt und logistisch übersetzt (Ragin 2008).",
   "calib.method.directHelpInverted":
     "Drei qualitative Anker werden auf absteigende Rohwerte gemappt, wenn ein niedriger Rohwert mehr Zugehörigkeit bedeutet; die resultierende Kurve wird entsprechend invertiert.",
+  "calib.method.linearHelp":
+    "Dieselben drei qualitativen Anker werden mit einer stückweise linearen Zugehörigkeitsfunktion verbunden; das entspricht QCA::calibrate(logistic = FALSE).",
+  "calib.method.linearHelpInverted":
+    "Dieselben drei qualitativen Anker werden bei niedrigerem Rohwert als höherer Zugehörigkeit mit einer stückweise linearen Funktion verbunden und anschließend invertiert.",
   "calib.method.crispHelp":
     "Eine inhaltlich begründete Einschlussschwelle: Rohwert ≥ Schwelle → 1, sonst 0 (höherer Rohwert = mehr Zugehörigkeit).",
   "calib.method.crispHelpInverted":
@@ -487,6 +498,7 @@ const de = {
   "calib.guide.context.outcome": "Dieses Set ist das zu erklärende Outcome. Seine Mitgliedschaft ist kein Truth-Table-, Frequency-, Konsistenz- oder PRI-Cutoff.",
   "calib.guide.mode.already": "bereits kalibriert, Provenienz",
   "calib.guide.mode.direct": "direkte Fuzzy-Kalibrierung",
+  "calib.guide.mode.linear": "lineare Fuzzy-Kalibrierung",
   "calib.guide.mode.crisp": "Crisp-Kalibrierung",
   "calib.guide.mode.unselected": "Methode noch nicht gewählt",
   "calib.guide.direction.high": "höhere Rohwerte erhöhen Zugehörigkeit",
@@ -566,6 +578,7 @@ const de = {
   "proto.caseReviewConfirmed": "Fallprüfung bestätigt",
   "proto.sensitivityReviewConfirmed": "Sensitivitätsprüfung bestätigt",
   "proto.method.direct": "direkte Fuzzy-Kalibrierung (logistisch)",
+  "proto.method.linear": "lineare Fuzzy-Kalibrierung",
   "proto.method.crisp": "Crisp-Kalibrierung",
   "proto.method.already": "bereits kalibriert",
   "proto.provenance": "Provenienz",
@@ -601,6 +614,7 @@ const de = {
   "tt.col.cases": "Fälle",
   "tt.hint":
     "{observed} beobachtete Konfigurationen, {remainders} Remainder. OUT = 1, wenn n ≥ {freqCut} und Konsistenz ≥ {consCut}.",
+  "tt.limitWarn": "Die Engine begrenzt Truth Tables auf 12 Bedingungen (2^k Zeilen). Reduzieren Sie die Bedingungen, bevor Sie fortfahren.",
 
   // -- Lösungen ---------------------------------------------------------------
   "sol.complex.title": "Komplexe (konservative) Lösung",
@@ -643,6 +657,21 @@ const de = {
   "rob.stable": "Die Lösung ist über den geprüften Cutoff-Bereich stabil.",
   "rob.change":
     "Die Lösung wechselt bei Cutoff {cutoff} von {from} zu {to} — die Cutoff-Wahl ist hier folgenreich und sollte begründet werden.",
+  "rob.combined.explainer":
+    "Dieses Raster trennt Kalibrierungsalternativen von analytischen Cutoffs. Nur ausdrücklich dokumentierte substantielle Alternativen werden als Szenarien einbezogen; diagnostische Verschiebungen sind kein Beleg.",
+  "rob.combined.scenarios": "{count} Kalibrierungsszenario(s) werden gemeinsam mit Frequency-, Consistency- und PRI-Cutoffs geprüft.",
+  "rob.combined.stabilityTitle": "Stabilität der Lösungsterme",
+  "rob.combined.stabilityHint": "Anteil der geprüften Zellen mit demselben Ausdruck. Stabilität ersetzt keine substantielle Begründung.",
+  "rob.combined.solutionType": "Lösungsmodell",
+  "rob.combined.expression": "Ausdruck",
+  "rob.combined.cells": "Zellen",
+  "rob.combined.share": "Anteil",
+  "rob.combined.caseTitle": "Fallklassifikationen",
+  "rob.combined.caseHint": "Diese Fälle wechseln gegenüber der Basiszelle ihre Truth-Table-Klassifikation oder ihre Outcome-Seite.",
+  "rob.combined.caseChanged": "Zellen mit Änderung",
+  "rob.combined.fullGrid": "Vollständiges Robustheitsraster ({count} Zellen)",
+  "rob.combined.scenario": "Szenario",
+  "rob.combined.caseChanges": "Falländerungen",
   "rob.chart.aria":
     "Liniendiagramm des Cutoff-Sweeps: Lösungs-Konsistenz und Lösungs-Coverage über dem Konsistenz-Cutoff (0,70 bis 0,95).",
   "rob.chart.consistency": "Konsistenz",
@@ -686,7 +715,7 @@ const de = {
   // -- Protokoll --------------------------------------------------------------
   "proto.title": "Analyseprotokoll",
   "proto.desc":
-    "Reproduzierbar: Kalibrierungsprotokoll (JSON + Markdown) und R-Skript (package QCA, logistic = TRUE für direkte Methode).",
+    "Reproduzierbar: Kalibrierungsprotokoll (JSON + Markdown) und R-Skript (package QCA; logistic = TRUE für direkte, logistic = FALSE für lineare Fuzzy-Kalibrierung).",
   "proto.downloadBtn": "Protokoll als JSON herunterladen",
   "proto.downloadData": "Rohdaten als CSV herunterladen",
   "proto.notReady": "Export wird freigeschaltet, sobald Kalibrierungsentscheidungen und Sensitivität dokumentiert sind.",
@@ -931,8 +960,8 @@ const de = {
 
   "info.calibAnchors.title": "Kalibrierungs-Anker (e / c / i)",
   "info.calibAnchors.body":
-    "Die drei Ankerpunkte übersetzen Rohwerte in Fuzzy-Set-Zugehörigkeit: „voll draußen“ (e) wird zu 0,05, der Kreuzungspunkt (c) zu 0,50 und „voll drinnen“ (i) zu 0,95. Die direkte Methode berechnet dazwischen eine logistische Kurve, sodass die Zugehörigkeit stetig zwischen den Ankern verläuft.",
-  "info.calibAnchors.formula": "e → 0,05 · c → 0,50 · i → 0,95",
+    "Die drei Ankerpunkte übersetzen Rohwerte in Fuzzy-Set-Zugehörigkeit: „voll draußen“ (e), Kreuzung (c) und „voll drinnen“ (i). Die direkte Methode berechnet dazwischen eine logistische Kurve (Fixpunkte etwa 0,05 / 0,50 / 0,95); die lineare Methode verbindet dieselben Anker stückweise linear. Anker sind eine inhaltliche Forschungsentscheidung, keine automatische Verteilungsdiagnose.",
+  "info.calibAnchors.formula": "e → 0,05 · c → 0,50 · i → 0,95 (direkt; linear: 0 / 0,5 / 1)",
 
   "info.solComplex.title": "Komplexe (konservative) Lösung",
   "info.solComplex.body":
@@ -1171,6 +1200,12 @@ const en: Record<DictKey, string> = {
 
   // -- Data section (dataset loaded) ------------------------------------------
   "data.reloadBtn": "Load a different dataset (CSV/XLSX)",
+  "data.saveLocal": "Save project locally",
+  "data.loadLocal": "Load local project",
+  "data.localSaved": "Saved locally.",
+  "data.localRestored": "Local project loaded.",
+  "data.localMissing": "No local project found.",
+  "data.localSaveFailed": "Local save unavailable (storage quota or private mode).",
   "data.title": "Data · {n} cases",
   "descriptives.title": "Descriptive statistics (calibrated sets)",
 
@@ -1220,7 +1255,7 @@ const en: Record<DictKey, string> = {
   "step.intro.2":
     "QCA works with sets: every case belongs to every property somewhere between 0 (clearly not in) and 1 (clearly in). Here you define which columns are conditions, which one is the outcome — and whether the values are already memberships or still need to be translated.",
   "step.intro.3":
-    "Calibration means defining the concept and target set, choosing a method (crisp / direct fuzzy / already calibrated), justifying anchors substantively, reviewing cases, and testing plausible alternatives. Raw numbers alone are not memberships.",
+    "Calibration means defining the concept and target set, choosing a method (crisp / direct or piecewise-linear fuzzy / already calibrated), justifying anchors substantively, reviewing cases, and testing plausible alternatives. Raw numbers alone are not memberships.",
   "step.intro.4":
     "Before we check combinations: is there a condition without which the outcome (almost) never occurs? That would be a necessary condition — it is reported separately.",
   "step.intro.5":
@@ -1331,12 +1366,17 @@ const en: Record<DictKey, string> = {
   "calib.method.title": "2. Calibration method",
   "calib.method.direct": "Direct (fuzzy, logistic)",
   "calib.method.crisp": "Crisp (one inclusion threshold)",
+  "calib.method.linear": "Linear (fuzzy, piecewise)",
   "calib.method.provenance": "Provenance of already calibrated values",
   "calib.method.provenancePh": "e.g. from paper X, appendix table 2; scale 0–1 …",
   "calib.method.directHelp":
     "Three qualitative anchors map to raw values and are translated logistically (Ragin 2008).",
   "calib.method.directHelpInverted":
     "Three qualitative anchors map to descending raw values when lower raw values mean more membership; the resulting curve is inverted accordingly.",
+  "calib.method.linearHelp":
+    "The same three qualitative anchors are connected with a piecewise-linear membership function; this matches QCA::calibrate(logistic = FALSE).",
+  "calib.method.linearHelpInverted":
+    "The same three qualitative anchors are connected with a piecewise-linear function when lower raw values mean more membership, then the result is inverted.",
   "calib.method.crispHelp":
     "One substantively justified inclusion boundary: raw ≥ threshold → 1, else 0 (higher raw values mean more membership).",
   "calib.method.crispHelpInverted":
@@ -1440,6 +1480,7 @@ const en: Record<DictKey, string> = {
   "calib.guide.context.outcome": "This set is the outcome being explained. Its membership is not a truth-table, frequency, consistency, or PRI cutoff.",
   "calib.guide.mode.already": "already calibrated, provenance",
   "calib.guide.mode.direct": "direct fuzzy calibration",
+  "calib.guide.mode.linear": "linear fuzzy calibration",
   "calib.guide.mode.crisp": "crisp calibration",
   "calib.guide.mode.unselected": "method not selected",
   "calib.guide.direction.high": "higher raw values increase membership",
@@ -1519,6 +1560,7 @@ const en: Record<DictKey, string> = {
   "proto.caseReviewConfirmed": "Case review confirmed",
   "proto.sensitivityReviewConfirmed": "Sensitivity review confirmed",
   "proto.method.direct": "direct fuzzy calibration (logistic)",
+  "proto.method.linear": "linear fuzzy calibration",
   "proto.method.crisp": "crisp calibration",
   "proto.method.already": "already calibrated",
   "proto.provenance": "Provenance",
@@ -1554,6 +1596,7 @@ const en: Record<DictKey, string> = {
   "tt.col.cases": "Cases",
   "tt.hint":
     "{observed} observed configurations, {remainders} remainders. OUT = 1 when n ≥ {freqCut} and consistency ≥ {consCut}.",
+  "tt.limitWarn": "The engine limits truth tables to 12 conditions (2^k rows). Reduce the conditions before continuing.",
 
   // -- Solutions --------------------------------------------------------------
   "sol.complex.title": "Complex (conservative) solution",
@@ -1596,6 +1639,21 @@ const en: Record<DictKey, string> = {
   "rob.stable": "The solution is stable across the tested cutoff range.",
   "rob.change":
     "The solution changes at cutoff {cutoff} from {from} to {to} — the cutoff choice is consequential here and should be justified.",
+  "rob.combined.explainer":
+    "This grid separates calibration alternatives from analytical cutoffs. Only explicitly documented substantive alternatives become scenarios; diagnostic shifts are not evidence.",
+  "rob.combined.scenarios": "{count} calibration scenario(s) are checked together with frequency, consistency, and PRI cutoffs.",
+  "rob.combined.stabilityTitle": "Solution-term stability",
+  "rob.combined.stabilityHint": "Share of tested cells with the same expression. Stability does not replace substantive justification.",
+  "rob.combined.solutionType": "Solution model",
+  "rob.combined.expression": "Expression",
+  "rob.combined.cells": "Cells",
+  "rob.combined.share": "Share",
+  "rob.combined.caseTitle": "Case classifications",
+  "rob.combined.caseHint": "These cases change their truth-table classification or outcome side relative to the baseline cell.",
+  "rob.combined.caseChanged": "cells changed",
+  "rob.combined.fullGrid": "Full robustness grid ({count} cells)",
+  "rob.combined.scenario": "Scenario",
+  "rob.combined.caseChanges": "Case changes",
   "rob.chart.aria":
     "Line chart of the cutoff sweep: solution consistency and solution coverage across the consistency cutoff (0.70 to 0.95).",
   "rob.chart.consistency": "Consistency",
@@ -1639,7 +1697,7 @@ const en: Record<DictKey, string> = {
   // -- Protocol ---------------------------------------------------------------
   "proto.title": "Analysis protocol",
   "proto.desc":
-    "Reproducible: calibration protocol (JSON + Markdown) and R script (QCA package, logistic = TRUE for direct method).",
+    "Reproducible: calibration protocol (JSON + Markdown) and R script (QCA package; logistic = TRUE for direct and logistic = FALSE for piecewise-linear fuzzy calibration).",
   "proto.downloadBtn": "Download protocol as JSON",
   "proto.downloadData": "Download raw data as CSV",
   "proto.notReady": "Export unlocks once calibration decisions and sensitivity review are documented.",
@@ -1884,8 +1942,8 @@ const en: Record<DictKey, string> = {
 
   "info.calibAnchors.title": "Calibration anchors (e / c / i)",
   "info.calibAnchors.body":
-    "The three anchor points translate raw values into fuzzy-set membership: “fully out” (e) maps to 0.05, the crossover point (c) to 0.50, and “fully in” (i) to 0.95. The direct method fits a logistic curve between them, so membership varies continuously between the anchors.",
-  "info.calibAnchors.formula": "e → 0,05 · c → 0,50 · i → 0,95",
+    "The three anchor points translate raw values into fuzzy-set membership: “fully out” (e), crossover (c), and “fully in” (i). The direct method uses a logistic curve between them (fixed-point values about 0.05 / 0.50 / 0.95); the linear method connects the same anchors piecewise linearly. Anchors are a substantive research decision, not an automatic distributional diagnostic.",
+  "info.calibAnchors.formula": "e → 0,05 · c → 0,50 · i → 0,95 (direct; linear: 0 / 0,5 / 1)",
 
   "info.solComplex.title": "Complex (conservative) solution",
   "info.solComplex.body":

@@ -8,7 +8,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { calibrateDirect, calibrateCrisp } from "../packages/engine/src/index.ts";
+import { calibrateDirect, calibrateLinear, calibrateCrisp } from "../packages/engine/src/index.ts";
 
 const NUM_TOL = 1e-6;
 // Ragin (2008) logistic uses log-odds ±3 at full-in/out anchors → ≈0.0474 / 0.9526.
@@ -49,6 +49,18 @@ async function main() {
     if (!ok) failed += 1;
   }
 
+  console.log("\n--- Piecewise-linear fuzzy (must match within 1e-6) ---");
+  const linear = expected.linearPiecewise;
+  const { e: linearE, c: linearC, i: linearI } = linear.thresholds;
+  for (let idx = 0; idx < linear.x.length; idx++) {
+    const got = calibrateLinear(linear.x[idx], linearE, linearC, linearI);
+    const exp = linear.membership[idx];
+    const ok = numEq(got, exp);
+    console.log(
+      `${ok ? "PASS" : "FAIL"} linear x=${linear.x[idx]} engine=${got} R=${exp}`,
+    );
+    if (!ok) failed += 1;
+  }
   console.log("\n--- Direct logistic (Ragin engine vs R QCA) ---");
   const d = expected.directLogistic;
   const { e, c, i } = d.thresholds;
@@ -66,6 +78,30 @@ async function main() {
       `${tag} direct x=${x} engine=${got.toFixed(6)} R=${Number(exp).toFixed(6)} |Δ|=${abs.toExponential(3)}`,
     );
     if (!withinDoc) failed += 1;
+  }
+
+  console.log("\n--- Direct logistic (R QCA with engine-compatible idm) ---");
+  const dEngine = expected.directLogisticEngineIdm;
+  if (!dEngine) {
+    console.log("FAIL direct engine-compatible oracle missing");
+    failed += 1;
+  } else {
+    const engineThresholds = dEngine.thresholds;
+    for (let idx = 0; idx < dEngine.x.length; idx++) {
+      const x = dEngine.x[idx];
+      const got = calibrateDirect(
+        x,
+        engineThresholds.e,
+        engineThresholds.c,
+        engineThresholds.i,
+      );
+      const exp = dEngine.membership[idx];
+      const ok = numEq(got, exp);
+      console.log(
+        `${ok ? "PASS" : "FAIL"} engine-idm direct x=${x} engine=${got.toFixed(9)} R=${Number(exp).toFixed(9)}`,
+      );
+      if (!ok) failed += 1;
+    }
   }
   notes.push(
     `Max |engine−R| on direct logistic grid: ${maxAbs}. ` +

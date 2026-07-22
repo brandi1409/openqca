@@ -77,9 +77,11 @@ function calibrationTable(
           varMeta?.[s.column]?.type === "raw"
             ? s.method === "crisp"
               ? `crisp ≥ ${s.crisp?.threshold ?? "—"}`
-              : s.direct
-                ? `direct ${s.direct.fullOut} / ${s.direct.crossover} / ${s.direct.fullIn}`
-                : "raw"
+              : s.method === "linear" && s.linear
+                ? `linear ${s.linear.fullOut} / ${s.linear.crossover} / ${s.linear.fullIn}`
+                : s.direct
+                  ? `direct ${s.direct.fullOut} / ${s.direct.crossover} / ${s.direct.fullIn}`
+                  : "raw"
             : `already ${varMeta?.[s.column]?.type ?? ""}`;
         return `<div class="set-block">
           <h3>${esc(s.set.setLabel || s.column)} <span class="hint">(${esc(role)} · ${esc(s.column)})</span></h3>
@@ -88,11 +90,13 @@ function calibrationTable(
           ${
             s.method === "direct" && s.direct
               ? `<p class="hint">Meanings — out: ${esc(s.direct.meaningFullOut || "—")}; cross: ${esc(s.direct.meaningCrossover || "—")}; in: ${esc(s.direct.meaningFullIn || "—")}</p>`
-              : s.method === "crisp" && s.crisp
-                ? `<p class="hint">Inclusion meaning: ${esc(s.crisp.meaningInclusion || "—")}</p>`
-                : s.alreadyCalibratedProvenance
-                  ? `<p class="hint">Provenance: ${esc(s.alreadyCalibratedProvenance)}</p>`
-                  : ""
+              : s.method === "linear" && s.linear
+                ? `<p class="hint">Linear anchor meanings — out: ${esc(s.linear.meaningFullOut || "—")}; cross: ${esc(s.linear.meaningCrossover || "—")}; in: ${esc(s.linear.meaningFullIn || "—")}</p>`
+                : s.method === "crisp" && s.crisp
+                  ? `<p class="hint">Inclusion meaning: ${esc(s.crisp.meaningInclusion || "—")}</p>`
+                  : s.alreadyCalibratedProvenance
+                    ? `<p class="hint">Provenance: ${esc(s.alreadyCalibratedProvenance)}</p>`
+                    : ""
           }
         </div>`;
       })

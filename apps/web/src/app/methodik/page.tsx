@@ -277,6 +277,25 @@ const FORMULA_CARDS: FormulaCardData[] = [
     code: "packages/engine/src/calibrate.ts (calibrateDirect)",
   },
   {
+    id: "calibration-linear",
+    title: "Lineare Fuzzy-Kalibrierung (stückweise)",
+    formulas: [
+      String.raw`m(x) = \begin{cases} 0 & x \le e \\[2pt] \dfrac{1}{2}\dfrac{x-e}{c-e} & e < x < c \\[6pt] \dfrac{1}{2}+\dfrac{1}{2}\dfrac{x-c}{i-c} & c \le x < i \\[6pt] 1 & x \ge i \end{cases}`,
+    ],
+    body: (
+      <p style={cardTextStyle}>
+        Verbindet dieselben drei qualitativen Anker — e (voll draußen), c
+        (Kreuzungspunkt, 0,5) und i (voll drinnen) — mit zwei linearen
+        Teilstücken. Werte außerhalb der Anker werden auf 0 bzw. 1 begrenzt;
+        bei c ergibt sich exakt 0,5. Das ist die stückweise-lineare Variante
+        von <span className="mono">QCA::calibrate(logistic = FALSE)</span>, nicht
+        eine automatische Wahl der Anker aus der Datenverteilung.
+      </p>
+    ),
+    source: "Dusa (2019), QCA with R; R-Paket QCA::calibrate(logistic = FALSE).",
+    code: "packages/engine/src/calibrate.ts (calibrateLinear)",
+  },
+  {
     id: "fuzzy-operations",
     title: "Fuzzy-Operationen (Zadeh)",
     formulas: [

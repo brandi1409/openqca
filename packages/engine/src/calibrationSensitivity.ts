@@ -107,8 +107,11 @@ export function cornerBits(values: Record<string, number>, conditions: string[])
   return conditions.map((c) => (values[c] > 0.5 ? "1" : "0")).join("");
 }
 
-function buildCasesFromVariant(
-  args: CalibrationSensitivityArgs,
+export function buildCasesFromVariant(
+  args: Pick<
+    CalibrationSensitivityArgs,
+    "caseLabels" | "valuesByColumn" | "calibrateColumns" | "conditions" | "outcome"
+  >,
   variant: AnchorVariant,
 ): QcaCase[] {
   const { caseLabels, valuesByColumn, calibrateColumns } = args;

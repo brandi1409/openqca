@@ -123,6 +123,22 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
       );
     }
     await page.getByTestId("calibration-method-confirm").click();
+    const sensitivityLabels = page.locator('[data-testid^="calibration-sensitivity-label-"]');
+    while (await sensitivityLabels.count() < 2) {
+      await page.getByTestId("calibration-sensitivity-add").click();
+      await expect(
+        page.getByTestId(`calibration-sensitivity-label-${(await sensitivityLabels.count()) - 1}`),
+      ).toBeVisible();
+    }
+    for (const [index, delta] of [-5, 5].entries()) {
+      await page.getByTestId(`calibration-sensitivity-label-${index}`).fill(
+        `Crossover alternative ${delta > 0 ? "higher" : "lower"}`,
+      );
+      await page.getByTestId(`calibration-sensitivity-delta-${index}`).fill(String(delta));
+      await page.getByTestId(`calibration-sensitivity-rationale-${index}`).fill(
+        "Substantive alternative recorded for this calibration decision.",
+      );
+    }
     const caseReview = page.getByTestId("calibration-case-review");
     if (!(await caseReview.isChecked())) await caseReview.check();
     const sensitivityReview = page.getByTestId("calibration-sensitivity-review");
@@ -138,9 +154,11 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   await expect(page.getByTestId("calibration-crisp-threshold")).toBeVisible();
   await completeCurrentVariable(["set", "method", "threshold"]);
 
-  // A second fuzzy condition remains directly calibrated.
+  // A second fuzzy condition uses the independently validated piecewise-linear path.
   await page.getByRole("button", { name: /ALPHABETISIERUNG/ }).click();
-  await expect(page.getByTestId("calibration-mapping-direct")).toBeVisible();
+  await page.getByTestId("calibration-method-linear").click();
+  await expect(page.getByTestId("calibration-mapping-linear")).toBeVisible();
+  await expect(page.getByTestId("calibration-mapping-direct")).toHaveCount(0);
   await completeCurrentVariable(["set", "method", "fullOut", "crossover", "fullIn"]);
 
   // Outcome calibration remains a separate set decision and keeps its own
@@ -159,10 +177,17 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   await expect(protocol.locator("pre")).toContainText("10.7208/chicago/9780226702797.001.0001");
   await expect(protocol.locator("pre")).toContainText("solution_sensitivity_");
   await expect(protocol.locator("pre")).toContainText("parse_openqca_number");
+  await expect(protocol.locator("pre")).toContainText("logistic = FALSE");
+  const protocolText = await protocol.locator("pre").innerText();
+  expect(protocolText).toMatch(
+    /analysis_sensitivity_ALPHABETISIERUNG_[\s\S]*?calibrate\(parse_openqca_number\(analysis_raw\[\["ALPHABETISIERUNG"\]\]\)[\s\S]*?logistic = FALSE/,
+  );
   await expect(protocol.locator("pre")).toContainText(
     "calibrate(parse_openqca_number(analysis_raw",
   );
   await expect(protocol.locator("pre")).toContainText("minimize(tt_sensitivity_");
+  await expect(protocol.locator("pre")).toContainText("Combined robustness grid");
+  await expect(protocol.locator("pre")).toContainText("robustness_pri_cuts");
   const jsonButton = protocol.getByRole("button", { name: /Protokoll als JSON herunterladen/ });
   const jsonDownload = page.waitForEvent("download");
   await jsonButton.click();
@@ -175,6 +200,12 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
       baseFit: { consistency: number; coverage: number };
       variantFit: { consistency: number; coverage: number };
     }[];
+    robustness: {
+      totalCells: number;
+      cells: unknown[];
+      caseStability: unknown[];
+      baseline: { scenarioId: string; freqCut: number; consCut: number; priCut: number | null };
+    } | null;
     sets: { column: string; method?: string }[];
     transformations: {
       rowIndex: number;
@@ -197,11 +228,21 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
       }),
     ]),
   );
+  expect(jsonPayload.robustness?.baseline).toMatchObject({
+    scenarioId: "base",
+    freqCut: 1,
+    consCut: 0.8,
+    priCut: null,
+  });
   expect(jsonPayload.sensitivitySummary.length).toBeGreaterThan(0);
+  expect(jsonPayload.robustness).not.toBeNull();
+  expect(jsonPayload.robustness?.totalCells).toBeGreaterThan(0);
+  expect(jsonPayload.robustness?.cells.length).toBe(jsonPayload.robustness?.totalCells);
   expect(jsonPayload.sets).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ column: "INDUSTRIEANTEIL", method: "crisp" }),
       expect.objectContaining({ column: "DEMOKRATIE_INDEX", method: "direct" }),
+      expect.objectContaining({ column: "ALPHABETISIERUNG", method: "linear" }),
     ]),
   );
   expect(jsonPayload.analysis).toMatchObject({
@@ -234,6 +275,24 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   expect(markdownText).not.toContain("Protocol ready");
   expect(markdownText).toContain("A Robustness Test Protocol for Applied QCA");
   expect(markdownFile.suggestedFilename()).toBe("openqca-calibration-protocol.md");
+
+  await page.getByRole("button", { name: "Projekt lokal speichern" }).click();
+  await expect(page.getByText("Lokal gespeichert.")).toBeVisible();
+  await page.reload();
+  const restoredProtocol = page.locator("#protokoll");
+  await expect(restoredProtocol.locator("pre")).toContainText("sessionInfo()");
+  const restoredJsonDownload = page.waitForEvent("download");
+  await restoredProtocol.getByRole("button", { name: /Protokoll als JSON herunterladen/ }).click();
+  const restoredJsonFile = await restoredJsonDownload;
+  const restoredJsonPath = await restoredJsonFile.path();
+  if (!restoredJsonPath) throw new Error("Restored JSON export path missing");
+  const restoredJson = JSON.parse(await readFile(restoredJsonPath, "utf8")) as {
+    transformations: { rowIndex: number }[];
+    robustness: { totalCells: number } | null;
+  };
+  expect(restoredJson.transformations.length).toBeGreaterThan(0);
+  expect(restoredJson.transformations[0]?.rowIndex).toBe(0);
+  expect(restoredJson.robustness?.totalCells).toBeGreaterThan(0);
 
   await page.getByTestId("truth-table-consistency-cut").fill("0.81");
   await expect(protocol.getByRole("button", { name: /Protokoll als JSON herunterladen/ })).toBeDisabled();
@@ -292,4 +351,36 @@ test("A2.13 Evidence gate and method reset stay explicit", async ({ page }) => {
   await expect(page.getByTestId("calibration-active-context")).toContainText(/This set explains/i);
   await expect(page.getByTestId("calibration-evidence-coverage")).toContainText(/Evidence coverage/i);
   await expect(page.getByTestId("calibration-substepper")).toContainText(/Define set/i);
+});
+
+test("A2.14 Local project persistence survives reload", async ({ page }) => {
+  await loadExample(page, /Fuzzy-Sets Beispiel/);
+
+  const saveButton = page.getByRole("button", { name: "Projekt lokal speichern" });
+  const loadButton = page.getByRole("button", { name: "Lokales Projekt laden" });
+  await expect(saveButton).toBeEnabled();
+  await saveButton.click();
+  await expect(page.getByText("Lokal gespeichert.")).toBeVisible();
+  await page.reload();
+  await expect(page.locator("#deskriptiv")).toBeVisible({ timeout: 15_000 });
+  await expect(loadButton).toBeVisible();
+  await expect(page.getByText("Lokales Projekt geladen.")).toBeVisible();
+  await page.evaluate(() => localStorage.removeItem("openqca_local_project"));
+});
+
+test("A2.15 Calibration provenance and missing policy survive reload", async ({ page }) => {
+  await loadRawRohwerte(page);
+  await page.getByRole("button", { name: /Lehr-Seed anwenden/ }).click();
+  await page.getByTestId("calibration-missing-policy").selectOption("leave_unresolved");
+  await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustrative teaching seed/i);
+
+  await page.getByRole("button", { name: "Projekt lokal speichern" }).click();
+  await expect(page.getByText("Lokal gespeichert.")).toBeVisible();
+  await page.reload();
+
+  await expect(page.getByTestId("calibration-variable-BIP_pKopf")).toBeVisible();
+  await expect(page.getByLabel("Set-Bezeichnung")).toHaveValue("Relatively wealthy countries");
+  await expect(page.getByTestId("calibration-missing-policy")).toHaveValue("leave_unresolved");
+  await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustrative teaching seed/i);
+  await page.evaluate(() => localStorage.removeItem("openqca_local_project"));
 });

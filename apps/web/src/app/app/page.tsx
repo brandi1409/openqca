@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildTruthTable,
   complexSolution,
   parsimoniousSolution,
   intermediateSolution,
   necessityAnalysis,
+  runCombinedRobustnessGrid,
   type TruthTableResult,
   type Expectation,
+  type RobustnessScenario,
+  type CombinedRobustnessResult,
 } from "@openqca/engine";
 import { DEMO, type RawDataset } from "@/lib/demo";
 import { parseCsv } from "@/lib/csv";
@@ -41,7 +44,9 @@ import {
   type CalibSpecs,
 } from "@/lib/calibration-model";
 import { numericColumns, numericValues } from "@/lib/dataset-columns";
+import { readLocalProject, writeLocalProject } from "@/lib/project-storage";
 import {
+  buildRobustnessScenarios,
   buildSensitivityBundle,
   evaluateCalibration,
   type CalibrationEvaluation,
@@ -152,7 +157,7 @@ function deriveVarMeta(ds: RawDataset): Record<string, VarMeta> {
   return meta;
 }
 
-/** Anker nur der Roh-Variablen mit gültiger direkter Kalibrierung — für Bericht. */
+/** Legacy ascending anchors for active raw fuzzy calibrations — used by report fallbacks. */
 function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, calibSpecs: CalibSpecs): Anchors {
   return anchorsFromSpecs(
     Object.fromEntries(
@@ -160,8 +165,8 @@ function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, calibSpe
         ([col, s]) =>
           varMeta[col]?.type === "raw" &&
           varMeta[col]?.role !== "ignore" &&
-          s.method === "direct" &&
-          s.direct,
+          (s.method === "direct" || s.method === "linear") &&
+          (s.direct || s.linear),
       ),
     ),
   );
@@ -184,8 +189,10 @@ export default function Home() {
   const [expectations, setExpectations] = useState<Record<string, Expectation>>({});
   // Geführte Beispiel-Tour: null = aus, sonst Index der aktiven Station.
   const [tourStep, setTourStep] = useState<number | null>(null);
+  const [localProjectStatus, setLocalProjectStatus] = useState("");
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const localRestoreRef = useRef(false);
 
   const tourSteps: GuidedTourStep[] = useMemo(
     () => [
@@ -223,10 +230,12 @@ export default function Home() {
         if (!s.set.definition.trim()) {
           s.set.definition = `Membership in the set «${col}» (provisional placeholder — replace with a substantive definition).`;
         }
-        if (s.method === "direct" && s.direct) {
-          if (!s.direct.meaningFullOut.trim()) s.direct.meaningFullOut = "Clearly out of the set (provisional)";
-          if (!s.direct.meaningCrossover.trim()) s.direct.meaningCrossover = "Maximum ambiguity (provisional)";
-          if (!s.direct.meaningFullIn.trim()) s.direct.meaningFullIn = "Clearly in the set (provisional)";
+        const fuzzyAnchors =
+          s.method === "direct" ? s.direct : s.method === "linear" ? s.linear : undefined;
+        if (fuzzyAnchors) {
+          if (!fuzzyAnchors.meaningFullOut.trim()) fuzzyAnchors.meaningFullOut = "Clearly out of the set (provisional)";
+          if (!fuzzyAnchors.meaningCrossover.trim()) fuzzyAnchors.meaningCrossover = "Maximum ambiguity (provisional)";
+          if (!fuzzyAnchors.meaningFullIn.trim()) fuzzyAnchors.meaningFullIn = "Clearly in the set (provisional)";
         }
         specs[col] = {
           ...s,
@@ -270,6 +279,21 @@ export default function Home() {
   function endTour() {
     setTourStep(null);
   }
+
+  // Local-first restore: an explicit demo deep-link always wins over a saved project.
+  useEffect(() => {
+    if (localRestoreRef.current) return;
+    localRestoreRef.current = true;
+    if (new URLSearchParams(window.location.search).get("demo") === "1") return;
+    const saved = readLocalProject();
+    if (!saved) return;
+    startTransition(() => {
+      loadState(saved.state);
+      setLocalProjectStatus(t(locale, "data.localRestored"));
+    });
+    // Restore only once per mount; state changes are handled by the autosave effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Deep-Link von der Landing: /app?demo=1 lädt sofort den Demo-Datensatz.
   // Der Parameter wird danach entfernt, damit ein Reload nicht erneut lädt.
@@ -335,6 +359,30 @@ export default function Home() {
     setFocusVar(firstRawFocus(s.dataset, meta));
   }
 
+  function saveLocalProject() {
+    if (!ds) return;
+    setLocalProjectStatus(
+      writeLocalProject(currentState())
+        ? t(locale, "data.localSaved")
+        : t(locale, "data.localSaveFailed"),
+    );
+  }
+
+  function restoreLocalProject() {
+    const saved = readLocalProject();
+    if (!saved) {
+      setLocalProjectStatus(t(locale, "data.localMissing"));
+      return;
+    }
+    loadState(saved.state);
+    setLocalProjectStatus(t(locale, "data.localRestored"));
+  }
+
+  useEffect(() => {
+    if (!ds || demoMode) return;
+    writeLocalProject({ dataset: ds, anchors, varMeta, calibSpecs, demoMode, freqCut, consCut });
+  }, [anchors, calibSpecs, consCut, demoMode, ds, freqCut, varMeta]);
+
   // Berechnungskette: crisp/fuzzy → Wert unverändert; raw → calibrateValue per CalibrationSpec.
   // Fälle mit NaN in genutzten Spalten werden für TT/Lösungen ausgeschlossen.
   const evaluation: CalibrationEvaluation = useMemo(
@@ -389,20 +437,82 @@ export default function Home() {
     }
   }, [ds, cases, conditions, outcome, freqCut, consCut]);
   const sensitivity: SensitivityBundle = useMemo(
-    () =>
-      ds
-        ? buildSensitivityBundle({
-            ds,
-            varMeta,
-            calibSpecs,
-            conditions,
-            outcome,
-            freqCut,
-            consCut,
-          })
-        : { resultsByColumn: {}, variantsByColumn: {} },
+    () => {
+      if (!ds || conditions.length > 12) {
+        return { resultsByColumn: {}, variantsByColumn: {} };
+      }
+      return buildSensitivityBundle({
+        ds,
+        varMeta,
+        calibSpecs,
+        conditions,
+        outcome,
+        freqCut,
+        consCut,
+      });
+    },
     [ds, varMeta, calibSpecs, conditions, outcome, freqCut, consCut],
   );
+  const robustnessScenarios: RobustnessScenario[] = useMemo(() => {
+    if (
+      !ds ||
+      conditions.length > 12 ||
+      conditions.length < 1 ||
+      !outcome ||
+      conditions.includes(outcome)
+    ) {
+      return [];
+    }
+    try {
+      const scenarios = buildRobustnessScenarios({
+        ds,
+        varMeta,
+        calibSpecs,
+        conditions,
+        outcome,
+      });
+      return scenarios[0]?.cases.length
+        ? scenarios
+        : cases.length
+          ? [{
+              id: "base",
+              label: "Basis-Kalibrierung",
+              cases,
+            }]
+          : [];
+    } catch {
+      return cases.length
+        ? [{ id: "base", label: "Basis-Kalibrierung", cases }]
+        : [];
+    }
+  }, [ds, varMeta, calibSpecs, conditions, outcome, cases]);
+  const robustnessResult: CombinedRobustnessResult | null = useMemo(() => {
+    if (!robustnessScenarios.length || conditions.length < 1 || !outcome) return null;
+    const robustnessFreqCuts = [
+      ...new Set([Math.max(1, freqCut - 1), freqCut, freqCut + 1]),
+    ].sort((a, b) => a - b);
+    const robustnessConsCuts = [
+      ...new Set([0.7, 0.8, 0.9, 0.95, consCut]),
+    ]
+      .filter((cut) => cut >= 0 && cut <= 1)
+      .sort((a, b) => a - b);
+    try {
+      return runCombinedRobustnessGrid({
+        scenarios: robustnessScenarios,
+        conditions,
+        outcome,
+        freqCuts: robustnessFreqCuts,
+        consCuts: robustnessConsCuts,
+        priCuts: [null, 0.5, 0.75],
+        baseline: { scenarioId: "base", freqCut, consCut, priCut: null },
+        expectations: Object.fromEntries(
+          conditions.map((condition) => [condition, expectations[condition] ?? "present"]),
+        ),
+      });
+    } catch {
+      return null;
+    }
+  }, [conditions, consCut, expectations, freqCut, outcome, robustnessScenarios]);
 
   // Notwendigkeitsanalyse hängt methodisch NUR von conditions/outcome/cases ab
   // (nicht von der Truth Table) — sie gehört vor die Suffizienzanalyse.
@@ -572,7 +682,10 @@ export default function Home() {
             <DataSection ds={ds} />
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, margin: "-8px 0 18px" }}>
               <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
+              <Button disabled={!ds} onClick={saveLocalProject}>{t(locale, "data.saveLocal")}</Button>
+              <Button onClick={restoreLocalProject}>{t(locale, "data.loadLocal")}</Button>
               <CloudSaveLoad getState={currentState} onLoad={loadState} />
+              {localProjectStatus && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{localProjectStatus}</span>}
             </div>
           </>
         )}
@@ -639,6 +752,7 @@ export default function Home() {
           consCut={consCut}
           setConsCut={setConsCut}
           tt={tt}
+          conditionCount={conditions.length}
         />
         {sol && tt && (
           <SolutionSection
@@ -664,7 +778,18 @@ export default function Home() {
                   body={t(locale, "info.robustness.body")}
                 />
               </div>
-              <RobustnessPanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} currentConsCut={consCut} />
+              <RobustnessPanel
+                cases={cases}
+                robustness={robustnessResult}
+                scenarios={robustnessScenarios}
+                conditions={conditions}
+                outcome={outcome}
+                freqCut={freqCut}
+                currentConsCut={consCut}
+                expectations={Object.fromEntries(
+                  conditions.map((condition) => [condition, expectations[condition] ?? "present"]),
+                )}
+              />
             </Card>
             {/* Panel bringt eigene Karte + Überschrift mit — nicht doppelt verpacken. */}
             <div id="negiert" style={{ scrollMarginTop: 56 }}>
@@ -699,6 +824,7 @@ export default function Home() {
               consCut={consCut}
               evaluation={evaluation}
               sensitivity={sensitivity}
+              robustness={robustnessResult}
               researchReady={calibrationResearchReady}
             />
             <Card>
@@ -1053,9 +1179,10 @@ function TruthTableSection(props: {
   consCut: number;
   setConsCut: (n: number) => void;
   tt: TruthTableResult | null;
+  conditionCount: number;
 }) {
   const [locale] = useLocale();
-  const { freqCut, setFreqCut, consCut, setConsCut, tt } = props;
+  const { freqCut, setFreqCut, consCut, setConsCut, tt, conditionCount } = props;
   const observed = tt
     ? tt.rows
         .filter((r) => r.n > 0)
@@ -1072,6 +1199,11 @@ function TruthTableSection(props: {
           {t(locale, "tt.rolesLink")}
         </a>
       </p>
+      {conditionCount > 12 && (
+        <p className="hint" style={{ ...hintStyle, color: "var(--bad)", marginTop: 0 }}>
+          {t(locale, "tt.limitWarn", { n: conditionCount })}
+        </p>
+      )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "end" }}>
         <Field
           label={
@@ -1378,6 +1510,7 @@ function ProtocolSection({
   consCut,
   evaluation,
   sensitivity,
+  robustness,
   researchReady,
 }: {
   ds: RawDataset;
@@ -1389,6 +1522,7 @@ function ProtocolSection({
   consCut: number;
   evaluation: CalibrationEvaluation;
   sensitivity: SensitivityBundle;
+  robustness: CombinedRobustnessResult | null;
   researchReady: boolean;
 }) {
   const [locale] = useLocale();
@@ -1403,8 +1537,9 @@ function ProtocolSection({
         freqCut,
         consCut,
         sensitivity,
+        robustness,
       }),
-    [ds, calibSpecs, varMeta, conditions, outcome, freqCut, consCut, sensitivity],
+    [ds, calibSpecs, varMeta, conditions, outcome, freqCut, consCut, sensitivity, robustness],
   );
 
   function downloadJson() {
@@ -1418,6 +1553,7 @@ function ProtocolSection({
       consCut,
       evaluation,
       sensitivity,
+      robustness,
     });
     downloadText(
       "openqca-calibration-protocol.json",
@@ -1442,6 +1578,7 @@ function ProtocolSection({
       outcome,
       evaluation,
       sensitivity,
+      robustness,
       freqCut,
       consCut,
       locale,

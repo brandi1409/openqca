@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   calibrateDirect,
+  calibrateLinear,
   calibrateCrisp,
   calibrateFourValue,
   calibrate,
@@ -17,6 +18,14 @@ const approx = (a: number, b: number, eps = 1e-4) =>
 
 test("direkte Methode: Kreuzungspunkt bildet exakt auf 0,5 ab", () => {
   assert.equal(calibrateDirect(85, 60, 85, 98), 0.5);
+});
+
+test("lineare Methode: drei Anker bilden eine stückweise lineare Kurve", () => {
+  assert.equal(calibrateLinear(60, 60, 85, 98), 0);
+  assert.equal(calibrateLinear(85, 60, 85, 98), 0.5);
+  assert.equal(calibrateLinear(98, 60, 85, 98), 1);
+  approx(calibrateLinear(72.5, 60, 85, 98), 0.25);
+  approx(calibrateLinear(91.5, 60, 85, 98), 0.75);
 });
 
 test("direkte Methode: Ragins Fixpunkte an den Ankern (0,9526 / 0,0474)", () => {
@@ -77,10 +86,27 @@ test("Dispatch calibrate() deckt sich mit den Einzelfunktionen", () => {
   );
 });
 
+test("Dispatch calibrate() supports linear fuzzy calibration", () => {
+  assert.equal(
+    calibrate(91.5, "linear", [60, 85, 98]),
+    calibrateLinear(91.5, 60, 85, 98),
+  );
+});
+
 test("calibrateValue: Inversion liefert 1 − direct", () => {
   const base = calibrateDirect(900, 300, 600, 1000);
   const inv = calibrateValue(900, {
     method: "direct",
+    thresholds: [300, 600, 1000],
+    highIsMembership: false,
+  });
+  approx(inv, 1 - base);
+});
+
+test("calibrateValue: Inversion liefert 1 − linear", () => {
+  const base = calibrateLinear(750, 300, 600, 1000);
+  const inv = calibrateValue(750, {
+    method: "linear",
     thresholds: [300, 600, 1000],
     highIsMembership: false,
   });
