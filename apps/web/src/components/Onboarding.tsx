@@ -37,12 +37,15 @@ export function Onboarding({ onDismiss }: OnboardingProps) {
   const STEPS = steps(locale);
 
   useEffect(() => {
-    try {
-      if (window.localStorage.getItem(STORAGE_KEY) !== "1") setVisible(true);
-    } catch {
-      // localStorage nicht verfügbar (z. B. Privatmodus) → Einführung zeigen
-      setVisible(true);
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        if (window.localStorage.getItem(STORAGE_KEY) !== "1") setVisible(true);
+      } catch {
+        // localStorage nicht verfügbar (z. B. Privatmodus) → Einführung zeigen
+        setVisible(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function dismiss() {

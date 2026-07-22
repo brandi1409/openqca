@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import "katex/dist/katex.min.css";
 import { renderMarkdown } from "@/lib/markdown";
 import { Formula } from "@/lib/formulas";
+import { METHODOLOGY_REFERENCES } from "@/lib/protocol-export";
 
 export const metadata: Metadata = {
   title: "Methodik — openQCA",
@@ -98,6 +99,19 @@ function FormulaReference() {
             Dușa, A. (2019). <em>QCA with R: A Comprehensive Resource</em>.
             Springer.
           </li>
+        </ul>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>Verifizierte Referenzen für Kalibrierung und Robustheit</h3>
+        <ul style={literatureListStyle}>
+          {METHODOLOGY_REFERENCES.map((reference) => (
+            <li key={reference.id}>
+              {reference.citation}
+              {reference.pages ? `, S. ${reference.pages}` : ""}.{" "}
+              {reference.scope}.{" "}
+              <a href={reference.url} target="_blank" rel="noreferrer">
+                {reference.doi ? `DOI: ${reference.doi}` : reference.url}
+              </a>
+            </li>
+          ))}
         </ul>
       </div>
     </section>
@@ -218,7 +232,7 @@ const cardMetaStyle: CSSProperties = {
   paddingTop: 10,
   borderTop: "1px solid var(--line-soft)",
   color: "var(--muted)",
-  fontSize: 12.5,
+  fontSize: 13.5,
   lineHeight: 1.6,
 };
 

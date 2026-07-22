@@ -14,8 +14,10 @@ alter table public.profiles enable row level security;
 
 create policy "Profile: eigene lesen" on public.profiles
   for select using (auth.uid() = user_id);
+
 create policy "Profile: eigene ändern" on public.profiles
   for update using (auth.uid() = user_id);
+
 create policy "Profile: eigene anlegen" on public.profiles
   for insert with check (auth.uid() = user_id);
 
@@ -30,6 +32,7 @@ end;
 $$;
 
 drop trigger if exists on_auth_user_created on auth.users;
+
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
@@ -48,10 +51,13 @@ alter table public.projects enable row level security;
 
 create policy "Projekte: eigene lesen" on public.projects
   for select using (auth.uid() = user_id);
+
 create policy "Projekte: eigene anlegen" on public.projects
   for insert with check (auth.uid() = user_id);
+
 create policy "Projekte: eigene ändern" on public.projects
   for update using (auth.uid() = user_id);
+
 create policy "Projekte: eigene löschen" on public.projects
   for delete using (auth.uid() = user_id);
 
@@ -65,6 +71,7 @@ end;
 $$;
 
 drop trigger if exists projects_touch_updated_at on public.projects;
+
 create trigger projects_touch_updated_at
   before update on public.projects
   for each row execute function public.touch_updated_at();

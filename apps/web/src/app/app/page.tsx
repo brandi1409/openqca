@@ -1,21 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
-  calibrateDirect,
   buildTruthTable,
   complexSolution,
   parsimoniousSolution,
   intermediateSolution,
   necessityAnalysis,
-  type QcaCase,
   type TruthTableResult,
   type Expectation,
 } from "@openqca/engine";
 import { DEMO, type RawDataset } from "@/lib/demo";
 import { parseCsv } from "@/lib/csv";
 import { parseXlsxToDataset } from "@/lib/xlsx";
-import { AiAssist } from "@/components/AiAssist";
 import { AccountButton, CloudSaveLoad } from "@/components/cloud";
 import { XyPlot } from "@/components/XyPlot";
 import { Descriptives } from "@/components/Descriptives";
@@ -32,8 +30,31 @@ import { useLocale } from "@/i18n/locale";
 import { t, type DictKey } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { InfoHint } from "@/components/InfoHint";
-import { ChartFrame } from "@/components/ChartFrame";
 import { Kpi as UiKpi, SectionHeading } from "@/components/ui";
+import { CalibrationWorkbench } from "@/components/calibration/CalibrationWorkbench";
+import {
+  anchorsFromSpecs,
+  migrateSpecsFromAnchors,
+  specIsAnalysisReady,
+  specIsComputable,
+  specIsProtocolReady,
+  type CalibSpecs,
+} from "@/lib/calibration-model";
+import { numericColumns, numericValues } from "@/lib/dataset-columns";
+import {
+  buildSensitivityBundle,
+  evaluateCalibration,
+  type CalibrationEvaluation,
+  type SensitivityBundle,
+} from "@/lib/calibration-analysis";
+import {
+  buildRScript,
+  buildRawCsv,
+  buildCalibrationProtocolJson,
+  buildCalibrationNarrative,
+  downloadText,
+  RAW_DATA_FILENAME,
+} from "@/lib/protocol-export";
 
 /** Datenart je numerischer Spalte: Rohwert (muss kalibriert werden), bereits Fuzzy, oder Crisp. */
 type VarType = "raw" | "fuzzy" | "crisp";
@@ -48,6 +69,8 @@ interface SavedState {
   dataset: RawDataset;
   anchors: Anchors;
   varMeta?: Record<string, VarMeta>;
+  calibSpecs?: CalibSpecs;
+  demoMode?: boolean;
   // Ältere Speicherstände hielten Bedingungen/Outcome (mit fs_-Präfix) direkt —
   // werden beim Laden bewusst ignoriert und aus varMeta neu abgeleitet.
   conditions?: string[];
@@ -74,16 +97,8 @@ function statusOf(unlocked: boolean, done: boolean): StepStatus {
   return done ? "done" : "active";
 }
 
-function numericCols(ds: RawDataset): string[] {
-  return ds.columns.filter(
-    (c) => c !== ds.caseCol && ds.rows.every((r) => typeof r[c] === "number"),
-  );
-}
 
 /** Numerische Werte einer Spalte (NaN herausgefiltert). */
-function colNumericValues(ds: RawDataset, col: string): number[] {
-  return ds.rows.map((r) => Number(r[col])).filter((v) => !Number.isNaN(v));
-}
 
 /**
  * Datenart einer numerischen Spalte automatisch erkennen:
@@ -99,29 +114,30 @@ function detectVarType(values: number[]): VarType {
   return allUnit ? "fuzzy" : "raw";
 }
 
-/** Anker strikt aufsteigend? Nur dann ist calibrateDirect definiert (wirft sonst). */
-function anchorsAscending(a: [number, number, number] | undefined): boolean {
-  return !!a && a[0] < a[1] && a[1] < a[2];
-}
 
 /**
- * Ist eine Spalte mit ihrer (ggf. übersteuerten) Datenart als Set nutzbar?
- * crisp verlangt Werte ∈ {0,1}, fuzzy Werte ∈ [0,1], raw aufsteigende Anker.
+ * Ist eine Spalte mit Datenart + Kalibrierungsspezifikation als Set nutzbar?
  */
-function isColUsable(type: VarType, values: number[], anchors: Anchors, col: string): boolean {
+function isColUsable(
+  type: VarType,
+  values: number[],
+  col: string,
+  calibSpecs: CalibSpecs,
+): boolean {
+  if (!specIsComputable(calibSpecs[col], type)) return false;
   if (type === "crisp") return values.every((v) => v === 0 || v === 1);
   if (type === "fuzzy") return values.every((v) => v >= 0 && v <= 1);
-  return anchorsAscending(anchors[col]);
+  return true;
 }
 
 /** Auto-Ableitung des Variablen-Metamodells: Datenart erkennen, Rollen heuristisch vorbelegen. */
 function deriveVarMeta(ds: RawDataset): Record<string, VarMeta> {
-  const cols = numericCols(ds);
+  const cols = numericColumns(ds);
   const meta: Record<string, VarMeta> = {};
   const outcomeCol = cols.length ? cols[cols.length - 1] : "";
   let conditionBudget = 3;
   cols.forEach((col) => {
-    const type = detectVarType(colNumericValues(ds, col));
+    const type = detectVarType(numericValues(ds, col));
     let role: VarRole;
     if (col === outcomeCol) {
       role = "outcome";
@@ -136,19 +152,30 @@ function deriveVarMeta(ds: RawDataset): Record<string, VarMeta> {
   return meta;
 }
 
-/** Anker nur der Roh-Variablen mit gültiger (aufsteigender) Kalibrierung — für Bericht & R-Skript. */
-function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, anchors: Anchors): Anchors {
-  const out: Anchors = {};
-  for (const col of numericCols(ds)) {
-    if (varMeta[col]?.type === "raw" && anchorsAscending(anchors[col])) out[col] = anchors[col];
-  }
-  return out;
+/** Anker nur der Roh-Variablen mit gültiger direkter Kalibrierung — für Bericht. */
+function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, calibSpecs: CalibSpecs): Anchors {
+  return anchorsFromSpecs(
+    Object.fromEntries(
+      Object.entries(calibSpecs).filter(
+        ([col, s]) =>
+          varMeta[col]?.type === "raw" &&
+          varMeta[col]?.role !== "ignore" &&
+          s.method === "direct" &&
+          s.direct,
+      ),
+    ),
+  );
 }
 
 export default function Home() {
   const [locale] = useLocale();
   const [ds, setDs] = useState<RawDataset | null>(null);
   const [anchors, setAnchors] = useState<Anchors>({});
+  const [calibSpecs, setCalibSpecs] = useState<CalibSpecs>({});
+  // Synthetic demo data may illustrate the full calculation chain, but it is
+  // never treated as a research-ready export.
+  const [demoMode, setDemoMode] = useState(false);
+  const [calibMigrateBanner, setCalibMigrateBanner] = useState(false);
   const [varMeta, setVarMeta] = useState<Record<string, VarMeta>>({});
   const [focusVar, setFocusVar] = useState<string>("");
   const [freqCut, setFreqCut] = useState(1);
@@ -175,20 +202,62 @@ export default function Home() {
 
   function firstRawFocus(dataset: RawDataset, meta: Record<string, VarMeta>): string {
     return (
-      numericCols(dataset).find((c) => meta[c]?.type === "raw" && meta[c]?.role !== "ignore") ?? ""
+      numericColumns(dataset).find((c) => meta[c]?.type === "raw" && meta[c]?.role !== "ignore") ?? ""
     );
   }
 
-  function applyDataset(dataset: RawDataset) {
+  function applyDataset(dataset: RawDataset, options: { demo?: boolean } = {}) {
+    setDemoMode(options.demo === true);
     setDs(dataset);
     setAnchors({ ...dataset.anchors });
     const meta = deriveVarMeta(dataset);
     setVarMeta(meta);
+    const cols = numericColumns(dataset);
+    const specs = migrateSpecsFromAnchors(cols, dataset.anchors);
+    for (const col of cols) {
+      const m = meta[col];
+      if (!m) continue;
+      if (m.type === "raw") {
+        const s = specs[col];
+        if (!s.set.setLabel.trim()) s.set.setLabel = col;
+        if (!s.set.definition.trim()) {
+          s.set.definition = `Membership in the set «${col}» (provisional placeholder — replace with a substantive definition).`;
+        }
+        if (s.method === "direct" && s.direct) {
+          if (!s.direct.meaningFullOut.trim()) s.direct.meaningFullOut = "Clearly out of the set (provisional)";
+          if (!s.direct.meaningCrossover.trim()) s.direct.meaningCrossover = "Maximum ambiguity (provisional)";
+          if (!s.direct.meaningFullIn.trim()) s.direct.meaningFullIn = "Clearly in the set (provisional)";
+        }
+        specs[col] = {
+          ...s,
+          provisionalDefaults: true,
+          status: s.status === "unresolved" ? "provisional" : s.status,
+        };
+        continue;
+      }
+      specs[col] = {
+        ...specs[col],
+        method: undefined,
+        alreadyCalibratedProvenance: specs[col].alreadyCalibratedProvenance?.trim() ||
+          `Already calibrated ${m.type} values from «${dataset.name}» (confirm provenance before publication).`,
+        set: {
+          ...specs[col].set,
+          setLabel: specs[col].set.setLabel || col,
+          definition:
+            specs[col].set.definition ||
+            `Pre-calibrated membership for «${col}» (provisional — document original calibration).`,
+        },
+        provisionalDefaults: true,
+        status: specs[col].status === "unresolved" ? "provisional" : specs[col].status,
+      };
+    }
+    setCalibSpecs(specs);
+    setCalibMigrateBanner(false);
     setFocusVar(firstRawFocus(dataset, meta));
   }
 
   function loadDemo() {
-    applyDataset(DEMO);
+    applyDataset(DEMO, { demo: true });
   }
 
   function startTour() {
@@ -207,10 +276,11 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("demo") !== "1") return;
-    applyDataset(DEMO);
+    const timer = window.setTimeout(() => applyDataset(DEMO, { demo: true }), 0);
     params.delete("demo");
     const qs = params.toString();
     window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -243,11 +313,12 @@ export default function Home() {
   }
 
   function currentState(): SavedState {
-    return { dataset: ds!, anchors, varMeta, freqCut, consCut };
+    return { dataset: ds!, anchors, varMeta, calibSpecs, demoMode, freqCut, consCut };
   }
   function loadState(raw: unknown) {
     const s = raw as SavedState;
     if (!s?.dataset) return;
+    setDemoMode(s.demoMode === true);
     setDs(s.dataset);
     setAnchors(s.anchors ?? {});
     // Fehlt das Variablen-Metamodell (alter Speicherstand), neu ableiten;
@@ -255,37 +326,48 @@ export default function Home() {
     const meta =
       s.varMeta && Object.keys(s.varMeta).length > 0 ? s.varMeta : deriveVarMeta(s.dataset);
     setVarMeta(meta);
+    const cols = numericColumns(s.dataset);
+    const hadSpecs = !!(s.calibSpecs && Object.keys(s.calibSpecs).length > 0);
+    setCalibSpecs(migrateSpecsFromAnchors(cols, s.anchors ?? s.dataset.anchors ?? {}, s.calibSpecs));
+    setCalibMigrateBanner(!hadSpecs);
     setFreqCut(s.freqCut ?? 1);
     setConsCut(s.consCut ?? 0.8);
     setFocusVar(firstRawFocus(s.dataset, meta));
   }
 
-  // Berechnungskette: Schlüssel = Spaltenname (kein fs_-Präfix). crisp/fuzzy →
-  // Wert unverändert; raw → calibrateDirect NUR bei aufsteigenden Ankern (sonst
-  // Spalte ausgeschlossen). setCols = tatsächlich nutzbare Set-Spalten.
-  const { cases, setCols } = useMemo(() => {
-    if (!ds) return { cases: [] as QcaCase[], setCols: [] as string[] };
-    const usable = numericCols(ds).filter((c) => {
-      const meta = varMeta[c];
-      if (!meta || meta.role === "ignore") return false;
-      return isColUsable(meta.type, colNumericValues(ds, c), anchors, c);
-    });
-    const cs: QcaCase[] = ds.rows.map((r) => {
-      const values: Record<string, number> = {};
-      usable.forEach((c) => {
-        const x = Number(r[c]);
-        if (varMeta[c].type === "raw") {
-          const a = anchors[c];
-          // isColUsable garantiert aufsteigende Anker → calibrateDirect wirft nicht.
-          values[c] = a ? +calibrateDirect(x, a[0], a[1], a[2]).toFixed(4) : x;
-        } else {
-          values[c] = x;
-        }
-      });
-      return { label: String(r[ds.caseCol]), values };
-    });
-    return { cases: cs, setCols: usable };
-  }, [ds, anchors, varMeta]);
+  // Berechnungskette: crisp/fuzzy → Wert unverändert; raw → calibrateValue per CalibrationSpec.
+  // Fälle mit NaN in genutzten Spalten werden für TT/Lösungen ausgeschlossen.
+  const evaluation: CalibrationEvaluation = useMemo(
+    () =>
+      ds
+        ? evaluateCalibration(ds, varMeta, calibSpecs)
+        : {
+            cases: [],
+            cells: [],
+            excludedCaseLabels: [],
+            unresolvedCaseLabels: [],
+          },
+    [ds, varMeta, calibSpecs],
+  );
+  const setCols = useMemo(
+    () =>
+      ds
+        ? numericColumns(ds).filter((column) => {
+            const meta = varMeta[column];
+            return (
+              !!meta &&
+              meta.role !== "ignore" &&
+              isColUsable(meta.type, numericValues(ds, column), column, calibSpecs)
+            );
+          })
+        : [],
+    [ds, varMeta, calibSpecs],
+  );
+  const cases = evaluation.cases;
+  const excludedMissingCount = new Set([
+    ...evaluation.excludedCaseLabels,
+    ...evaluation.unresolvedCaseLabels,
+  ]).size;
 
   // Bedingungen/Outcome leiten sich aus varMeta ab (nur nutzbare Set-Spalten).
   const conditions = useMemo(
@@ -306,6 +388,21 @@ export default function Home() {
       return null;
     }
   }, [ds, cases, conditions, outcome, freqCut, consCut]);
+  const sensitivity: SensitivityBundle = useMemo(
+    () =>
+      ds
+        ? buildSensitivityBundle({
+            ds,
+            varMeta,
+            calibSpecs,
+            conditions,
+            outcome,
+            freqCut,
+            consCut,
+          })
+        : { resultsByColumn: {}, variantsByColumn: {} },
+    [ds, varMeta, calibSpecs, conditions, outcome, freqCut, consCut],
+  );
 
   // Notwendigkeitsanalyse hängt methodisch NUR von conditions/outcome/cases ab
   // (nicht von der Truth Table) — sie gehört vor die Suffizienzanalyse.
@@ -328,37 +425,49 @@ export default function Home() {
       intermediate: intermediateSolution(tt, cases, exp),
       parsimonious: parsimoniousSolution(tt, cases),
     };
-  }, [tt, cases, conditions, outcome, expectations]);
+  }, [tt, cases, conditions, expectations]);
 
   // -- Geführter 6-Schritte-Stepper: Status je Schritt aus dem State ableiten. --
-  // Roh-Variablen mit Rolle ≠ ignorieren müssen kalibriert (Anker aufsteigend) sein.
-  const rawActiveCols = useMemo(
+  const activeAnalysisCols = useMemo(
     () =>
       ds
-        ? numericCols(ds).filter(
-            (c) => varMeta[c]?.type === "raw" && varMeta[c]?.role !== "ignore",
-          )
+        ? numericColumns(ds).filter((c) => {
+            const m = varMeta[c];
+            return m && m.role !== "ignore";
+          })
         : [],
     [ds, varMeta],
   );
 
   const step1Done = !!ds;
-  const step2Done = conditions.length > 0 && !!outcome;
-  // Kalibrierung fertig, sobald keine aktive Roh-Variable mehr unkalibriert ist.
-  // Ohne Roh-Variablen (leeres Array) sofort fertig — an step2Done gekoppelt,
-  // damit „fertig" erst nach gesetzten Rollen gilt.
+  const step2Done =
+    activeAnalysisCols.some((c) => varMeta[c]?.role === "condition") &&
+    activeAnalysisCols.some((c) => varMeta[c]?.role === "outcome");
+  // The synthetic demo is an explicit teaching exception: calculations stay
+  // visible, while the research/export gate remains closed below.
   const step3Done =
-    step2Done && rawActiveCols.every((c) => anchorsAscending(anchors[c]));
+    step2Done &&
+    (demoMode ||
+      activeAnalysisCols.every((column) =>
+        specIsAnalysisReady(calibSpecs[column], varMeta[column].type),
+      ));
+  const calibrationResearchReady =
+    !demoMode &&
+    step2Done &&
+    activeAnalysisCols.every((column) =>
+      specIsProtocolReady(calibSpecs[column], varMeta[column].type),
+    );
   const step4Done = step3Done && !!necessity; // Analyse-Schritt: bereit = Ergebnis liegt vor
   const step5Done = step3Done && !!(tt && sol);
   const step6Done = false; // Terminal-Schritt: bleibt „aktiv", solange man hier arbeitet
 
   const s1 = statusOf(true, step1Done);
   const s2 = statusOf(step1Done, step2Done);
-  const s3 = statusOf(step2Done, step3Done);
+  // Step 3 is the editing workspace; do not lock it behind its own checklist.
+  const s3: StepStatus = step2Done ? (step3Done ? "done" : "active") : "locked";
   const s4 = statusOf(step3Done, step4Done);
   const s5 = statusOf(step3Done, step5Done);
-  const s6 = statusOf(!!(tt && sol), step6Done);
+  const s6 = statusOf(step5Done, step6Done);
   const statuses: StepStatus[] = [s1, s2, s3, s4, s5, s6];
 
   // Anzahl der von vorne lückenlos erledigten Schritte → aktiver Schritt = k+1.
@@ -472,28 +581,44 @@ export default function Home() {
 
       {/* Schritt 2 — Variablen & Rollen */}
       <Step n={2} id={stepMeta[1].id} title={t(locale, stepMeta[1].titleKey)} status={s2} lockedReason={t(locale, lockedReasonKeys[1]!)} intro={t(locale, "step.intro.2")}>
-        {ds && <VariablesSection ds={ds} varMeta={varMeta} setVarMeta={setVarMeta} anchors={anchors} />}
+        {ds && <VariablesSection ds={ds} varMeta={varMeta} setVarMeta={setVarMeta} calibSpecs={calibSpecs} />}
       </Step>
-      {renderContinue(2)}
-
-      {/* Schritt 3 — Kalibrieren (inkl. Deskriptivstatistik) */}
       <Step n={3} id={stepMeta[2].id} title={t(locale, stepMeta[2].titleKey)} status={s3} lockedReason={t(locale, lockedReasonKeys[2]!)} intro={t(locale, "step.intro.3")}>
         {ds && (
           <>
+            {demoMode ? (
+              <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>
+            ) : (
+              !calibrationResearchReady && (
+                <Diag kind="warn">{t(locale, "calib.protocol.pageIncomplete")}</Diag>
+              )
+            )}
+            {calibMigrateBanner && (
+              <Diag kind="warn">{t(locale, "calib.migrate.banner")}</Diag>
+            )}
             {setCols.length > 0 && (
               <Card id="deskriptiv">
                 <H2>{t(locale, "descriptives.title")}</H2>
                 <Descriptives columns={setCols} cases={cases} />
               </Card>
             )}
-            <CalibrationSection
+            <CalibrationWorkbench
               ds={ds}
               varMeta={varMeta}
+              setVarMeta={setVarMeta}
+              calibSpecs={calibSpecs}
+              setCalibSpecs={setCalibSpecs}
               anchors={anchors}
               setAnchors={setAnchors}
               focusVar={focusVar}
               setFocusVar={setFocusVar}
-              cases={cases}
+              evaluation={evaluation}
+              sensitivity={sensitivity}
+              conditions={conditions}
+              outcome={outcome}
+              excludedMissingCount={excludedMissingCount}
+              freqCut={freqCut}
+              consCut={consCut}
             />
           </>
         )}
@@ -564,17 +689,31 @@ export default function Home() {
                 </Card>
               );
             })()}
-            <ProtocolSection ds={ds} anchors={anchors} varMeta={varMeta} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
+            <ProtocolSection
+              ds={ds}
+              calibSpecs={calibSpecs}
+              varMeta={varMeta}
+              conditions={conditions}
+              outcome={outcome}
+              freqCut={freqCut}
+              consCut={consCut}
+              evaluation={evaluation}
+              sensitivity={sensitivity}
+              researchReady={calibrationResearchReady}
+            />
             <Card>
               <H2>{t(locale, "report.title")}</H2>
               <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
               <ReportButton
+                disabled={!calibrationResearchReady}
                 getInput={(): ReportInput | null => {
-                  if (!ds || !tt || !sol || !necessity) return null;
+                  if (!calibrationResearchReady || !ds || !tt || !sol || !necessity) return null;
                   return {
                     datasetName: ds.name,
                     caseCount: ds.rows.length,
-                    anchors: rawAnchorsOf(ds, varMeta, anchors),
+                    anchors: rawAnchorsOf(ds, varMeta, calibSpecs),
+                    calibSpecs,
+                    varMeta,
                     conditions,
                     outcome,
                     freqCut,
@@ -585,7 +724,16 @@ export default function Home() {
                     parsimonious: sol.parsimonious,
                     necessity,
                     expectations: Object.fromEntries(conditions.map((c) => [c, expectations[c] ?? "present"])),
-                    rScript: buildRScript(ds, anchors, varMeta, conditions, outcome, freqCut, consCut),
+                    rScript: buildRScript({
+                      ds,
+                      calibSpecs,
+                      varMeta,
+                      conditions,
+                      outcome,
+                      freqCut,
+                      consCut,
+                      sensitivity,
+                    }),
                   };
                 }}
               />
@@ -705,418 +853,6 @@ function ContinueButton({ targetN, targetTitle, targetId }: { targetN: number; t
   );
 }
 
-/* ---------- Kalibrierung + Coach (Herzstück) ---------- */
-
-function CalibrationSection({
-  ds,
-  varMeta,
-  anchors,
-  setAnchors,
-  focusVar,
-  setFocusVar,
-  cases,
-}: {
-  ds: RawDataset;
-  varMeta: Record<string, VarMeta>;
-  anchors: Anchors;
-  setAnchors: (a: Anchors) => void;
-  focusVar: string;
-  setFocusVar: (v: string) => void;
-  cases: QcaCase[];
-}) {
-  const [locale] = useLocale();
-  // Kalibrierung betrifft nur Roh-Variablen mit Rolle ≠ ignorieren.
-  const raw = numericCols(ds).filter(
-    (c) => varMeta[c]?.type === "raw" && varMeta[c]?.role !== "ignore",
-  );
-
-  if (raw.length === 0) {
-    return (
-      <Card>
-        <H2>{t(locale, "calib.title")}</H2>
-        <Diag kind="ok">{t(locale, "calib.allCalibrated")}</Diag>
-      </Card>
-    );
-  }
-
-  const v = raw.includes(focusVar) ? focusVar : raw[0];
-  const a = anchors[v] ?? [0, 0.5, 1];
-  const rows = cases.map((c) => ({ label: c.label, f: c.values[v] }));
-  const values = ds.rows.map((r) => Number(r[v]));
-
-  const hi = rows.filter((r) => r.f > 0.5).length;
-  const lo = rows.filter((r) => r.f < 0.5).length;
-  const atHalf = rows.filter((r) => Math.abs(r.f - 0.5) < 1e-6);
-  const nearCross = rows.filter((r) => r.f > 0.4 && r.f < 0.6 && Math.abs(r.f - 0.5) >= 1e-6);
-  const ordered = a[0] < a[1] && a[1] < a[2];
-
-  function setAnchor(i: number, val: number) {
-    const next: [number, number, number] = [a[0], a[1], a[2]];
-    next[i] = val;
-    setAnchors({ ...anchors, [v]: next });
-  }
-
-  function resetAnchors() {
-    const orig = ds.anchors[v];
-    if (!orig) return;
-    setAnchors({ ...anchors, [v]: [orig[0], orig[1], orig[2]] });
-  }
-
-  return (
-    <Card>
-      <H2>{t(locale, "calib.title")}</H2>
-      <p style={{ color: "var(--ink-2)", maxWidth: "66ch", marginTop: 0 }}>
-        {t(locale, "calib.desc")}
-      </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-        {raw.map((c) => (
-          <button
-            key={c}
-            className="oq-btn"
-            onClick={() => setFocusVar(c)}
-            style={{
-              fontSize: 13.5,
-              padding: "6px 12px",
-              border: "1px solid var(--line)",
-              background: c === v ? "var(--brand)" : "var(--panel-2)",
-              color: c === v ? "#fff" : "var(--ink-2)",
-              fontWeight: c === v ? 600 : 400,
-            }}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
-        {([t(locale, "calib.anchorOut"), t(locale, "calib.anchorCross"), t(locale, "calib.anchorIn")]).map((lab, i) => (
-          <div key={i} style={{ background: "var(--panel-2)", borderRadius: 8, padding: "10px 12px" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)", fontWeight: 700 }}>
-              {lab}
-              {i === 1 && (
-                <InfoHint
-                  title={t(locale, "info.calibAnchors.title")}
-                  body={t(locale, "info.calibAnchors.body")}
-                  formula={t(locale, "info.calibAnchors.formula")}
-                />
-              )}
-            </div>
-            <input
-              type="number"
-              step="any"
-              value={a[i]}
-              onChange={(e) => setAnchor(i, Number(e.target.value))}
-              style={{
-                width: "100%",
-                font: "inherit",
-                fontSize: 16.5,
-                fontWeight: 600,
-                color: "var(--ink)",
-                background: "none",
-                border: "none",
-                borderBottom: "2px solid var(--line)",
-                padding: "4px 0",
-                marginTop: 4,
-              }}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4, marginBottom: 12 }}>
-        <button
-          className="oq-btn oq-btn--secondary"
-          onClick={resetAnchors}
-          style={{ fontSize: 13.5, padding: "4px 11px", color: "var(--ink-2)" }}
-        >
-          {t(locale, "calib.reset")}
-        </button>
-      </div>
-
-      {ordered ? (
-        <CalibrationCurve variable={v} anchors={a} values={values} rows={rows} nearCross={nearCross} atHalf={atHalf} onAnchorChange={setAnchor} />
-      ) : (
-        <Diag kind="bad">{t(locale, "calib.badOrder")}</Diag>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
-        {atHalf.length ? (
-          <Diag kind="bad">
-            <b>{t(locale, "calib.atHalf.count", { n: atHalf.length })}</b>{" "}
-            {t(locale, "calib.atHalf.rest", { labels: atHalf.map((r) => r.label).join(", ") })}
-          </Diag>
-        ) : (
-          <Diag kind="ok"><b>{t(locale, "calib.atHalf.okBold")}</b> {t(locale, "calib.atHalf.okRest")}</Diag>
-        )}
-        {hi / rows.length >= 0.85 || hi / rows.length <= 0.15 ? (
-          <Diag kind="warn">
-            <b>{t(locale, "calib.skew.bold")}</b> {t(locale, "calib.skew.rest", { hi, total: rows.length })}
-          </Diag>
-        ) : (
-          <Diag kind="ok"><b>{t(locale, "calib.skew.okBold")}</b> {t(locale, "calib.skew.okRest", { hi, lo })}</Diag>
-        )}
-        {nearCross.length > 0 && (
-          <Diag kind="warn">
-            <b>{t(locale, "calib.nearCross.bold", { n: nearCross.length })}</b>{" "}
-            {t(locale, "calib.nearCross.rest", { list: nearCross.map((r) => `${r.label} ${fmt(r.f, 2)}`).join(", ") })}
-          </Diag>
-        )}
-      </div>
-
-      <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line-soft)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--ai)" }}>
-            {t(locale, "calib.ai.badge")}
-          </span>
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>{t(locale, "calib.ai.plan")}</span>
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          <AiAssist
-            task="anchors"
-            label={t(locale, "calib.ai.anchors")}
-            needsContext
-            getData={() => {
-              const sorted = [...values].sort((a2, b2) => a2 - b2);
-              return { variable: v, min: sorted[0], median: sorted[Math.floor(sorted.length / 2)], max: sorted[sorted.length - 1] };
-            }}
-          />
-          <AiAssist task="skew" label={t(locale, "calib.ai.skew")} getData={() => ({ total: rows.length, inside: hi, atHalf: atHalf.length })} />
-          <AiAssist
-            task="methods"
-            label={t(locale, "calib.ai.methods")}
-            needsContext
-            getData={() => ({ variable: v, anchors: a.map((x) => fmt(x, 0)).join(" / "), total: rows.length, inside: hi })}
-          />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function CalibrationCurve({
-  variable,
-  anchors,
-  values,
-  rows,
-  nearCross,
-  atHalf,
-  onAnchorChange,
-}: {
-  variable: string;
-  anchors: [number, number, number];
-  values: number[];
-  rows: { label: string; f: number }[];
-  nearCross: { label: string; f: number }[];
-  atHalf: { label: string; f: number }[];
-  onAnchorChange: (index: number, value: number) => void;
-}) {
-  const [locale] = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
-  const rafRef = useRef<number | null>(null);
-  const pointerX = useRef(0);
-  const dragIndex = useRef<number | null>(null);
-
-  const [o, c, i] = anchors;
-  const lo = Math.min(...values, o);
-  const hi = Math.max(...values, i);
-  const pad = (hi - lo) * 0.07 || 1;
-  const W = 640, H = 280, ML = 44, MR = 16, MT = 12, MB = 40;
-  const domainLo = lo - pad;
-  const domainHi = hi + pad;
-  const px = (val: number) => ML + ((val - domainLo) / (domainHi - domainLo)) * (W - ML - MR);
-  const py = (val: number) => MT + (1 - val) * (H - MT - MB);
-  const invX = (xInSvg: number) =>
-    domainLo + ((xInSvg - ML) / (W - ML - MR)) * (domainHi - domainLo);
-
-  // Präzision an die Spannweite koppeln: große Skalen ganzzahlig, kleine 2 Dezimalstellen.
-  const span = hi - lo;
-  const step = span >= 100 ? 1 : 0.01;
-  const roundVal = (val: number) => (step >= 1 ? Math.round(val) : Math.round(val * 100) / 100);
-
-  // Ordnungs-Clamping (o < c < i) mit Mindestabstand von einem Präzisionsschritt.
-  const commit = (index: number, rawVal: number) => {
-    const r = roundVal(rawVal);
-    let clamped: number;
-    if (index === 0) clamped = Math.min(r, roundVal(c - step));
-    else if (index === 2) clamped = Math.max(r, roundVal(c + step));
-    else clamped = Math.min(Math.max(r, roundVal(o + step)), roundVal(i - step));
-    onAnchorChange(index, clamped);
-  };
-
-  const clientToValue = (clientX: number): number => {
-    const svg = svgRef.current;
-    if (!svg) return domainLo;
-    const rect = svg.getBoundingClientRect();
-    const xInSvg = rect.width ? ((clientX - rect.left) / rect.width) * W : ML;
-    return invX(xInSvg);
-  };
-
-  useEffect(
-    () => () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    },
-    [],
-  );
-
-  let curve = "";
-  for (let s = 0; s <= 140; s++) {
-    const x = domainLo + (s / 140) * (domainHi - domainLo);
-    curve += (s ? "L" : "M") + px(x).toFixed(1) + "," + py(calibrateDirect(x, o, c, i)).toFixed(1);
-  }
-
-  const anchorMeta: { value: number; name: string }[] = [
-    { value: o, name: t(locale, "calib.handle.out") },
-    { value: c, name: t(locale, "calib.handle.cross") },
-    { value: i, name: t(locale, "calib.handle.in") },
-  ];
-  const domainMin = roundVal(domainLo);
-  const domainMax = roundVal(domainHi);
-
-  const rawByLabel = new Map(rows.map((r, idx) => [r.label, values[idx]]));
-  const center = (ML + (W - MR)) / 2;
-
-  // Label-Kollisionsvermeidung (aus XyPlot übernommen): nach y sortieren, bei
-  // <12px Abstand und ähnlichem x (<70px) nach unten staffeln; Anker je Hälfte.
-  const placed = [...nearCross, ...atHalf].slice(0, 4).map((r) => {
-    const raw = rawByLabel.get(r.label) ?? 0;
-    const pointX = px(raw);
-    const rightHalf = pointX >= center;
-    return {
-      label: r.label,
-      pointX,
-      anchorX: rightHalf ? pointX - 8 : pointX + 8,
-      anchorY: py(r.f) - 6,
-      textAnchor: (rightHalf ? "end" : "start") as "start" | "end",
-    };
-  });
-  // Box-basierte Kollisionsauflösung (wie XyPlot): vertikal < 16px UND
-  // horizontale Textbox-Intervalle überschneiden sich → nach unten staffeln.
-  const estLabelWidth = (s: string) => s.length * 6 + 10;
-  const labelInterval = (l: (typeof placed)[number]): [number, number] =>
-    l.textAnchor === "start"
-      ? [l.anchorX, l.anchorX + estLabelWidth(l.label)]
-      : [l.anchorX - estLabelWidth(l.label), l.anchorX];
-  for (let pass = 0; pass < 3; pass++) {
-    placed.sort((a2, b2) => a2.anchorY - b2.anchorY);
-    for (let k = 1; k < placed.length; k++) {
-      for (let j = 0; j < k; j++) {
-        const cur = placed[k];
-        const prev = placed[j];
-        if (Math.abs(cur.anchorY - prev.anchorY) >= 16) continue;
-        const [a0, a1] = labelInterval(prev);
-        const [b0, b1] = labelInterval(cur);
-        if (b0 < a1 && a0 < b1) cur.anchorY = prev.anchorY + 16;
-      }
-    }
-  }
-
-  return (
-    <ChartFrame filename={`kalibrierung-${variable}`} caption={t(locale, "calib.rug.desc")}>
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} role="img" style={{ width: "100%", maxWidth: W, height: "auto", background: "var(--panel)" }}>
-        {[0, 0.25, 0.5, 0.75, 1].map((val) => (
-          <g key={val}>
-            <line x1={ML} x2={W - MR} y1={py(val)} y2={py(val)} stroke="var(--grid)" />
-            <text x={ML - 6} y={py(val) + 3.5} textAnchor="end" fill="var(--muted)" fontSize={10.5}>
-              {val.toFixed(2).replace(".", ",")}
-            </text>
-          </g>
-        ))}
-
-        {/* Rug-Plot: Verteilung der Rohwerte direkt über der X-Achse */}
-        {values.map((val, idx) => (
-          <line key={`rug-${idx}`} x1={px(val)} x2={px(val)} y1={H - MB} y2={H - MB - 8} stroke="var(--muted)" strokeWidth={1.5} opacity={0.8} />
-        ))}
-
-        {anchorMeta.map(({ value }, idx) => (
-          <g key={`anchor-line-${idx}`}>
-            <line x1={px(value)} x2={px(value)} y1={MT} y2={H - MB} stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 4" opacity={0.8} />
-            <text x={px(value)} y={H - MB + 15} textAnchor="middle" fill="var(--accent-deep)" fontSize={10.5} fontWeight={600}>
-              {String(value).replace(".", ",")}
-            </text>
-          </g>
-        ))}
-
-        <path d={curve} fill="none" stroke="var(--accent)" strokeWidth={2.25} />
-
-        {rows.map((r, idx) => {
-          const flag = r.f > 0.4 && r.f < 0.6;
-          return (
-            <circle key={idx} cx={px(values[idx])} cy={py(r.f)} r={5} fill={flag ? "var(--warn-text)" : "var(--accent)"} stroke="var(--panel)" strokeWidth={2}>
-              <title>{`${r.label}: ${values[idx]} → ${r.f.toFixed(3)}`}</title>
-            </circle>
-          );
-        })}
-
-        {placed.map((l, idx) => (
-          <text key={`lbl-${idx}`} x={l.anchorX} y={l.anchorY} textAnchor={l.textAnchor} fill="var(--warn-text)" fontSize={10} fontWeight={600} stroke="var(--panel)" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round" style={{ pointerEvents: "none" }}>
-            {l.label}
-          </text>
-        ))}
-
-        {/* Ziehbare Griffe: sichtbarer Kreis + großzügige unsichtbare Trefferfläche */}
-        {anchorMeta.map(({ value, name }, idx) => {
-          const cx = px(value);
-          const startDrag = (e: React.PointerEvent) => {
-            (e.currentTarget as Element).setPointerCapture(e.pointerId);
-            dragIndex.current = idx;
-            e.preventDefault();
-          };
-          const moveDrag = (e: React.PointerEvent) => {
-            if (dragIndex.current !== idx) return;
-            pointerX.current = e.clientX;
-            if (rafRef.current == null) {
-              rafRef.current = requestAnimationFrame(() => {
-                rafRef.current = null;
-                if (dragIndex.current != null) commit(dragIndex.current, clientToValue(pointerX.current));
-              });
-            }
-          };
-          const endDrag = (e: React.PointerEvent) => {
-            dragIndex.current = null;
-            (e.currentTarget as Element).releasePointerCapture(e.pointerId);
-          };
-          const onKey = (e: React.KeyboardEvent) => {
-            let dir = 0;
-            if (e.key === "ArrowLeft" || e.key === "ArrowDown") dir = -1;
-            else if (e.key === "ArrowRight" || e.key === "ArrowUp") dir = 1;
-            else return;
-            e.preventDefault();
-            const mult = e.shiftKey ? 10 : 1;
-            commit(idx, value + dir * step * mult);
-          };
-          return (
-            <g key={`handle-${idx}`}>
-              <rect
-                x={cx - 12}
-                y={MT}
-                width={24}
-                height={H - MB - MT}
-                fill="transparent"
-                style={{ cursor: "ew-resize", touchAction: "none" }}
-                tabIndex={0}
-                role="slider"
-                aria-label={t(locale, "calib.handle.aria", { name, value: String(value).replace(".", ",") })}
-                aria-valuemin={domainMin}
-                aria-valuemax={domainMax}
-                aria-valuenow={value}
-                onPointerDown={startDrag}
-                onPointerMove={moveDrag}
-                onPointerUp={endDrag}
-                onKeyDown={onKey}
-              />
-              <circle cx={cx} cy={H - MB} r={7} fill="var(--accent)" stroke="var(--panel)" strokeWidth={2} style={{ pointerEvents: "none" }} />
-            </g>
-          );
-        })}
-
-        <text x={(ML + W - MR) / 2} y={H - 2} textAnchor="middle" fill="var(--muted)" fontSize={11}>
-          {t(locale, "calib.curve.axis", { variable })}
-        </text>
-      </svg>
-    </ChartFrame>
-  );
-}
-
 /* ---------- Daten ---------- */
 
 function DataSection({ ds }: { ds: RawDataset }) {
@@ -1156,15 +892,15 @@ function VariablesSection({
   ds,
   varMeta,
   setVarMeta,
-  anchors,
+  calibSpecs,
 }: {
   ds: RawDataset;
   varMeta: Record<string, VarMeta>;
   setVarMeta: (m: Record<string, VarMeta>) => void;
-  anchors: Anchors;
+  calibSpecs: CalibSpecs;
 }) {
   const [locale] = useLocale();
-  const cols = numericCols(ds);
+  const cols = numericColumns(ds);
 
   function setType(col: string, type: VarType) {
     setVarMeta({ ...varMeta, [col]: { ...varMeta[col], type } });
@@ -1195,6 +931,12 @@ function VariablesSection({
   return (
     <Card>
       {/* Titel + Intro liefert der Step-Wrapper (step.intro.2) — hier nicht doppeln. */}
+      <p
+        data-testid="variables-role-explainer"
+        style={{ color: "var(--ink-2)", maxWidth: "70ch", margin: "0 0 14px", fontSize: 13.5, lineHeight: 1.55 }}
+      >
+        {t(locale, "vars.role.help")}
+      </p>
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
           <thead>
@@ -1207,9 +949,9 @@ function VariablesSection({
           <tbody>
             {cols.map((col) => {
               const meta = varMeta[col] ?? { type: "raw" as VarType, role: "ignore" as VarRole };
-              const values = colNumericValues(ds, col);
+              const values = numericValues(ds, col);
               const detected = detectVarType(values);
-              const usable = meta.role === "ignore" || isColUsable(meta.type, values, anchors, col);
+              const usable = meta.role === "ignore" || isColUsable(meta.type, values, col, calibSpecs);
               const badgeKey: DictKey = meta.type === "raw" ? "vars.badge.raw" : "vars.badge.ready";
               const warnKey: DictKey =
                 meta.type === "crisp"
@@ -1237,6 +979,16 @@ function VariablesSection({
                         )}
                         <span style={typeBadgeStyle(meta.type)}>{t(locale, badgeKey)}</span>
                       </div>
+                      <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "6px 0 0", maxWidth: "42ch" }}>
+                        {t(
+                          locale,
+                          meta.type === "raw"
+                            ? "vars.type.help.raw"
+                            : meta.type === "fuzzy"
+                              ? "vars.type.help.fuzzy"
+                              : "vars.type.help.crisp",
+                        )}
+                      </p>
                     </td>
                     <td style={{ ...tdStyle(false, false), verticalAlign: "top" }}>
                       <select
@@ -1329,7 +1081,7 @@ function TruthTableSection(props: {
             </span>
           }
         >
-          <input type="number" min={1} value={freqCut} onChange={(e) => setFreqCut(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, width: 90 }} />
+          <input data-testid="truth-table-frequency-cut" type="number" min={1} value={freqCut} onChange={(e) => setFreqCut(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, width: 90 }} />
         </Field>
         <Field
           label={
@@ -1340,7 +1092,7 @@ function TruthTableSection(props: {
           }
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input type="number" min={0} max={1} step={0.01} value={consCut} onChange={(e) => setConsCut(Number(e.target.value) || 0.8)} style={{ ...inputStyle, width: 90 }} />
+            <input data-testid="truth-table-consistency-cut" type="number" min={0} max={1} step={0.01} value={consCut} onChange={(e) => setConsCut(Number(e.target.value) || 0.8)} style={{ ...inputStyle, width: 90 }} />
             <input
               type="range"
               min={0.5}
@@ -1616,43 +1368,108 @@ function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessit
 
 /* ---------- Protokoll ---------- */
 
-function buildRScript(ds: RawDataset, anchors: Anchors, varMeta: Record<string, VarMeta>, conditions: string[], outcome: string, freqCut: number, consCut: number): string {
-  const lines = ["library(QCA)", "", `df <- read.csv("${ds.name}.csv")`];
-  // calibrate()-Zeilen NUR für Roh-Variablen mit gültigen Ankern; Spaltennamen ohne Präfix.
-  for (const [v, a] of Object.entries(rawAnchorsOf(ds, varMeta, anchors))) {
-    lines.push(`df$${v} <- calibrate(df$${v}, type = "fuzzy", thresholds = "e=${a[0]}, c=${a[1]}, i=${a[2]}")`);
-  }
-  if (conditions.length && outcome) {
-    lines.push("", `tt <- truthTable(df, outcome = "${outcome}", conditions = "${conditions.join(", ")}",`);
-    lines.push(`                 incl.cut = ${consCut}, n.cut = ${freqCut}, show.cases = TRUE)`);
-    lines.push(`minimize(tt, details = TRUE)                 # komplexe Lösung`);
-    lines.push(`minimize(tt, include = "?", details = TRUE)  # sparsame Lösung`);
-  }
-  return lines.join("\n");
-}
-
-function ProtocolSection({ ds, anchors, varMeta, conditions, outcome, freqCut, consCut }: { ds: RawDataset; anchors: Anchors; varMeta: Record<string, VarMeta>; conditions: string[]; outcome: string; freqCut: number; consCut: number }) {
+function ProtocolSection({
+  ds,
+  calibSpecs,
+  varMeta,
+  conditions,
+  outcome,
+  freqCut,
+  consCut,
+  evaluation,
+  sensitivity,
+  researchReady,
+}: {
+  ds: RawDataset;
+  calibSpecs: CalibSpecs;
+  varMeta: Record<string, VarMeta>;
+  conditions: string[];
+  outcome: string;
+  freqCut: number;
+  consCut: number;
+  evaluation: CalibrationEvaluation;
+  sensitivity: SensitivityBundle;
+  researchReady: boolean;
+}) {
   const [locale] = useLocale();
   const r = useMemo(
-    () => buildRScript(ds, anchors, varMeta, conditions, outcome, freqCut, consCut),
-    [ds, anchors, varMeta, conditions, outcome, freqCut, consCut],
+    () =>
+      buildRScript({
+        ds,
+        calibSpecs,
+        varMeta,
+        conditions,
+        outcome,
+        freqCut,
+        consCut,
+        sensitivity,
+      }),
+    [ds, calibSpecs, varMeta, conditions, outcome, freqCut, consCut, sensitivity],
   );
 
-  function download() {
-    const payload = { tool: "openQCA", exportiert: new Date().toISOString(), datensatz: ds.name, kalibrierungen: rawAnchorsOf(ds, varMeta, anchors), bedingungen: conditions, outcome, freqCut, consCut };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "openqca-protokoll.json";
-    link.click();
-    URL.revokeObjectURL(link.href);
+  function downloadJson() {
+    const payload = buildCalibrationProtocolJson({
+      ds,
+      calibSpecs,
+      varMeta,
+      conditions,
+      outcome,
+      freqCut,
+      consCut,
+      evaluation,
+      sensitivity,
+    });
+    downloadText(
+      "openqca-calibration-protocol.json",
+      JSON.stringify(payload, null, 2),
+      "application/json",
+    );
+  }
+  function downloadRawData() {
+    downloadText(
+      RAW_DATA_FILENAME,
+      buildRawCsv(ds),
+      "text/csv;charset=utf-8",
+    );
+  }
+
+  function downloadMd() {
+    const md = buildCalibrationNarrative({
+      ds,
+      calibSpecs,
+      varMeta,
+      conditions,
+      outcome,
+      evaluation,
+      sensitivity,
+      freqCut,
+      consCut,
+      locale,
+    });
+    downloadText("openqca-calibration-protocol.md", md, "text/markdown;charset=utf-8");
+  }
+
+  async function copyR() {
+    try {
+      await navigator.clipboard.writeText(r);
+    } catch {
+      /* ignore */
+    }
   }
 
   return (
     <Card id="protokoll">
       <H2>{t(locale, "proto.title")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "proto.desc")}</p>
-      <Button primary onClick={download}>{t(locale, "proto.downloadBtn")}</Button>
+      {!researchReady && (
+        <p className="hint" style={hintStyle}>{t(locale, "proto.notReady")}</p>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <Button primary disabled={!researchReady} onClick={downloadJson}>{t(locale, "proto.downloadBtn")}</Button>
+        <Button disabled={!researchReady} onClick={downloadRawData}>{t(locale, "proto.downloadData")}</Button>
+        <Button disabled={!researchReady} onClick={downloadMd}>{t(locale, "proto.downloadMd")}</Button>
+        <Button disabled={!researchReady} onClick={() => void copyR()}>{t(locale, "proto.copyR")}</Button>
+      </div>
       <pre className="mono" style={{ fontSize: 13.5, lineHeight: 1.6, background: "var(--panel-2)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", marginTop: 14 }}>
         {r}
       </pre>
@@ -1666,9 +1483,9 @@ function Header() {
   const [locale] = useLocale();
   return (
     <header style={{ display: "flex", alignItems: "baseline", gap: 13, flexWrap: "wrap", paddingBottom: 16, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
-      <a href="/" style={{ fontWeight: 600, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
+      <Link href="/" style={{ fontWeight: 600, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
         open<span style={{ color: "var(--brand)" }}>QCA</span>
-      </a>
+      </Link>
       <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{t(locale, "header.tagline")}</span>
       <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12 }}>
         <a href="/methodik" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.methodik")}</a>
@@ -1718,7 +1535,8 @@ function SectionNav({
 
   // Fortschritt springt weiter → aktiven Schritt hervorheben, bis der Nutzer scrollt.
   useEffect(() => {
-    setActiveId(activeStepId);
+    const timer = window.setTimeout(() => setActiveId(activeStepId), 0);
+    return () => window.clearTimeout(timer);
   }, [activeStepId]);
 
   useEffect(() => {
@@ -1858,9 +1676,19 @@ function Label({ children }: { children: React.ReactNode }) {
 function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><Label>{label}</Label>{children}</div>;
 }
-function Button({ children, primary, onClick }: { children: React.ReactNode; primary?: boolean; onClick: () => void }) {
+function Button({
+  children,
+  primary,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  primary?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick} className={`oq-btn oq-btn--${primary ? "primary" : "secondary"}`}>
+    <button disabled={disabled} onClick={onClick} className={`oq-btn oq-btn--${primary ? "primary" : "secondary"}`}>
       {children}
     </button>
   );

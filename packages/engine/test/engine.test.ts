@@ -5,6 +5,8 @@ import {
   calibrateCrisp,
   calibrateFourValue,
   calibrate,
+  calibrateValue,
+  calibrateSeries,
   inclusionConsistency,
   rawCoverage,
   priConsistency,
@@ -40,6 +42,26 @@ test("crisp: Schwelle trennt 0/1", () => {
   assert.equal(calibrateCrisp(85, 85), 1);
   assert.equal(calibrateCrisp(84.9, 85), 0);
 });
+test("calibrateValue: invertiertes Crisp bleibt an der Schwelle inklusiv", () => {
+  assert.equal(
+    calibrateValue(40, {
+      method: "crisp",
+      thresholds: [40],
+      highIsMembership: false,
+      crispInclusive: true,
+    }),
+    1,
+  );
+  assert.equal(
+    calibrateValue(40.0001, {
+      method: "crisp",
+      thresholds: [40],
+      highIsMembership: false,
+      crispInclusive: true,
+    }),
+    0,
+  );
+});
 
 test("Vier-Werte-Fuzzy: vier Stufen", () => {
   assert.equal(calibrateFourValue(10, 20, 50, 80), 0);
@@ -53,6 +75,36 @@ test("Dispatch calibrate() deckt sich mit den Einzelfunktionen", () => {
     calibrate(85, "direct", [60, 85, 98]),
     calibrateDirect(85, 60, 85, 98),
   );
+});
+
+test("calibrateValue: Inversion liefert 1 − direct", () => {
+  const base = calibrateDirect(900, 300, 600, 1000);
+  const inv = calibrateValue(900, {
+    method: "direct",
+    thresholds: [300, 600, 1000],
+    highIsMembership: false,
+  });
+  approx(inv, 1 - base);
+});
+
+test("calibrateValue: fehlende Werte → NaN oder zugewiesen", () => {
+  assert.ok(
+    Number.isNaN(
+      calibrateValue(Number.NaN, { method: "crisp", thresholds: [40], onMissing: "NaN" }),
+    ),
+  );
+  assert.equal(
+    calibrateValue(Number.NaN, { method: "crisp", thresholds: [40], onMissing: 0 }),
+    0,
+  );
+});
+
+test("calibrateSeries: wendet calibrateValue elementweise an", () => {
+  const out = calibrateSeries([30, 50, 90], {
+    method: "crisp",
+    thresholds: [50],
+  });
+  assert.deepEqual(out, [0, 1, 1]);
 });
 
 test("Konsistenz & Coverage: deterministisches Kleinbeispiel", () => {

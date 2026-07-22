@@ -4,14 +4,14 @@ Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft 
 
 ## 0. Grundlage
 - [ ] Repo auf GitHub anlegen und pushen (`openqca`).
-- [ ] Lokal prüfen: `npm install`, dann `npm test --workspace @openqca/engine` (14/14) und `npm run build --workspace web`.
+- [ ] Lokal prüfen: `npm install`, dann `npm test --workspace @openqca/engine` (38/38) und `npm run build --workspace web`.
 
 ## 1. Supabase (Konto & Datenbank — P3)
-- [ ] Konto auf **supabase.com**, neues Projekt anlegen. Region wählen (EU für DSGVO).
-- [ ] SQL Editor → Inhalt von `supabase/schema.sql` ausführen (Tabellen `profiles`, `projects` + RLS + Trigger).
-- [ ] Project Settings → API: `URL`, `anon key`, `service_role key` kopieren.
-- [ ] Auth → E-Mail-Anmeldung (Magic Link) aktivieren; unter „Redirect URLs" die Live-Domain und `http://localhost:3000` eintragen.
-- [ ] Werte eintragen: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+- [x] Konto auf **supabase.com**, neues Projekt anlegen. Region wählen (EU für DSGVO). → OpenQCA `yuhsxueaafugixeiausy` eu-central-1
+- [x] SQL Editor → Inhalt von `supabase/schema.sql` ausführen (Tabellen `profiles`, `projects` + RLS + Trigger). → via CLI migration applied
+- [x] Project Settings → API: `URL`, `anon key`, `service_role key` kopieren. → in Vercel + local `.env.local`
+- [x] Auth → E-Mail-Anmeldung (Magic Link) aktivieren; unter „Redirect URLs" die Live-Domain und `http://localhost:3000` eintragen. → config push
+- [x] Werte eintragen: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. → Vercel prod/preview/dev + apps/web/.env.local
 
 ## 2. Anthropic (KI — P4)
 - [ ] Konto auf **console.anthropic.com**, API-Key erstellen.

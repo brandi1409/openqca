@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 
 /**
@@ -60,6 +62,23 @@ export async function loadExample(page: Page, cardName: RegExp): Promise<void> {
   await dismissConsent(page);
   await page.getByRole("button", { name: cardName }).click();
   // Deskriptivstatistik-Karte erscheint, sobald nutzbare Set-Spalten vorliegen.
+  await expect(page.locator("#deskriptiv")).toBeVisible({ timeout: 15_000 });
+}
+
+/** Load the repository's real raw-data fixture through the browser file input. */
+export async function loadRawRohwerte(page: Page): Promise<void> {
+  await page.goto("/app");
+  await dismissConsent(page);
+  const candidateRoots = [
+    process.env.INIT_CWD,
+    process.cwd(),
+    path.resolve(process.cwd(), "../.."),
+  ].filter((root): root is string => !!root);
+  const fixturePath = candidateRoots
+    .map((root) => path.resolve(root, "datasets/rohwerte-demokratie.csv"))
+    .find((candidate) => existsSync(candidate));
+  if (!fixturePath) throw new Error("Raw fixture datasets/rohwerte-demokratie.csv not found");
+  await page.locator('input[type="file"]').setInputFiles(fixturePath);
   await expect(page.locator("#deskriptiv")).toBeVisible({ timeout: 15_000 });
 }
 

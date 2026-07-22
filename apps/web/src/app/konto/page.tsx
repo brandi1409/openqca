@@ -71,8 +71,11 @@ export default function AccountPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setCheckout(params.get("checkout"));
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      setCheckout(params.get("checkout"));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const loadTier = useCallback(async () => {
@@ -97,8 +100,11 @@ export default function AccountPage() {
   }, [user]);
 
   useEffect(() => {
-    void loadTier();
-    void loadProjects();
+    const timer = window.setTimeout(() => {
+      void loadTier();
+      void loadProjects();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadTier, loadProjects]);
 
   async function manageSubscription() {

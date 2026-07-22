@@ -28,14 +28,17 @@ export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored !== "necessary" && stored !== "all") setVisible(true);
-    } catch {
-      // localStorage nicht verfügbar (z. B. Privatmodus) → Banner zeigen,
-      // damit die Wahl zumindest für diese Sitzung getroffen werden kann.
-      setVisible(true);
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        const stored = window.localStorage.getItem(STORAGE_KEY);
+        if (stored !== "necessary" && stored !== "all") setVisible(true);
+      } catch {
+        // localStorage nicht verfügbar (z. B. Privatmodus) → Banner zeigen,
+        // damit die Wahl zumindest für diese Sitzung getroffen werden kann.
+        setVisible(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function choose(choice: ConsentChoice) {

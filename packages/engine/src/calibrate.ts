@@ -77,6 +77,40 @@ export function calibrate(
   }
 }
 
+export type CalibrateSeriesOptions = {
+  method: CalibrationMethod;
+  thresholds: number[];
+  /** default true; if false, return 1 - m after successful calibration */
+  highIsMembership?: boolean;
+  /** For inverted crisp sets, preserve the inclusive raw ≤ threshold rule. */
+  crispInclusive?: boolean;
+  /** value considered missing; default: !Number.isFinite(x) */
+  isMissing?: (value: number) => boolean;
+  onMissing?: "NaN" | 0 | 1;
+};
+
+export function calibrateValue(x: number, opts: CalibrateSeriesOptions): number {
+  const isMissing = opts.isMissing ?? ((value: number) => !Number.isFinite(value));
+  if (isMissing(x)) {
+    const m = opts.onMissing ?? "NaN";
+    return m === "NaN" ? NaN : m;
+  }
+  if (
+    opts.method === "crisp" &&
+    opts.crispInclusive === true &&
+    opts.highIsMembership === false
+  ) {
+    return x <= opts.thresholds[0] ? 1 : 0;
+  }
+  const membership = calibrate(x, opts.method, opts.thresholds);
+  return opts.highIsMembership === false ? 1 - membership : membership;
+}
+
+/** Vectorized {@link calibrateValue}. */
+export function calibrateSeries(xs: number[], opts: CalibrateSeriesOptions): number[] {
+  return xs.map((x) => calibrateValue(x, opts));
+}
+
 function assertAscending(a: number, b: number, c: number): void {
   if (!(a < b && b < c)) {
     throw new Error(

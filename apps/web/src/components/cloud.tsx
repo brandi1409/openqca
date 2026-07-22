@@ -104,7 +104,10 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
   }, [user]);
 
   useEffect(() => {
-    void refresh();
+    const timer = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [refresh]);
 
   if (!cloudEnabled) return null;

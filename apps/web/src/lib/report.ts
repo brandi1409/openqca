@@ -5,11 +5,14 @@
  */
 
 import type { NecessityEntry, Solution, TruthTableResult, TruthTableRow } from "@openqca/engine";
+import type { CalibSpecs } from "@/lib/calibration-model";
 
 export interface ReportInput {
   datasetName: string;
   caseCount: number;
   anchors: Record<string, [number, number, number]>;
+  calibSpecs?: CalibSpecs;
+  varMeta?: Record<string, { type: string; role: string }>;
   conditions: string[];
   outcome: string;
   freqCut: number;
@@ -57,7 +60,45 @@ function observedRows(tt: TruthTableResult): TruthTableRow[] {
     .sort((x, y) => Number(y.output === 1) - Number(x.output === 1) || y.consistency - x.consistency);
 }
 
-function calibrationTable(anchors: Record<string, [number, number, number]>): string {
+function calibrationTable(
+  anchors: Record<string, [number, number, number]>,
+  calibSpecs?: CalibSpecs,
+  varMeta?: Record<string, { type: string; role: string }>,
+): string {
+  if (calibSpecs && Object.keys(calibSpecs).length) {
+    const blocks = Object.values(calibSpecs)
+      .filter((s) => {
+        const role = varMeta?.[s.column]?.role;
+        return role === "condition" || role === "outcome";
+      })
+      .map((s) => {
+        const role = varMeta?.[s.column]?.role ?? "";
+        const method =
+          varMeta?.[s.column]?.type === "raw"
+            ? s.method === "crisp"
+              ? `crisp ≥ ${s.crisp?.threshold ?? "—"}`
+              : s.direct
+                ? `direct ${s.direct.fullOut} / ${s.direct.crossover} / ${s.direct.fullIn}`
+                : "raw"
+            : `already ${varMeta?.[s.column]?.type ?? ""}`;
+        return `<div class="set-block">
+          <h3>${esc(s.set.setLabel || s.column)} <span class="hint">(${esc(role)} · ${esc(s.column)})</span></h3>
+          <p>${esc(s.set.definition || "—")}</p>
+          <p class="hint">Status: ${esc(s.status)} · Method: ${esc(method)} · Direction: ${s.set.highIsMembership ? "high→in" : "inverted"}</p>
+          ${
+            s.method === "direct" && s.direct
+              ? `<p class="hint">Meanings — out: ${esc(s.direct.meaningFullOut || "—")}; cross: ${esc(s.direct.meaningCrossover || "—")}; in: ${esc(s.direct.meaningFullIn || "—")}</p>`
+              : s.method === "crisp" && s.crisp
+                ? `<p class="hint">Inclusion meaning: ${esc(s.crisp.meaningInclusion || "—")}</p>`
+                : s.alreadyCalibratedProvenance
+                  ? `<p class="hint">Provenance: ${esc(s.alreadyCalibratedProvenance)}</p>`
+                  : ""
+          }
+        </div>`;
+      })
+      .join("");
+    if (blocks) return blocks;
+  }
   const rows = Object.entries(anchors)
     .map(
       ([v, a]) =>
@@ -220,7 +261,7 @@ export function generateReportHtml(input: ReportInput): string {
   <p class="note">Erstellt mit openQCA (openqca.vercel.app), Open Source (MIT).</p>
 
   <h2>Kalibrierung</h2>
-  ${calibrationTable(input.anchors)}
+  ${calibrationTable(input.anchors, input.calibSpecs, input.varMeta)}
 
   <h2>Truth Table</h2>
   <p class="hint">Bedingungen: ${esc(input.conditions.map(label).join(", "))} &nbsp;·&nbsp; Outcome: ${esc(outLabel)} &nbsp;·&nbsp; Frequenz-Cutoff: ${input.freqCut} &nbsp;·&nbsp; Konsistenz-Cutoff: ${fmt(input.consCut)}</p>

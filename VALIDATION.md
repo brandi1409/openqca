@@ -89,6 +89,30 @@ konservativ*. Eine frühere Näherung im Rechenkern behandelte „either" umgeke
 (als „entfernen") und wurde durch die kanonische, R-validierte Konstruktion
 ersetzt (`packages/engine/src/solutions.ts`, `intermediateSolution`).
 
+## Kalibrierungs-Kreuzvalidierung
+
+Drei getrennte Evidenzebenen:
+
+1. **Ragin-Fixpunkte (Implementierungsverifikation):** `calibrateDirect` bildet den
+   Kreuzungspunkt exakt auf 0,5 und die Anker auf \(1/(1+e^{\pm 3})\) ≈ 0,0474 / 0,9526
+   ab. Geprüft in `packages/engine/test/engine.test.ts` und
+   `node scripts/reference-check.mjs` (inkl. dokumentiertem BIP-Beispiel 300/600/1000).
+2. **R-Paket QCA (externe Gegenüberstellung):**
+   ```sh
+   Rscript scripts/r-oracle/calibrate-oracle.R   # schreibt calibrate-expected.json
+   node scripts/calibrate-cross-validate.mjs
+   ```
+   Crisp-Kalibrierung muss exakt übereinstimmen (Toleranz `1e-6`). Die logistische
+   Direktmethode im R-Paket zielt an den Ankern auf ≈ 0,05 / 0,95; openQCA folgt
+   Ragin mit ≈ 0,0474 / 0,9526. Die Differenz auf dem Prüfgitter bleibt unter 0,01
+   und wird als **dokumentiertes Residual** akzeptiert — die Engine wird nicht an
+   R angepasst, und das Orakel wird nicht „zurechtgebogen“.
+3. **Noch nicht extern validiert:** `calibrateLinear`, `calibrateFourValue`.
+
+Substantive Gültigkeit von Ankern und Robustheit gegenüber Ankerwahl sind
+Forschungsurteile bzw. Sensitivitätsanalysen — keine reine Implementierungsfrage.
+
+
 ## Aussagegrenze
 
 Die Kalibrierungs- und Notwendigkeits-Kennzahlen sowie die Kennzahlen der

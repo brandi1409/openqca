@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { calibrateDirect, buildTruthTable, intermediateSolution } from "@openqca/engine";
 import { DEMO } from "@/lib/demo";
@@ -123,9 +124,9 @@ function LandingNav() {
       }}
     >
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "12px 26px", display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-        <a href="/" style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
+        <Link href="/" style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
           open<span style={{ color: "var(--brand)" }}>QCA</span>
-        </a>
+        </Link>
         <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <NavLink href="#funktionen">{t(locale, "landing.nav.funktionen")}</NavLink>
           <NavLink href="/methodik">{t(locale, "landing.nav.methodik")}</NavLink>

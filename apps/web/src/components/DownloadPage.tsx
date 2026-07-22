@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useLocale, type Locale } from "@/i18n/locale";
 import { t, type DictKey } from "@/i18n/dict";
@@ -58,9 +59,9 @@ export function DownloadPage() {
 
   return (
     <div style={pageStyle}>
-      <a href="/" style={backLinkStyle}>
+      <Link href="/" style={backLinkStyle}>
         {t(locale, "download.back")}
-      </a>
+      </Link>
 
       <h1 style={titleStyle}>{t(locale, "download.title")}</h1>
       <p style={introStyle}>{t(locale, "download.intro")}</p>

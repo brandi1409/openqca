@@ -1,68 +1,68 @@
-# Roadmap — openQCA
+# Roadmap: openQCA
 
-Dieses Dokument gibt einen ehrlichen Überblick über die geplanten Entwicklungen von openQCA in drei Zeithorizonten. Die Roadmap wird regelmäßig aktualisiert und ist **nicht verbindlich** — Prioritäten können sich ändern.
+Dieses Dokument beschreibt die priorisierten nächsten Schritte für openQCA. Es trennt lokal lösbare Produktarbeit von Validierungs-, Fach- und Eigentümeraufgaben. Prioritäten können sich ändern, Statusangaben müssen jedoch durch die dokumentierten Prüfungen gedeckt sein.
 
----
+## Aktueller Stand
 
-## Kurzfristig (nächste 3–6 Monate)
+- Der kostenlose Analyse-Kern läuft local-first im Browser.
+- Die Engine ist intern regressionsgetestet. `node scripts/reference-check.mjs` prüft dokumentierte Ragin-Beispiele und interne Snapshots.
+- Die QCA-Lösungslogik ist in 12 Szenarien gegen das R-Paket `QCA` kreuzvalidiert: `node scripts/cross-validate.mjs`.
+- Crisp-Kalibrierung und direkte Ragin-Kalibrierung sind gegen `QCA` geprüft. Die direkte Methode nutzt Ragins ±3-Logit-Fixpunkte; `QCA` verwendet abweichende dokumentierte Zielwerte um 0,05/0,95. Die Restabweichung ist kein Beleg für substantielle Kalibrierungsgültigkeit.
+- `calibrateLinear` und `calibrateFourValue` sind im Rechenkern vorhanden, aber in diesem Projektstand nicht extern gegen eine unabhängige Referenz validiert.
+- Die Web-App besitzt bereits Rohdatenimport, Rollenwahl, Set-Spezifikationen, Evidenzfelder, Fallprüfung, Anker-Sensitivität und Protokoll-Export. Die geführte Begründungskette wird mit dem ersten Meilenstein ausgebaut.
 
-### Cross-Validierung gegen R-Paket QCA abschließen
+## P0: Raw-data-to-defensible-calibration
 
-Die Engine-Regressions-Suite (`node scripts/reference-check.mjs`) validiert derzeit nur interne Konsistenz. Ziel ist eine **Kreuzvalidierung** gegen das etablierte R-Paket QCA (und ggf. fsQCA 4.1), um Korrektheit und Reproduzierbarkeit wissenschaftlich zu sichern. Erfordert: Vergleichs-Fixtures erstellen, Toleranzen abstimmen, Befunde dokumentieren.
+**In Umsetzung:** Ein zusammenhängender Ablauf führt für jede Bedingung und das Outcome von Rohwerten zu dokumentierten Set-Mitgliedschaften:
 
-### Desktop-Installer via Tauri signieren
+- Set-Konzept, Population, Einheit, Zeitraum, Richtung und substantielle Mitgliedschaftsdefinition.
+- Bewusste Wahl zwischen direkter Fuzzy-, Crisp- und bereits kalibrierter Provenienz.
+- Qualitative Fuzzy-Anker für vollständige Nichtmitgliedschaft, Crossover und vollständige Mitgliedschaft, beziehungsweise eine begründete Crisp-Grenze.
+- Evidenz pro Entscheidung und Anker. Empirische Verteilungsdiagnostik bleibt ausdrücklich ein Hinweis, keine Begründung.
+- Fallweise Rohwerte, Mitgliedschaften, 0,5-Seite, Grenzfälle, fehlende Werte und Ausnahmen.
+- Sensitivität plausibler Ankeralternativen mit Änderungen an Mitgliedschaften, Truth-Table-Zeilen, Lösungen, Fit und Fallklassifikationen.
+- Reproduzierbarer JSON-, Markdown- und R-Export einschließlich Methodenreferenzen und Einschränkungen.
 
-Die Tauri-Builds sind funktional, aber unsigniert. Desktop-Download setzt Signatur voraus (Apple Developer ID, Windows Authenticode). Erfordert: Developer-Konten, Zertifikate, Build-Pipeline erweitern, Releases verwalten.
+Abnahmekriterium ist der Rohdatensatz `datasets/rohwerte-demokratie.csv` mit mindestens einer Crisp-Bedingung, zwei Fuzzy-Bedingungen und einem Fuzzy-Outcome. Ein grüner Test belegt die Implementierung des Ablaufs, nicht die substantielle Gültigkeit der Beispielanker.
 
-### Repository-Veröffentlichung (öffentlich gehen)
+## P0: Validierung und Anspruchshygiene
 
-Der Code ist reif, aber das Repo ist noch privat. Nächster Schritt: GitHub öffentlich machen, Lizenztext prüfen, Domain einrichten (oder zenodo.org), Zenodo-DOI generieren, erste stabile Version taggen (v1.0 o. ä.).
+- R-`QCA`-Kreuzvalidierung für Engine-Lösungen und unterstützte Crisp/direkte Kalibrierungsfälle erhalten und reproduzierbar ausführen.
+- Interne Regression-Snapshots nicht als externe Validierung bezeichnen.
+- Keine erwarteten Formeln, Toleranzen, Fixtures oder R-Orakel ändern, nur damit eine Prüfung grün wird.
+- Die Gültigkeit eines Sets bleibt eine begründete Forschungsentscheidung der Nutzerin oder des Nutzers.
 
----
+## P1: Kombinierte Robustheit
 
-## Mittelfristig (6–12 Monate)
+Nach dem ersten Meilenstein: methodisch begründete gemeinsame Varianten von Kalibrierungsankern sowie Frequency-, Consistency- und PRI-Entscheidungen. Berichtet werden sollen Sensitivitätsbereiche, stabile und instabile Lösungsterme, Fit-Änderungen sowie robuste, mögliche und fallbezogen wechselnde Klassifikationen. Grundlage ist das Robustness-Test-Protokoll von Oana und Schneider:
+https://doi.org/10.1177/00491241211036158
 
-### csQCA- und mvQCA-Erweiterungen
+## P1: Lokale Projektdaten und Nachvollziehbarkeit
 
-Die aktuelle Engine implementiert **Standardfall-QCA** (single-outcome, cross-case). Erweiterungen um **Crisp-Set QCA** (vereinfachte, nur 0/1) und **Multi-Value QCA** (Bedingungen mit >2 Werten) würden Anwendbarkeit vergrößern. Erfordert: neue Kalibrations- und Minimierungslogik, separate Tests, Dokumentation.
+- Versioniertes lokales Projekt- und Exportformat.
+- Vollständige Missing-Data-Provenienz und wiederholbare Rekonstruktion.
+- Offline- und Datenschutzprüfungen für den kostenlosen Kern.
+- Keine Uploads, Telemetrie oder Cloud-Abhängigkeiten im lokalen Analysepfad ohne ausdrückliche Freigabe.
 
-### Zeitreihen- und Panel-Ansätze prüfen
+## P2: Methodenerweiterung und Reichweite
 
-Einige QCA-Projekte arbeiten mit **Längsschnittdaten** (mehrere Messzeitpunkte pro Fall). Ziel: Machbarkeits-Studie durchführen — können Zeitserien direkt (via Weighted QCA) oder mit Voraggregation in Standard-QCA eingehen? Ergebnis dokumentieren.
+- Linear-, Vier-Werte- und Multi-Value-Methoden erst nach klarer UI-Semantik, eigener Evidenzführung und unabhängiger Validierung in den geführten Ablauf aufnehmen.
+- Englische Methodikseite und englischer Bericht.
+- Performance-Analyse für große Datensätze und gegebenenfalls Web Worker.
+- Zeitreihen- und Panel-Ansätze zunächst als Machbarkeitsprüfung, nicht als stiller Standardfall.
 
-### Weitere Robustheits-Tests
+## Eigentümer- oder Fachfreigabe erforderlich
 
-Aktuell: `robustness.test.ts` prüft Konsistenz/Coverage unter Perturationen. Erweiterungen: **Jackknife**-Validierung (Fall-wise cross-validation), **Stabilitäts-Indizes** für einzelne Lösungsterme, Sensitivity gegenüber Kalibrationsschwellen. Tools: Integration in Web-UI und/oder R-Export.
+Diese Punkte sind keine lokal lösbaren Fertig-Blocker für den kostenlosen Analyse-Kern:
 
-### Englische Methodik-Seite (`docs/qca-primer-en.md`)
+- öffentliche Repository-Veröffentlichung, Domain, Zenodo-DOI und Release-Tags;
+- Tauri-Signierung mit Apple- oder Windows-Zertifikaten;
+- Supabase-, Stripe-, KI- und sonstige Produktionsschlüssel;
+- Deployment und Änderung von Produktionsdaten;
+- juristische Prüfung der Entwürfe unter `legal/`.
 
-Der QCA-Primer existiert nur auf Deutsch. Eine **englische Übersetzung** würde internationales Publikum erreichen und das Projekt als wissenschaftliches Werkzeug etablieren. Erfordert: fachkundige Übersetzung (Englisch + QCA-Fachsprache), Review.
+## Pflege
 
----
-
-## Ideen (low-priority backlog)
-
-### Collaboration (echtzeitbasiert)
-
-**Live-Kollaboration** (mehrere Nutzer an einem Projekt): Würde Lehrszenarien und Gruppenprojekte unterstützen. Technisch komplex (WebSocket, Conflict-Resolution). Nieder-Priorität, da aktuell Fokus auf Kern-Engine liegt.
-
-### Lehr-Modus ("Guided Teaching")
-
-Ein **Schritt-für-Schritt-Tutorial**, das Anfänger durch QCA führt — mit Erklärungen, interaktiven Quiz, Beispieldatensätzen. Würde Hürde für Studierende senken. Erfordert: Didaktik-Input, UI-Komponenten.
-
-### Plugin-Schnittstelle
-
-Eine **offene Plugin-API**, mit der Expert:innen die Engine erweitern könnten (neue Kalibrationsmethoden, Export-Formate, Post-Processing). Würde Ökosystem-Wachstum ermöglichen. Langfristig, abhängig von Prioritäten.
-
-### Performance-Optimierungen
-
-Die Engine lädt **vollständig lokal** (browserbasiert), was Vertrauen schafft. Aber: große Datensätze (1000+ Fälle) können langsam werden. Ziel: Profiling, Algorithmen-Optimierung, Web-Worker zur Parallelisierung.
-
----
-
-## Kontext und Wartung
-
-- **Issue-Triaging:** Regelmäßige Community-Anfragen werden hier eingepflegt; je 2 Wochen Review.
-- **Abhängigkeitsupdate:** Node.js, TypeScript, Next.js, React monatlich gepinnt; Sicherheitsupdates sofort.
-- **Datenschutz & Lizenz:** Anwaltliche Prüfung der legal/*-Entwürfe bleibt ausstehend (DSGVO, AGB, Impressum müssen vor öffentlichem Deployment verifiziert werden).
-
+- Issue-Triage und Abhängigkeitsupdates regelmäßig dokumentieren.
+- Jede neue öffentliche Behauptung zur Rechengenauigkeit mit einer unabhängigen Referenz oder als interne Regression kennzeichnen.
+- Jede neue Kalibrierungsmethode mit Methodikquelle, fehlenden Validierungsgrenzen und einem reproduzierbaren Prüfpfad versehen.

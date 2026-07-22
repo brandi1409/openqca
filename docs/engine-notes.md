@@ -49,6 +49,9 @@ type CalibrationMethod = "direct" | "linear" | "crisp" | "fourValue";
 **Wichtig:** Bei `direct`, `linear` und `fourValue` müssen die Anker/Schwellen
 **streng aufsteigend** sein, sonst wird ein `Error` geworfen
 (`fullOut < crossover < fullIn` bzw. `t1 < t2 < t3`).
+Bei invertierten Crisp-Sets verwendet `calibrateValue` mit
+`crispInclusive: true` die inklusive Regel `raw <= threshold → 1`; die
+normale Inversion von `calibrateCrisp` wäre an der Gleichheit strikt draußen.
 
 `thresholds` bei `calibrate`: `direct`/`linear` erwarten `[fullOut, crossover,
 fullIn]`, `crisp` erwartet `[threshold]`, `fourValue` erwartet `[t1, t2, t3]`.

@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { RawDataset } from "@/lib/demo";
-
+import { findCaseColumn, numericValues } from "@/lib/dataset-columns";
 /** Wandelt eine hochgeladene XLSX-Datei (erstes Sheet) in ein RawDataset um. */
 export async function parseXlsxToDataset(file: File): Promise<RawDataset> {
   const buffer = await file.arrayBuffer();
@@ -40,13 +40,12 @@ export async function parseXlsxToDataset(file: File): Promise<RawDataset> {
     return row;
   });
 
-  const caseCol = columns.find((c) => rows.some((r) => typeof r[c] === "string")) ?? columns[0];
+  const caseCol = findCaseColumn(columns, rows);
 
   // Anker-Vorschläge aus Perzentilen (nur Startpunkt — Nutzer soll theoretisch begründen).
   const anchors: Record<string, [number, number, number]> = {};
   for (const col of columns) {
-    if (col === caseCol) continue;
-    const nums = rows.map((r) => r[col]).filter((v): v is number => typeof v === "number").sort((a, b) => a - b);
+    const nums = numericValues({ name: file.name, caseCol, columns, rows, anchors: {} }, col).sort((a, b) => a - b);
     if (nums.length < 3) continue;
     const q = (p: number) => nums[Math.min(nums.length - 1, Math.round(p * (nums.length - 1)))];
     anchors[col] = [round(q(0.1)), round(q(0.5)), round(q(0.9))];
