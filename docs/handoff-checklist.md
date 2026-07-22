@@ -3,7 +3,7 @@
 Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft nur den Cloud-Tarif und den Live-Gang. Alles hier kann **nur der Inhaber** tun (Konten, Schlüssel, Rechtsprüfung, Deploy). Reihenfolge einhalten.
 
 ## 0. Grundlage
-- [ ] Repo auf GitHub anlegen und pushen (`openqca`).
+- [x] Repo auf GitHub anlegen und pushen (`openqca`).
 - [ ] Lokal prüfen: `npm install`, dann `npm test --workspace @openqca/engine` (43/43) und `npm run build --workspace web`.
 
 ## 1. Supabase (Konto & Datenbank — P3)
