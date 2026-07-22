@@ -273,7 +273,7 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   expect(markdownText).toContain("Protokoll bereit");
   expect(markdownText).not.toContain("Unit:");
   expect(markdownText).not.toContain("Protocol ready");
-  expect(markdownText).toContain("A Robustness Test for Qualitative Comparative Analysis (QCA)");
+  expect(markdownText).toContain("A Robustness Test Protocol for Applied QCA: Theory and R Software Application");
   expect(markdownFile.suggestedFilename()).toBe("openqca-calibration-protocol.md");
 
   const germanReportPopup = page.waitForEvent("popup");
@@ -282,6 +282,7 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   await germanReportPage.waitForLoadState();
   await expect(germanReportPage.locator("html")).toHaveAttribute("lang", "de");
   await expect(germanReportPage.locator("body")).toContainText("openQCA — Analysebericht");
+  await expect(germanReportPage.locator("body")).toContainText("0,800");
   await germanReportPage.close();
 
   await page.getByRole("banner").getByRole("button", { name: "EN", exact: true }).click();
@@ -291,6 +292,8 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   await reportPage.waitForLoadState();
   await expect(reportPage.locator("html")).toHaveAttribute("lang", "en");
   await expect(reportPage.locator("body")).toContainText("openQCA — Analysis report");
+  await expect(reportPage.locator("body")).toContainText("0.800");
+  await expect(reportPage.locator("body")).not.toContainText("0,800");
   await expect(reportPage.locator("body")).not.toContainText("Analysebericht");
   await reportPage.close();
   await page.getByRole("banner").getByRole("button", { name: "DE", exact: true }).click();

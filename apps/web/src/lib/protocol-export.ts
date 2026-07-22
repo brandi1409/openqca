@@ -58,12 +58,12 @@ export const METHODOLOGY_REFERENCES: readonly MethodologyReference[] = [
     scope: "QCA workflows and the QCA package",
   },
   {
-    id: "oana-schneider-2022",
-    citation: "Ioana-Elena Oana and Carsten Q. Schneider (2022), A Robustness Test for Qualitative Comparative Analysis (QCA)",
+    id: "oana-schneider-2021",
+    citation: "Ioana-Elena Oana and Carsten Q. Schneider (online 2021; print 2024), A Robustness Test Protocol for Applied QCA: Theory and R Software Application, Sociological Methods & Research, 53(1), 57–88",
     doi: "10.1177/00491241211036158",
     url: "https://doi.org/10.1177/00491241211036158",
-    pages: "603–638",
-    scope: "Sensitivity analysis for calibration, thresholds, cases, and model specifications",
+    pages: "57–88",
+    scope: "Sensitivity ranges and fit-oriented and case-oriented robustness",
   },
   {
     id: "qca-manual-3-25",
@@ -671,8 +671,8 @@ export function buildCalibrationNarrative(args: {
   );
   lines.push(
     en
-      ? "Direct fuzzy calibration follows Ragin (2008), *Redesigning Social Inquiry* (DOI 10.7208/chicago/9780226702797.001.0001): logistic mapping with qualitative anchors for full non-membership, crossover (0.5), and full membership. Engine fixed points at anchors use log-odds ±3 (≈0.0474 / 0.50 / 0.9526). Linear fuzzy calibration uses the same three qualitative anchors with a piecewise-linear mapping and is exported as QCA::calibrate(logistic = FALSE). Crisp calibration uses an inclusive threshold (≥ → 1 for higher-membership scales; ≤ → 1 for inverted scales). See also Schneider & Wagemann (2012), pp. 35–36; Oana & Schneider (2022), *A Robustness Test for Qualitative Comparative Analysis (QCA)*, pp. 603–638, DOI 10.1177/00491241211036158; R package QCA `calibrate()` (Duša)."
-      : "Direkte Fuzzy-Kalibrierung nach Ragin (2008), *Redesigning Social Inquiry* (DOI 10.7208/chicago/9780226702797.001.0001): logistische Abbildung mit qualitativen Ankern für volle Nicht-Zugehörigkeit, Kreuzung (0,5) und volle Zugehörigkeit. Engine-Fixpunkte an den Ankern nutzen Log-Odds ±3 (≈0,0474 / 0,50 / 0,9526). Lineare Fuzzy-Kalibrierung nutzt dieselben drei qualitativen Anker mit einer stückweise linearen Abbildung und wird als QCA::calibrate(logistic = FALSE) exportiert. Crisp: inklusive Schwelle (≥ → 1 bei aufsteigender Zugehörigkeit; ≤ → 1 bei invertierter Skala). Siehe Schneider & Wagemann (2012), S. 35–36; Oana & Schneider (2022), *A Robustness Test for Qualitative Comparative Analysis (QCA)*, S. 603–638, DOI 10.1177/00491241211036158; R-Paket QCA `calibrate()` (Duša).",
+      ? "Direct fuzzy calibration follows Ragin (2008), *Redesigning Social Inquiry* (DOI 10.7208/chicago/9780226702797.001.0001): logistic mapping with qualitative anchors for full non-membership, crossover (0.5), and full membership. Engine fixed points at anchors use log-odds ±3 (≈0.0474 / 0.50 / 0.9526). Linear fuzzy calibration uses the same three qualitative anchors with a piecewise-linear mapping and is exported as QCA::calibrate(logistic = FALSE). Crisp calibration uses an inclusive threshold (≥ → 1 for higher-membership scales; ≤ → 1 for inverted scales). See also Schneider & Wagemann (2012), pp. 35–36; Oana & Schneider (online 2021; print 2024), *A Robustness Test Protocol for Applied QCA: Theory and R Software Application*, DOI 10.1177/00491241211036158; R package QCA `calibrate()` (Duša)."
+      : "Direkte Fuzzy-Kalibrierung nach Ragin (2008), *Redesigning Social Inquiry* (DOI 10.7208/chicago/9780226702797.001.0001): logistische Abbildung mit qualitativen Ankern für volle Nicht-Zugehörigkeit, Kreuzung (0,5) und volle Zugehörigkeit. Engine-Fixpunkte an den Ankern nutzen Log-Odds ±3 (≈0,0474 / 0,50 / 0,9526). Lineare Fuzzy-Kalibrierung nutzt dieselben drei qualitativen Anker mit einer stückweise linearen Abbildung und wird als QCA::calibrate(logistic = FALSE) exportiert. Crisp: inklusive Schwelle (≥ → 1 bei aufsteigender Zugehörigkeit; ≤ → 1 bei invertierter Skala). Siehe Schneider & Wagemann (2012), S. 35–36; Oana & Schneider (online 2021; Druck 2024), *A Robustness Test Protocol for Applied QCA: Theory and R Software Application*, DOI 10.1177/00491241211036158; R-Paket QCA `calibrate()` (Duša).",
   );
   lines.push("");
   lines.push(en ? "### Methodology references" : "### Methodologische Referenzen");

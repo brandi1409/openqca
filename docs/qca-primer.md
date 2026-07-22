@@ -273,8 +273,7 @@ nur aus Daten belegten Pfad.
 3. **Notwendige Bedingungen** prüfen (Konsistenz ≥ 0,9, Coverage beachten).
 4. **Truth Table** bauen; Frequenz- und Konsistenz-Cutoff setzen; Remainder und
    `atCrossover`-Fälle prüfen.
-5. **Minimieren** – komplexe und sparsame (und, sobald verfügbar, intermediäre)
-   Lösung berechnen.
+5. **Minimieren** – komplexe, sparsame und intermediäre Lösung berechnen.
 6. **Interpretieren** – Solution-/Pfad-Konsistenz und -Coverage lesen, typische
    Fälle je Pfad benennen, an die Theorie zurückbinden.
 

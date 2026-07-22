@@ -37,9 +37,11 @@ function esc(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Zahl mit 3 Nachkommastellen und Dezimal-Komma; NaN/undefined als „—". */
-function fmt(v: number, d = 3): string {
-  return v == null || Number.isNaN(v) ? "—" : v.toFixed(d).replace(".", ",");
+/** Format measures with locale-appropriate decimal separators. */
+function fmt(v: number, d = 3, locale: "de" | "en" = "de"): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  const fixed = v.toFixed(d);
+  return locale === "en" ? fixed : fixed.replace(".", ",");
 }
 
 /** „fs_"-Präfixe entfernen und groß schreiben, wie in der App-Anzeige. */
@@ -220,7 +222,7 @@ function calibrationTable(
   const rows = Object.entries(anchors)
     .map(
       ([v, a]) =>
-        `<tr><td>${esc(label(v))}</td><td>${fmt(a[0])}</td><td>${fmt(a[1])}</td><td>${fmt(a[2])}</td></tr>`,
+        `<tr><td>${esc(label(v))}</td><td>${fmt(a[0], 3, locale)}</td><td>${fmt(a[1], 3, locale)}</td><td>${fmt(a[2], 3, locale)}</td></tr>`,
     )
     .join("");
   return `
@@ -240,7 +242,7 @@ function truthTableSection(tt: TruthTableResult, locale: "de" | "en"): string {
   const bodyRows = observed
     .map((r) => {
       const bits = [...r.bits].map((b) => `<td class="mono num">${b}</td>`).join("");
-      return `<tr>${bits}<td class="num">${r.n}</td><td class="num">${fmt(r.consistency)}</td><td class="num">${fmt(r.pri)}</td><td class="num">${outSymbol(r.output)}</td><td>${esc(r.cases.join(", "))}</td></tr>`;
+      return `<tr>${bits}<td class="num">${r.n}</td><td class="num">${fmt(r.consistency, 3, locale)}</td><td class="num">${fmt(r.pri, 3, locale)}</td><td class="num">${outSymbol(r.output)}</td><td>${esc(r.cases.join(", "))}</td></tr>`;
     })
     .join("");
   const remainderRow = `<tr><td colspan="${tt.conditions.length + 5}" class="remainder">${remainderCount} ${copy.remainder}</td></tr>`;
@@ -270,12 +272,12 @@ function solutionBlock(
       const pathRows = m.paths
         .map(
           (p) =>
-            `<tr><td class="mono">${esc(label(p.expression))}</td><td class="num">${fmt(p.rawCoverage)}</td><td class="num">${fmt(p.uniqueCoverage)}</td><td class="num">${fmt(p.consistency)}</td></tr>`,
+            `<tr><td class="mono">${esc(label(p.expression))}</td><td class="num">${fmt(p.rawCoverage, 3, locale)}</td><td class="num">${fmt(p.uniqueCoverage, 3, locale)}</td><td class="num">${fmt(p.consistency, 3, locale)}</td></tr>`,
         )
         .join("");
       return `
         <div class="formula mono">${esc(formula)} → ${esc(outLabel)}</div>
-        <p class="kpis">${copy.solutionConsistency}: <strong>${fmt(m.solutionConsistency)}</strong> &nbsp;·&nbsp; ${copy.solutionCoverage}: <strong>${fmt(m.solutionCoverage)}</strong></p>
+        <p class="kpis">${copy.solutionConsistency}: <strong>${fmt(m.solutionConsistency, 3, locale)}</strong> &nbsp;·&nbsp; ${copy.solutionCoverage}: <strong>${fmt(m.solutionCoverage, 3, locale)}</strong></p>
         <table>
           <thead><tr><th>${copy.path}</th><th>${copy.rawCoverage}</th><th>${copy.uniqueCoverage}</th><th>${copy.consistency}</th></tr></thead>
           <tbody>${pathRows}</tbody>
@@ -295,7 +297,7 @@ function necessityTable(entries: NecessityEntry[], locale: "de" | "en"): string 
   const rows = entries
     .map(
       (n) =>
-        `<tr><td class="mono">${esc(label(n.condition))}</td><td class="num">${fmt(n.consistency)}</td><td class="num">${fmt(n.coverage)}</td><td class="num">${n.isCandidate ? (locale === "en" ? "yes" : "ja") : "—"}</td></tr>`,
+        `<tr><td class="mono">${esc(label(n.condition))}</td><td class="num">${fmt(n.consistency, 3, locale)}</td><td class="num">${fmt(n.coverage, 3, locale)}</td><td class="num">${n.isCandidate ? (locale === "en" ? "yes" : "ja") : "—"}</td></tr>`,
     )
     .join("");
   return `
@@ -411,7 +413,7 @@ export function generateReportHtml(input: ReportInput): string {
   ${calibrationTable(input.anchors, input.calibSpecs, input.varMeta, locale)}
 
   <h2>${copy.truthTable}</h2>
-  <p class="hint">${copy.conditions}: ${esc(input.conditions.map(label).join(", "))} &nbsp;·&nbsp; ${copy.outcome}: ${esc(outLabel)} &nbsp;·&nbsp; ${copy.frequencyCutoff}: ${input.freqCut} &nbsp;·&nbsp; ${copy.consistencyCutoff}: ${fmt(input.consCut)}</p>
+  <p class="hint">${copy.conditions}: ${esc(input.conditions.map(label).join(", "))} &nbsp;·&nbsp; ${copy.outcome}: ${esc(outLabel)} &nbsp;·&nbsp; ${copy.frequencyCutoff}: ${input.freqCut} &nbsp;·&nbsp; ${copy.consistencyCutoff}: ${fmt(input.consCut, 3, locale)}</p>
   ${truthTableSection(input.tt, locale)}
 
   <h2>${copy.solutions}</h2>

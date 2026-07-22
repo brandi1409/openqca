@@ -50,7 +50,7 @@ export default function MethodikPage() {
   );
   const en = (
     <>
-      {renderPrimer(primerEn ?? primerDe, "en")}
+      {renderPrimer(primerEn, "en")}
       <FormulaReference locale="en" />
     </>
   );
