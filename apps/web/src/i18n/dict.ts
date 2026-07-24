@@ -273,7 +273,7 @@ const de = {
   "step.intro.2":
     "QCA arbeitet mit Mengen („Sets“): Jeder Fall gehört zu jeder Eigenschaft irgendwo zwischen 0 (klar nicht dabei) und 1 (klar dabei). Hier legen Sie fest, welche Spalten Bedingungen sind, welche das Ergebnis (Outcome) ist — und ob die Werte schon Zugehörigkeiten sind oder erst übersetzt werden müssen.",
   "step.intro.3":
-    "Kalibrieren heißt: Konzept und Zielmenge definieren, Methode wählen (Crisp / direkte oder lineare Fuzzy-Kalibrierung / vorab kalibriert), Anker inhaltlich begründen, Fälle prüfen und plausible Alternativen testen. Rohwerte allein sind noch keine Zugehörigkeit.",
+    "Drei begründbare Anker übersetzen Rohwerte in Zugehörigkeiten: voll draußen, Kreuzung, voll drinnen. Ergebnisse erscheinen sofort — die vollständige Dokumentation für Publikationen können Sie jederzeit nachholen.",
   "step.intro.4":
     "Bevor wir Kombinationen prüfen: Gibt es eine Bedingung, ohne die das Outcome (fast) nie vorkommt? Das wäre eine notwendige Bedingung — sie wird separat berichtet.",
   "step.intro.5":
@@ -465,8 +465,33 @@ const de = {
     "Dieses Projekt stammt aus einer älteren Version: bitte Set-Definitionen und Ankerbegründungen ergänzen (neu in dieser Version).",
   "calib.protocol.ready": "Protokollbereit: Definition, Methode, Evidenz, Fallprüfung und Sensitivität sind dokumentiert.",
   "calib.protocol.incomplete": "Protokoll noch nicht vollständig ({n} offene Angabe(n)).",
-"calib.protocol.pageIncomplete": "Analyse und Export bleiben gesperrt, bis Definition, Methode, Evidenz und Fallprüfung dokumentiert sind; für den Export zusätzlich die Sensitivität.",
-  "calib.demoNotice": "Synthetischer Demo-Datensatz: Berechnung ist sichtbar, aber Analyseprotokoll und Bericht bleiben bis zur Dokumentation gesperrt.",
+  "calib.demoNotice": "Synthetischer Demo-Datensatz: Berechnung und Bericht sind sichtbar (der Bericht trägt einen Warnhinweis) — Protokoll- und R-Export bleiben gesperrt.",
+
+  // -- Kalibrierung: Ansicht, Dokumentations-Meter, Schnell-Ansicht ------------
+  "calib.view.aria": "Ansicht der Kalibrierung",
+  "calib.view.quick": "Schnell",
+  "calib.view.doc": "Dokumentation",
+  "calib.meter.title": "Publikationsreife: {done} von {total} Sets dokumentiert",
+  "calib.meter.aria": "Dokumentationsstand je Set",
+  "calib.meter.hint":
+    "Ergebnisse rechnen sofort — die Dokumentation macht sie publikationsreif und schaltet Protokoll- und R-Export frei.",
+  "calib.meter.docBtn": "Dokumentieren →",
+  "calib.meter.chipDone": "dokumentiert",
+  "calib.meter.chipOpen": "offen",
+  "calib.meter.chipAria": "{col} dokumentieren",
+  "calib.quick.title": "Anker setzen, Ergebnisse sehen",
+  "calib.quick.desc":
+    "Je Set: Methode wählen und die drei Anker setzen — per Zahlenfeld oder durch Ziehen der Griffe unter der Kurve. Notwendigkeit, Truth Table und Lösungen rechnen sofort mit.",
+  "calib.quick.method": "Methode",
+  "calib.quick.method.direct": "Direkt",
+  "calib.quick.method.linear": "Linear",
+  "calib.quick.method.crisp": "Crisp",
+  "calib.quick.methodAria": "Kalibrierungsmethode für {col}",
+  "calib.quick.noMethod": "Noch keine Methode gewählt — bitte Direkt, Linear oder Crisp wählen.",
+  "calib.quick.passthrough": "Bereits kalibriert ({type}): wird unverändert übernommen.",
+  "calib.quick.dist": "{inCount} Fälle drinnen · {outCount} draußen",
+  "calib.quick.nearHalf": "{n} nahe 0,5",
+  "calib.quick.missing": "{n} ohne Wert",
   "calib.set.notes": "Zusätzliche Set-Notizen / Ausnahmefälle",
   "calib.method.confirm": "Methode und Semantik bestätigen",
   "calib.method.confirmed": "Methode bestätigt",
@@ -737,13 +762,18 @@ const de = {
     "Reproduzierbar: Kalibrierungsprotokoll (JSON + Markdown) und R-Skript (package QCA; logistic = TRUE für direkte, logistic = FALSE für lineare Fuzzy-Kalibrierung).",
   "proto.downloadBtn": "Protokoll als JSON herunterladen",
   "proto.downloadData": "Rohdaten als CSV herunterladen",
-  "proto.notReady": "Export wird freigeschaltet, sobald Kalibrierungsentscheidungen und Sensitivität dokumentiert sind.",
+  // Erklärt die Export-Sperre dort, wo sie gilt — die Analyse selbst ist nie
+  // gesperrt (siehe calib.meter.hint).
+  "proto.notReady":
+    "Der Export ist das Replikationsartefakt und wird freigeschaltet, sobald jedes Set vollständig dokumentiert ist: Definition, Methode, Evidenz, Fallprüfung und Sensitivität. Bericht und Ergebnisse stehen unabhängig davon bereit.",
 
   // -- Bericht ----------------------------------------------------------------
   "report.title": "Bericht",
   "report.desc": "Öffnet einen druckfähigen Bericht (PDF über den Druckdialog).",
   "report.demoNotice":
     "Demo-Datensatz: Der Bericht lässt sich erzeugen und zeigt den vollständigen Rechenweg — er trägt dann den Hinweis „Synthetische Lehrdaten — nicht zitierfähig“. Protokoll- und R-Export bleiben gesperrt, bis Sie mit eigenen Daten arbeiten und die Kalibrierung begründet haben.",
+  "report.provisionalNotice":
+    "Der Bericht ist erzeugbar und wird als „vorläufig“ gekennzeichnet, solange die Kalibrierung nicht vollständig dokumentiert ist.",
   "report.missingData":
     "Für den Bericht fehlen noch Daten (Truth Table & Lösungen berechnen).",
   "report.generateBtn": "Bericht erzeugen (Druck/PDF)",
@@ -1276,7 +1306,7 @@ const en: Record<DictKey, string> = {
   "step.intro.2":
     "QCA works with sets: every case belongs to every property somewhere between 0 (clearly not in) and 1 (clearly in). Here you define which columns are conditions, which one is the outcome — and whether the values are already memberships or still need to be translated.",
   "step.intro.3":
-    "Calibration means defining the concept and target set, choosing a method (crisp / direct or piecewise-linear fuzzy / already calibrated), justifying anchors substantively, reviewing cases, and testing plausible alternatives. Raw numbers alone are not memberships.",
+    "Three defensible anchors translate raw values into memberships: fully out, crossover, fully in. Results appear immediately — the full documentation for publication can follow whenever you are ready.",
   "step.intro.4":
     "Before we check combinations: is there a condition without which the outcome (almost) never occurs? That would be a necessary condition — it is reported separately.",
   "step.intro.5":
@@ -1465,8 +1495,33 @@ const en: Record<DictKey, string> = {
     "This project was saved in an older version: please complete set definitions and anchor rationales (new in this version).",
   "calib.protocol.ready": "Protocol ready: definition, method, evidence, case review, and sensitivity are documented.",
   "calib.protocol.incomplete": "Protocol incomplete ({n} open item(s)).",
-"calib.protocol.pageIncomplete": "Analysis and export stay locked until definition, method, evidence, and case review are documented; export also requires sensitivity review.",
-  "calib.demoNotice": "Synthetic demo dataset: calculations are visible, but the analysis protocol and report stay locked until the decisions are documented.",
+  "calib.demoNotice": "Synthetic demo dataset: calculations and the report are visible (the report carries a warning banner) — protocol and R export stay locked.",
+
+  // -- Calibration: view switch, documentation meter, quick view ---------------
+  "calib.view.aria": "Calibration view",
+  "calib.view.quick": "Quick",
+  "calib.view.doc": "Documentation",
+  "calib.meter.title": "Publication readiness: {done} of {total} sets documented",
+  "calib.meter.aria": "Documentation status per set",
+  "calib.meter.hint":
+    "Results compute immediately — documentation makes them publication-ready and unlocks the protocol and R export.",
+  "calib.meter.docBtn": "Document →",
+  "calib.meter.chipDone": "documented",
+  "calib.meter.chipOpen": "open",
+  "calib.meter.chipAria": "Document {col}",
+  "calib.quick.title": "Set anchors, see results",
+  "calib.quick.desc":
+    "Per set: choose a method and place the three anchors — by typing a value or by dragging the handles below the curve. Necessity, truth table, and solutions recompute right away.",
+  "calib.quick.method": "Method",
+  "calib.quick.method.direct": "Direct",
+  "calib.quick.method.linear": "Linear",
+  "calib.quick.method.crisp": "Crisp",
+  "calib.quick.methodAria": "Calibration method for {col}",
+  "calib.quick.noMethod": "No method chosen yet — pick direct, linear, or crisp.",
+  "calib.quick.passthrough": "Already calibrated ({type}): passed through unchanged.",
+  "calib.quick.dist": "{inCount} cases in · {outCount} out",
+  "calib.quick.nearHalf": "{n} near 0.5",
+  "calib.quick.missing": "{n} without a value",
   "calib.set.notes": "Additional set notes / exceptions",
   "calib.method.confirm": "Confirm method and semantics",
   "calib.method.confirmed": "Method confirmed",
@@ -1737,13 +1792,16 @@ const en: Record<DictKey, string> = {
     "Reproducible: calibration protocol (JSON + Markdown) and R script (QCA package; logistic = TRUE for direct and logistic = FALSE for piecewise-linear fuzzy calibration).",
   "proto.downloadBtn": "Download protocol as JSON",
   "proto.downloadData": "Download raw data as CSV",
-  "proto.notReady": "Export unlocks once calibration decisions and sensitivity review are documented.",
+  "proto.notReady":
+    "The export is the replication artefact and unlocks once every set is fully documented: definition, method, evidence, case review, and sensitivity. Report and results are available regardless.",
 
   // -- Report -----------------------------------------------------------------
   "report.title": "Report",
   "report.desc": "Opens a print-ready report (PDF via the print dialog).",
   "report.demoNotice":
     "Demo dataset: the report can be generated and shows the full calculation path — it then carries the notice “Synthetic teaching data — not citable”. Protocol and R export stay locked until you work with your own data and justify the calibration.",
+  "report.provisionalNotice":
+    "The report can be generated and is marked “provisional” for as long as the calibration is not fully documented.",
   "report.missingData":
     "Data is still missing for the report (compute the truth table & solutions).",
   "report.generateBtn": "Generate report (print/PDF)",

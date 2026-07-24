@@ -62,13 +62,18 @@ test("A2.9 ⓘ-Popover — vollständig im Viewport, Escape schließt", async ({
 test("A2.10 Anker per Tastatur — ArrowRight erhöht das Zahlenfeld synchron", async ({ page }) => {
   await loadDemo(page);
 
+  // Kurve und Griffe gibt es seit dem Flow-Umbau an ZWEI Orten (Schnell-Karte
+  // und Werkbank). Geprüft wird der Startzustand: die Schnell-Ansicht. Ohne
+  // diese Eingrenzung würde `input[type="number"]` irgendwann auch die
+  // Schwellen-Felder der Truth Table treffen.
+  const quick = page.getByTestId("calibration-quick");
   // Erstes Anker-Zahlenfeld (= „voll draußen" der ersten Roh-Variable).
-  const firstNumber = page.locator('input[type="number"]').first();
+  const firstNumber = quick.locator('[data-testid^="calibration-quick-anchor-"]').first();
   await expect(firstNumber).toBeVisible();
   const before = Number(await firstNumber.inputValue());
 
   // Erster Kurven-Griff (role=slider) = derselbe Anker.
-  const slider = page.getByRole("slider").first();
+  const slider = quick.getByRole("slider").first();
   await slider.focus();
   await page.keyboard.press("ArrowRight");
 

@@ -5,7 +5,7 @@ Jedes Kriterium ist entweder durch die **E2E-Suite** (`apps/web/e2e/`, Playwrigh
 bestehenden Prüfungen (Engine-Tests, R-Kreuzvalidierung, Build) abgedeckt. „Fertig" heißt:
 **alle Prüfungen grün in CI** — nicht „sieht beim Durchklicken gut aus".
 
-Stand: 2026-07-22 · Ausführung: lokale Implementierung, deterministische Prüfungen und Playwright
+Stand: 2026-07-25 · Ausführung: lokale Implementierung, deterministische Prüfungen und Playwright
 
 ---
 
@@ -21,21 +21,41 @@ Stand: 2026-07-22 · Ausführung: lokale Implementierung, deterministische Prüf
 | A1.5 | **Kalibrierungs-Kreuzvalidierung** (crisp/piecewise-linear exakt; direkt-logistisch mit dokumentierter Restabweichung) | `node scripts/calibrate-cross-validate.mjs` — Engine nutzt Ragins ±3-Logit-Fixpunkte (≈0,0474/0,9526), R QCA zielt auf ≈0,05/0,95; Restabweichung ≤ 0,01 wird akzeptiert und dokumentiert |
 
 ### A2 — Funktionale Flüsse (E2E, Chromium)
+
+**Wo das Gate sitzt (verbindlich seit dem Flow-Umbau):** Das Rechnen ist **nie** gesperrt —
+sobald jede aktive Spalte eine *berechenbare* Kalibrierung hat, laufen Notwendigkeit, Truth Table,
+Lösungen und Robustheit, und der Bericht ist erzeugbar. Gesperrt bleibt allein die
+**Publikationsreife**: die vier Replikationsartefakte des Protokoll-Abschnitts (Protokoll-JSON,
+Rohdaten-CSV, Methoden-Protokoll Markdown, R-Skript) verlangen, dass **jedes** Set vollständig
+dokumentiert ist (Definition, Methode, Evidenz, Fallprüfung, Sensitivität). Bis dahin trägt der
+Bericht das Kennzeichen „Vorläufig". Kriterien, die früher „Analyse gesperrt" prüften, prüfen
+deshalb jetzt die Export-Buttons — die Schärfe bleibt, der Ort wandert.
+
+Der Kalibrier-Schritt hat zwei Ansichten: **„Schnell"** (Startzustand: Methode, drei Anker, Kurve)
+und **„Dokumentation"** (die vollständige Werkbank). Alle Werkbank-Tiefenprüfungen laufen
+unverändert scharf, nur eben nach `openDocumentationView()` (Helper in `e2e/helpers.ts`).
+
 | # | Kriterium | Test |
 |---|---|---|
 | A2.1 | Alle Routen liefern 200 und **null Konsolen-Fehler/Pageerrors**: `/`, `/app`, `/methodik`, `/preise`, `/download`, `/konto`, `/rechtliches/{impressum,datenschutz,agb}` | `smoke.spec` |
 | A2.2 | **Demo-Datensatz**: laden → Schritte 1–3 ✓ → komplexe Lösung enthält `WOHLSTAND*URBAN*BILDUNG` | `flows.spec` |
-| A2.3 | **Crisp-Beispiel**: laden ohne Fehler; Deskriptivstatistik zeigt Min/Max exakt `0`/`1`; Kalibrier-Schritt zeigt „bereits kalibriert" | `flows.spec` |
+| A2.3 | **Crisp-Beispiel**: laden ohne Fehler; Deskriptivstatistik zeigt Min/Max exakt `0`/`1`; **beide** Kalibrier-Ansichten zeigen „bereits kalibriert" (Schnell-Karte und Kontextband der Werkbank) | `flows.spec` |
 | A2.4 | **Fuzzy-Beispiel**: laden ohne Fehler; WOHLSTAND Min/Max exakt `0,100`/`0,900` (keine Re-Kalibrierung) | `flows.spec` |
 | A2.5 | **Beispiel-Tour**: startet, alle 7 Stationen per „Weiter", endet sauber | `tour.spec` |
 | A2.6 | **DE/EN**: Umschalter stellt Kern-Überschriften um und zurück; Wahl übersteht Reload | `i18n.spec` |
 | A2.7 | **Rollen-Wechsel**: Outcome im Variablen-Schritt umstellen → genau 1 Outcome, Lösungen rechnen neu, kein Fehler | `flows.spec` |
 | A2.8 | **Grafik-Export**: SVG- und PNG-Button lösen echten Download aus | `interactions.spec` |
 | A2.9 | **ⓘ-Popover**: öffnet vollständig im Viewport (auch in der kürzesten Tabelle), schließt per Escape | `interactions.spec` |
-| A2.10 | **Anker per Tastatur**: Pfeiltaste am Kurven-Griff ändert das Zahlenfeld synchron | `interactions.spec` |
-| A2.11 | **Rohdaten-Checkliste**: Rohdaten laden, vier Lehr-Seed-Spalten übernehmen, Definition/Methode/Anker/Evidenz/Fallprüfung/Sensitivität sichtbar | `flows.spec.ts` |
-| A2.12 | **Raw calibration milestone**: `rohwerte-demokratie.csv` supports at least one crisp condition, one direct-fuzzy condition, one piecewise-linear fuzzy condition, and one direct-fuzzy outcome with substantive evidence coverage, case-level diagnostics, unlocked analysis, sensitivity fit/case effects, and JSON/Markdown/R exports | `flows.spec.ts` |
-| A2.13 | **Evidence and method gate**: empirical diagnostics do not satisfy substantive evidence; switching direct/linear/crisp removes incompatible mapping state and invalidates method/sensitivity confirmations | `flows.spec` |
+| A2.10 | **Anker per Tastatur**: Pfeiltaste am Kurven-Griff der Schnell-Karte ändert das zugehörige Zahlenfeld synchron (Griffe existieren in beiden Ansichten — der Test greift bewusst nur die Schnell-Karte) | `interactions.spec` |
+| A2.11 | **Rohdaten-Checkliste**: Rohdaten laden, Ansicht „Dokumentation", Lehr-Seed übernehmen → Definition/Methode/Anker/Evidenz/Fallprüfung/Sensitivität sichtbar **und editierbar**; Ergebnisse rechnen bereits (Schritte 4–6 offen), Meter meldet „0 von 4 Sets dokumentiert", alle vier Export-Buttons gesperrt | `flows.spec` |
+| A2.12 | **Raw calibration milestone**: `rohwerte-demokratie.csv` trägt mindestens eine Crisp-Bedingung, eine direkt-fuzzy Bedingung, eine stückweise-lineare Bedingung und ein direkt-fuzzy Outcome — mit substanzieller Evidenzdeckung, Fall-Diagnostik, Sensitivitäts-Fit/Fallwirkungen; während der Dokumentation ist das **Export**-Gate geschlossen, danach liefern JSON/Markdown/R vollständige Artefakte (inkl. A2.19) | `flows.spec` |
+| A2.13 | **Evidence and method gate**: empirische Diagnostik erfüllt die substanzielle Evidenzpflicht nicht → Publikationsreife bleibt aus und das **Export**-Gate geschlossen; Methodenwechsel direkt/linear/crisp entfernt inkompatiblen Mapping-Zustand und entwertet Methoden-/Sensitivitäts-Bestätigungen | `flows.spec` |
+| A2.14 | **Lokale Projekt-Persistenz**: „Projekt lokal speichern" → Reload lädt den Datensatz automatisch zurück | `flows.spec` |
+| A2.15 | **Kalibrier-Provenienz & Missing-Policy** überstehen Reload (Set-Bezeichnung, Policy, Evidenzzeile) | `flows.spec` |
+| A2.16 | **Demo-Bericht**: erzeugbar, trägt im Dokument selbst das Banner „Synthetische Lehrdaten — nicht zitierfähig"; Rechenweg vollständig; Protokoll-/R-Export bleibt gesperrt | `flows.spec` |
+| A2.17 | **Schnellpfad**: eigene Rohwerte laden, **nichts** ausfüllen → Schnell-Ansicht ist Startzustand, Notwendigkeit/Truth Table/Lösungen rechnen sofort, Bericht-Button frei, Meter zeigt „0 von 4 Sets dokumentiert", alle vier Export-Buttons gesperrt, null Pageerrors | `flows.spec` |
+| A2.18 | **„Vorläufig"-Banner**: Bericht aus dem Schnellpfad trägt `Vorläufig — Kalibrierung noch nicht vollständig dokumentiert`, **kein** Demo-Banner, und enthält den vollständigen Rechenweg | `flows.spec` |
+| A2.19 | **Dokumentation schaltet Export frei**: nach vollständiger Dokumentation aller Sets meldet das Meter „4 von 4", alle vier Export-Buttons sind bedienbar, der Sperrgrund verschwindet und der Bericht trägt **kein** Banner mehr | `flows.spec` (im A2.12-Durchlauf geprüft — der vollständige Dokumentationslauf ist dort bereits vorhanden; ein eigener Test wäre reine Wiederholung) |
 
 ### A3 — Visuelle Integrität (E2E, generisch — findet auch künftige Fälle)
 Geprüft in **4 Matrizen**: Light/Dark × Desktop (1280) / Mobile (390).

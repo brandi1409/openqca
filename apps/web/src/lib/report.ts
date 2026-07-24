@@ -31,6 +31,13 @@ export interface ReportInput {
    * ergebnis durchgehen nein.
    */
   demo?: boolean;
+  /**
+   * Kalibrierung noch nicht vollständig dokumentiert (Definitionen, Evidenz,
+   * Fallprüfung). Der Bericht wird trotzdem erzeugt — Ergebnisse zuerst — und
+   * kennzeichnet sich als vorläufig. Bei `demo: true` hat das Demo-Banner
+   * Vorrang; dieses hier erscheint dann nicht zusätzlich.
+   */
+  provisional?: boolean;
 }
 
 /** HTML-Escaping für alle dynamischen Strings (Namen, Fälle, Ausdrücke). */
@@ -124,6 +131,10 @@ const REPORT_COPY = {
     demoBannerTitle: "Synthetische Lehrdaten — nicht zitierfähig",
     demoBannerBody:
       "Dieser Bericht wurde aus einem synthetischen Demonstrationsdatensatz erzeugt. Er zeigt den vollständigen Rechenweg von openQCA, belegt aber keine empirischen Befunde. Die Zahlen dürfen nicht zitiert, veröffentlicht oder als Forschungsergebnis verwendet werden. Für eine belastbare Analyse eigene Daten laden und die Kalibrierung inhaltlich begründen.",
+    provisionalBannerTitle: "Vorläufig — Kalibrierung noch nicht vollständig dokumentiert",
+    provisionalShort: "Vorläufig",
+    provisionalBannerBody:
+      "Die Berechnungen sind exakt, aber die inhaltliche Begründung der Kalibrierung (Set-Definitionen, Evidenz, Fallprüfung) ist noch unvollständig. Für eine publikationsreife Fassung die Dokumentation in der Kalibrier-Werkbank vervollständigen — sie schaltet auch Protokoll- und R-Export frei.",
   },
   en: {
     fullOut: "full non-membership (0.05)",
@@ -186,6 +197,10 @@ const REPORT_COPY = {
     demoBannerTitle: "Synthetic teaching data — not citable",
     demoBannerBody:
       "This report was generated from a synthetic demonstration dataset. It shows openQCA's full calculation path but establishes no empirical findings. The numbers must not be cited, published, or used as research results. For a defensible analysis, load your own data and justify the calibration substantively.",
+    provisionalBannerTitle: "Provisional — calibration not yet fully documented",
+    provisionalShort: "Provisional",
+    provisionalBannerBody:
+      "The calculations are exact, but the substantive justification of the calibration (set definitions, evidence, case review) is still incomplete. For a publication-ready version, complete the documentation in the calibration workbench — it also unlocks protocol and R export.",
   },
 } as const;
 
@@ -440,7 +455,7 @@ export function generateReportHtml(input: ReportInput): string {
 <html lang="${locale}">
 <head>
 <meta charset="utf-8" />
-<title>${input.demo ? `[${copy.demoBannerTitle}] ` : ""}openQCA — ${copy.analysisTitle}: ${esc(label(input.datasetName))}</title>
+<title>${input.demo ? `[${copy.demoBannerTitle}] ` : input.provisional ? `[${copy.provisionalShort}] ` : ""}openQCA — ${copy.analysisTitle}: ${esc(label(input.datasetName))}</title>
 <style>${STYLE}</style>
 </head>
 <body>
@@ -448,7 +463,9 @@ export function generateReportHtml(input: ReportInput): string {
   ${
     input.demo
       ? `<div class="demo-banner" role="note"><strong>${copy.demoBannerTitle}</strong><span>${copy.demoBannerBody}</span></div>`
-      : ""
+      : input.provisional
+        ? `<div class="demo-banner" role="note"><strong>${copy.provisionalBannerTitle}</strong><span>${copy.provisionalBannerBody}</span></div>`
+        : ""
   }
   <p class="subtitle">${copy.dataset}: <strong>${esc(input.datasetName)}</strong> &nbsp;·&nbsp; ${copy.cases}: <strong>${input.caseCount}</strong> &nbsp;·&nbsp; ${copy.created}: ${esc(created)}</p>
   <p class="note">${copy.createdWith}</p>

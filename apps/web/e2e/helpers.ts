@@ -83,6 +83,56 @@ export async function loadRawRohwerte(page: Page): Promise<void> {
 }
 
 /**
+ * Der Kalibrier-Schritt startet in der Schnell-Ansicht (Anker + Kurve). Alle
+ * Tiefenprüfungen der Werkbank (Set-Definition, Evidenz-Gate, Methodenwechsel,
+ * Persistenz) leben unverändert in der zweiten Ansicht „Dokumentation" — erst
+ * umschalten, dann prüfen. Die Wahl merkt sich die Sitzung
+ * (`sessionStorage: openqca_calibration_view`), nach einem Reload steht sie
+ * daher meist schon richtig; der Helfer ist deshalb idempotent.
+ */
+export async function openDocumentationView(page: Page): Promise<void> {
+  const docTab = page.getByTestId("calibration-view-doc");
+  await docTab.waitFor({ state: "visible", timeout: 15_000 });
+  if ((await docTab.getAttribute("aria-pressed")) !== "true") await docTab.click();
+  await expect(docTab).toHaveAttribute("aria-pressed", "true");
+  // Die Werkbank ist erst montiert, wenn ihr Kontextband gerendert ist.
+  await expect(page.getByTestId("calibration-active-context")).toBeVisible();
+}
+
+/**
+ * Die vier Replikationsartefakte des Protokoll-Abschnitts. Sie sind das
+ * Publikations-Gate: freigeschaltet erst, wenn JEDES Set vollständig
+ * dokumentiert ist (`calibrationResearchReady`). Das Rechnen selbst ist nie
+ * gesperrt — deshalb prüfen die Gate-Zusagen genau diese Buttons.
+ */
+export const PROTOCOL_EXPORT_LABELS = [
+  /Protokoll als JSON herunterladen/,
+  /Rohdaten als CSV herunterladen/,
+  /Methoden-Protokoll \(Markdown\)/,
+  /R-Skript kopieren/,
+] as const;
+
+/** Alle vier Export-Buttons sind gesperrt und die Begründung steht daneben. */
+export async function expectExportGateClosed(page: Page): Promise<void> {
+  const protocol = page.locator("#protokoll");
+  await expect(protocol).toBeVisible({ timeout: 15_000 });
+  await expect(protocol).toContainText(/Der Export ist das Replikationsartefakt/);
+  for (const label of PROTOCOL_EXPORT_LABELS) {
+    await expect(protocol.getByRole("button", { name: label }), String(label)).toBeDisabled();
+  }
+}
+
+/** Alle vier Export-Buttons sind frei und der Sperrgrund ist verschwunden. */
+export async function expectExportGateOpen(page: Page): Promise<void> {
+  const protocol = page.locator("#protokoll");
+  await expect(protocol).toBeVisible({ timeout: 15_000 });
+  await expect(protocol).not.toContainText(/Der Export ist das Replikationsartefakt/);
+  for (const label of PROTOCOL_EXPORT_LABELS) {
+    await expect(protocol.getByRole("button", { name: label }), String(label)).toBeEnabled();
+  }
+}
+
+/**
  * A3.1-Kernprüfung: In JEDEM `<svg>` dürfen sich keine Text-Labels überlappen.
  * Gesammelt werden `<text>`-Elemente mit sichtbarem Inhalt (Länge > 2) und
  * nicht rein numerisch (Achsen-Ticks/Ankerwerte ausgenommen). Verglichen wird

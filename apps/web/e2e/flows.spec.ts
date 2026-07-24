@@ -1,6 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
-import { loadDemo, loadExample, loadRawRohwerte } from "./helpers";
+import {
+  expectExportGateClosed,
+  expectExportGateOpen,
+  loadDemo,
+  loadExample,
+  loadRawRohwerte,
+  openDocumentationView,
+} from "./helpers";
 
 /**
  * A2.2–A2.4, A2.7 — Funktionale Kern-Flüsse: Demo, Crisp-/Fuzzy-Beispiel und
@@ -36,7 +43,13 @@ test("A2.3 Crisp-Beispiel — FOERDERUNG Min 0 / Max 1, bereits kalibriert", asy
   await expect(cells.nth(2), "Minimum FOERDERUNG").toHaveText(/^0(,0+)?$/);
   await expect(cells.nth(5), "Maximum FOERDERUNG").toHaveText(/^1(,0+)?$/);
 
-  // Crisp-Sets brauchen keine Kalibrierung.
+  // Crisp-Sets brauchen keine Kalibrierung. Das sagt jetzt schon die
+  // Start-Ansicht („Schnell") …
+  await expect(page.getByTestId("calibration-quick-card-FOERDERUNG")).toContainText(
+    /Bereits kalibriert/,
+  );
+  // … und die Ansicht „Dokumentation" bestätigt es unverändert im Kontextband.
+  await openDocumentationView(page);
   await expect(page.getByTestId("calibration-active-context")).toContainText(/bereits kalibriert/);
 });
 
@@ -80,6 +93,7 @@ test("A2.11 Raw calibration keeps editing open until research checklist is compl
   page,
 }) => {
   await loadExample(page, /Rohwerte Demokratie/);
+  await openDocumentationView(page);
   await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
 
   const methodConfirm = page.locator('[data-testid="calibration-method-confirm"]');
@@ -90,20 +104,33 @@ test("A2.11 Raw calibration keeps editing open until research checklist is compl
   const originalDefinition = await definition.inputValue();
   await definition.fill(`${originalDefinition} (edited)`);
   await expect(definition).toHaveValue(`${originalDefinition} (edited)`);
-  await expect(page.locator("#notwendigkeit")).toContainText("gesperrt");
-  await expect(page.locator("#truthtable")).toContainText("gesperrt");
-  await expect(page.locator("#robustheit")).toContainText("Erst Truth Table");
-  await expect(page.locator("#robustheit button")).toHaveCount(0);
+
+  // Die unvollständige Checkliste sperrt nicht mehr das Rechnen, sondern die
+  // Publikationsreife: Notwendigkeit, Truth Table und Robustheit sind
+  // freigeschaltet, der Dokumentationsstand ist unvollständig, und die vier
+  // Replikationsartefakte bleiben gesperrt.
+  await expect(page.locator("#notwendigkeit")).toContainText("Notwendige Bedingungen");
+  await expect(page.locator("#notwendigkeit")).not.toContainText("gesperrt");
+  await expect(page.locator("#truthtable")).not.toContainText("gesperrt");
+  await expect(page.locator("#robustheit")).not.toContainText("Erst Truth Table");
+  await expect(page.getByTestId("calibration-doc-meter-title")).toContainText(
+    /^Publikationsreife: 0 von 4 Sets dokumentiert$/,
+  );
+  await expect(page.locator('[data-readiness="protocol-incomplete"]')).toBeVisible();
+  await expectExportGateClosed(page);
 });
 
 test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and protocol", async ({
   page,
 }) => {
   await loadRawRohwerte(page);
+  await openDocumentationView(page);
   await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
   await expect(page.getByTestId("calibration-progress")).toBeVisible();
   await expect(page.getByTestId("calibration-progress")).not.toContainText("6 von 6");
-  await expect(page.locator("#notwendigkeit")).toContainText("gesperrt");
+  // Gate = Publikationsreife/Export, nicht das Rechnen: Solange dokumentiert
+  // wird, bleiben die vier Replikationsartefakte gesperrt.
+  await expectExportGateClosed(page);
 
   // The seeded raw workflow exposes a direct-fuzzy condition with meanings,
   // a case-level table, and explicit sensitivity output.
@@ -153,14 +180,14 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   await completeCurrentVariable(["set", "method", "fullOut", "crossover", "fullIn"]);
 
   // Switch to a crisp condition and verify the method-specific mapping UI.
-  await page.getByRole("button", { name: /INDUSTRIEANTEIL/ }).click();
+  await page.getByTestId("calibration-variable-INDUSTRIEANTEIL").click();
   await expect(page.getByTestId("calibration-method-crisp")).toBeVisible();
   await expect(page.getByTestId("calibration-mapping-crisp")).toBeVisible();
   await expect(page.getByTestId("calibration-crisp-threshold")).toBeVisible();
   await completeCurrentVariable(["set", "method", "threshold"]);
 
   // A second fuzzy condition uses the independently validated piecewise-linear path.
-  await page.getByRole("button", { name: /ALPHABETISIERUNG/ }).click();
+  await page.getByTestId("calibration-variable-ALPHABETISIERUNG").click();
   await page.getByTestId("calibration-method-linear").click();
   await expect(page.getByTestId("calibration-mapping-linear")).toBeVisible();
   await expect(page.getByTestId("calibration-mapping-direct")).toHaveCount(0);
@@ -168,12 +195,21 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
 
   // Outcome calibration remains a separate set decision and keeps its own
   // direct-fuzzy anchors and sensitivity interpretation.
-  await page.getByRole("button", { name: /DEMOKRATIE_INDEX/ }).click();
+  await page.getByTestId("calibration-variable-DEMOKRATIE_INDEX").click();
   await expect(page.getByTestId("calibration-set-role")).toHaveText(/Outcome/);
   await expect(page.getByTestId("calibration-mapping-direct")).toBeVisible();
   await expect(page.getByText(/keinen universellen „guten Outcome-Wert/)).toBeVisible();
   await expect(page.getByText(/Outcome-Zugehörigkeit ≠ Analyse-Cutoffs/)).toBeVisible();
   await completeCurrentVariable(["set", "method", "fullOut", "crossover", "fullIn"]);
+
+  // A2.19 — Vollständige Dokumentation schaltet die Replikationsartefakte frei:
+  // Das Meter meldet alle vier Sets dokumentiert, und alle vier Export-Buttons
+  // (JSON, CSV, Markdown, R) sind bedienbar. Die Zusage steckt hier statt in
+  // einem eigenen Test, weil sie exakt diesen Durchlauf braucht.
+  await expect(page.getByTestId("calibration-doc-meter-title")).toContainText(
+    /^Publikationsreife: 4 von 4 Sets dokumentiert$/,
+  );
+  await expectExportGateOpen(page);
 
   // Completing the local checklist unlocks the reproducible protocol exports.
   const protocol = page.locator("#protokoll");
@@ -288,6 +324,9 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   await expect(germanReportPage.locator("html")).toHaveAttribute("lang", "de");
   await expect(germanReportPage.locator("body")).toContainText("openQCA — Analysebericht");
   await expect(germanReportPage.locator("body")).toContainText("0,800");
+  // A2.19 — Kehrseite von A2.18: dokumentiert heißt kein „Vorläufig"-Banner
+  // (und ebenso wenig ein Demo-Banner) mehr im Bericht.
+  await expect(germanReportPage.locator(".demo-banner")).toHaveCount(0);
   await germanReportPage.close();
 
   await page.getByRole("banner").getByRole("button", { name: "EN", exact: true }).click();
@@ -327,6 +366,7 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
 
 test("A2.13 Evidence gate and method reset stay explicit", async ({ page }) => {
   await loadRawRohwerte(page);
+  await openDocumentationView(page);
   await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
 
   const evidenceRows = page.locator('[data-testid^="calibration-evidence-row-"]');
@@ -350,6 +390,9 @@ test("A2.13 Evidence gate and method reset stay explicit", async ({ page }) => {
     "false",
   );
   await expect(page.locator('[data-readiness="protocol-incomplete"]')).toBeVisible();
+  // Ein bloßes Verteilungs-Diagnostikum trägt keine Ankerbegründung — die
+  // Publikationsreife bleibt aus und mit ihr das Export-Gate geschlossen.
+  await expectExportGateClosed(page);
 
   await page.getByTestId("calibration-method-crisp").click();
   await expect(page.getByTestId("calibration-method-crisp")).toHaveAttribute("aria-pressed", "true");
@@ -397,6 +440,7 @@ test("A2.14 Local project persistence survives reload", async ({ page }) => {
 
 test("A2.15 Calibration provenance and missing policy survive reload", async ({ page }) => {
   await loadRawRohwerte(page);
+  await openDocumentationView(page);
   await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
   await page.getByTestId("calibration-missing-policy").selectOption("leave_unresolved");
   await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustratives Lehrbeispiel/i);
@@ -404,6 +448,9 @@ test("A2.15 Calibration provenance and missing policy survive reload", async ({ 
   await page.getByRole("button", { name: "Projekt lokal speichern" }).click();
   await expect(page.getByText("Lokal gespeichert.")).toBeVisible();
   await page.reload();
+  // Die Ansichtswahl lebt in der Sitzung, nicht im Projekt — nach dem Reload
+  // deshalb bewusst erneut auf „Dokumentation" stellen, statt darauf zu bauen.
+  await openDocumentationView(page);
 
   await expect(page.getByTestId("calibration-variable-BIP_pKopf")).toBeVisible();
   await expect(page.getByLabel("Set-Bezeichnung")).toHaveValue("Relativ wohlhabende Länder");
@@ -442,5 +489,81 @@ test("A2.16 Demo-Bericht ist erzeugbar und als nicht zitierfähig markiert", asy
   await expect(banner).toContainText(/nicht zitiert/i);
   // Und der Rechenweg ist trotzdem vollständig enthalten.
   await expect(report.locator("body")).toContainText(/WOHLSTAND/);
+  await report.close();
+});
+
+/**
+ * A2.17 — Schnellpfad: Wer eigene Rohwerte lädt, sieht Ergebnisse SOFORT, ohne
+ * ein einziges Feld auszufüllen. Der Kalibrier-Schritt startet in der
+ * Schnell-Ansicht, Notwendigkeit/Truth Table/Lösungen rechnen mit den beim
+ * Import gesetzten vorläufigen Ankern — und trotzdem bleibt das
+ * Replikationsartefakt (Protokoll/CSV/Markdown/R) gesperrt, weil nichts davon
+ * dokumentiert ist. Das ist die Umkehrung des alten Flusses und muss geprüft
+ * bleiben, sonst schleicht sich die Sperre wieder vor die Ergebnisse.
+ */
+test("A2.17 Schnellpfad — Rohwerte rechnen ohne Dokumentation, Export bleibt gesperrt", async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (e) => pageErrors.push(e.message));
+
+  await loadRawRohwerte(page);
+
+  // Startzustand: Schnell-Ansicht, kein einziges Set dokumentiert.
+  await expect(page.getByTestId("calibration-view-quick")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("calibration-quick")).toBeVisible();
+  await expect(page.getByTestId("calibration-active-context")).toHaveCount(0);
+  await expect(page.getByTestId("calibration-doc-meter-title")).toContainText(
+    /^Publikationsreife: 0 von 4 Sets dokumentiert$/,
+  );
+  await expect(page.locator('[data-testid^="calibration-doc-chip-"][data-documented="true"]')).toHaveCount(0);
+
+  // Ergebnisse sind da — ohne eine einzige Eingabe.
+  await expect(page.locator("#notwendigkeit")).not.toContainText("gesperrt");
+  await expect(page.locator("#notwendigkeit table")).toBeVisible();
+  await expect(page.locator("#truthtable")).not.toContainText("gesperrt");
+  await expect(page.locator("#truthtable table").first()).toBeVisible();
+  await expect(page.locator("#loesungen")).toContainText(/→ DEMOKRATIE_INDEX/);
+
+  // Der Bericht ist erzeugbar (er kennzeichnet sich als vorläufig, A2.18) …
+  await expect(page.getByRole("button", { name: "Bericht erzeugen (Druck/PDF)" })).toBeEnabled();
+  // … die vier Replikationsartefakte bleiben gesperrt.
+  await expectExportGateClosed(page);
+
+  expect(pageErrors, pageErrors.join(" | ")).toEqual([]);
+});
+
+/**
+ * A2.18 — Der Bericht aus dem Schnellpfad trägt das „Vorläufig"-Banner: echte
+ * Daten, exakte Zahlen, aber die Kalibrierung ist noch nicht begründet. Das
+ * Demo-Banner darf hier NICHT erscheinen (es sind keine synthetischen Daten),
+ * und der Rechenweg muss vollständig drinstehen — sonst wäre die Vorläufigkeit
+ * eine Sperre durch die Hintertür.
+ */
+test("A2.18 Vorläufig-Banner — Bericht aus dem Schnellpfad kennzeichnet sich selbst", async ({
+  page,
+  context,
+}) => {
+  await loadRawRohwerte(page);
+
+  // Hinweis in der App selbst.
+  await expect(page.getByText(/als .?vorläufig.? gekennzeichnet/i)).toBeVisible();
+
+  const generate = page.getByRole("button", { name: "Bericht erzeugen (Druck/PDF)" });
+  await expect(generate).toBeEnabled();
+
+  const popupPromise = context.waitForEvent("page");
+  await generate.click();
+  const report = await popupPromise;
+  await report.waitForLoadState("domcontentloaded");
+
+  const banner = report.locator(".demo-banner");
+  await expect(banner).toContainText("Vorläufig — Kalibrierung noch nicht vollständig dokumentiert");
+  await expect(banner).toContainText(/Berechnungen sind exakt/);
+  // Keine Verwechslung mit dem Demo-Warnbanner (A2.16).
+  await expect(report.locator("body")).not.toContainText(/Synthetische Lehrdaten/i);
+  // Der Rechenweg ist vollständig enthalten.
+  await expect(report.locator("body")).toContainText("DEMOKRATIE_INDEX");
+  await expect(report.locator("body")).toContainText("openQCA — Analysebericht");
   await report.close();
 });

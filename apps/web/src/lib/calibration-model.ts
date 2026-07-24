@@ -373,18 +373,11 @@ export function specIsComputable(spec: CalibrationSpec | undefined, varType: Var
 export function specIsProtocolReady(spec: CalibrationSpec | undefined, varType: VarType): boolean {
   return calibrationReadiness(spec, varType).protocolReady;
 }
-/** Research-ready for analysis; sensitivity is reviewed separately before export. */
-export function specIsAnalysisReady(
-  spec: CalibrationSpec | undefined,
-  varType: VarType,
-): boolean {
-  const readiness = calibrationReadiness(spec, varType);
-  return (
-    readiness.computable &&
-    readiness.missingEvidence.length === 0 &&
-    readiness.missingFields.filter((field) => field !== "sensitivityReview").length === 0
-  );
-}
+// Hinweis: Die frühere Zwischenstufe `specIsAnalysisReady` (Evidenz komplett,
+// aber Sensitivität offen) wurde mit der Flow-Umkehr entfernt: Rechnen hängt
+// jetzt an `specIsComputable`, Publikationsreife/Export an `specIsProtocolReady`.
+// Eine dritte Stufe mit dem irreführenden Namen „analysis-ready" hätte nur
+// wieder suggeriert, die Analyse sei an Dokumentation gebunden.
 
 export function hasSubstantiveEvidence(spec: CalibrationSpec): boolean {
   return spec.evidence.some((e) => e.isSubstantive && nonEmpty(e.note) && citationComplete(e));

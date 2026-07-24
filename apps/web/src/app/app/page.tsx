@@ -35,10 +35,10 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { InfoHint } from "@/components/InfoHint";
 import { Kpi as UiKpi, SectionHeading } from "@/components/ui";
 import { CalibrationWorkbench } from "@/components/calibration/CalibrationWorkbench";
+import { CalibrationQuick } from "@/components/calibration/CalibrationQuick";
 import {
   anchorsFromSpecs,
   migrateSpecsFromAnchors,
-  specIsAnalysisReady,
   specIsComputable,
   specIsProtocolReady,
   type CalibSpecs,
@@ -93,6 +93,15 @@ type SolBundle = {
 
 const fmt = (v: number, d = 3) =>
   v == null || Number.isNaN(v) ? "—" : v.toFixed(d).replace(".", ",");
+
+/**
+ * Ansicht des Kalibrier-Schritts. „Schnell" ist der Standard: Anker setzen,
+ * Ergebnisse sehen. „Dokumentation" ist die vollständige Workbench. Die Wahl
+ * gehört bewusst NICHT ins gespeicherte Projekt (sie beschreibt keine
+ * Forschungsentscheidung), sondern nur in die Sitzung.
+ */
+type CalibrationView = "quick" | "doc";
+const CALIBRATION_VIEW_STORAGE_KEY = "openqca_calibration_view";
 
 /** Zustand eines Stepper-Schritts: erledigt / aktiv (bereit) / gesperrt. */
 type StepStatus = "done" | "active" | "locked";
@@ -183,6 +192,10 @@ export default function Home() {
   const [calibMigrateBanner, setCalibMigrateBanner] = useState(false);
   const [varMeta, setVarMeta] = useState<Record<string, VarMeta>>({});
   const [focusVar, setFocusVar] = useState<string>("");
+  // Serverseitig gibt es keine sessionStorage — der Standard „Schnell" wird
+  // deshalb erst nach dem Mount durch die gemerkte Wahl ersetzt (keine
+  // Hydration-Abweichung).
+  const [calibView, setCalibView] = useState<CalibrationView>("quick");
   const [freqCut, setFreqCut] = useState(1);
   const [consCut, setConsCut] = useState(0.8);
   const [xyCond, setXyCond] = useState("");
@@ -277,6 +290,39 @@ export default function Home() {
   }
   function endTour() {
     setTourStep(null);
+  }
+
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = window.sessionStorage.getItem(CALIBRATION_VIEW_STORAGE_KEY);
+    } catch {
+      // Ohne sessionStorage bleibt es bei „Schnell" — kein Fehlerfall.
+    }
+    if (saved !== "quick" && saved !== "doc") return;
+    // Nach dem Mount statt im Effektrumpf: keine Kaskadenrenders, und das
+    // vorgerenderte Markup bleibt für die Hydration identisch.
+    const timer = window.setTimeout(() => setCalibView(saved as CalibrationView), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  function chooseCalibView(next: CalibrationView) {
+    setCalibView(next);
+    try {
+      window.sessionStorage.setItem(CALIBRATION_VIEW_STORAGE_KEY, next);
+    } catch {
+      // Die Wahl gilt dann nur bis zum Neuladen.
+    }
+  }
+
+  /** „Dokumentieren →": Ansicht wechseln UND die Variable in der Workbench fokussieren. */
+  function documentVariable(column: string) {
+    setFocusVar(column);
+    chooseCalibView("doc");
+    window.setTimeout(
+      () => document.getElementById("kalibrierung")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      0,
+    );
   }
 
   // Local-first restore: an explicit demo deep-link always wins over a saved project.
@@ -552,30 +598,40 @@ export default function Home() {
   const step2Done =
     activeAnalysisCols.some((c) => varMeta[c]?.role === "condition") &&
     activeAnalysisCols.some((c) => varMeta[c]?.role === "outcome");
-  // The synthetic demo is an explicit teaching exception: calculations stay
-  // visible, while the research/export gate remains closed below.
+  /**
+   * Rechnen darf, was rechenbar ist. Der Schritt gilt als erledigt, sobald jede
+   * aktive Spalte eine berechenbare Kalibrierung hat (Anker gültig, Methode
+   * gewählt) — NICHT erst, wenn sie vollständig dokumentiert ist. Die
+   * Dokumentation ist ein sichtbarer Fortschritt (Meter) und Voraussetzung für
+   * das Replikationsartefakt, nie fürs Sehen der Ergebnisse.
+   */
   const step3Done =
     step2Done &&
     (demoMode ||
       activeAnalysisCols.every((column) =>
-        specIsAnalysisReady(calibSpecs[column], varMeta[column].type),
+        specIsComputable(calibSpecs[column], varMeta[column].type),
       ));
+  const documentedCols = activeAnalysisCols.filter((column) =>
+    specIsProtocolReady(calibSpecs[column], varMeta[column].type),
+  );
   const calibrationResearchReady =
     !demoMode &&
     step2Done &&
     activeAnalysisCols.every((column) =>
       specIsProtocolReady(calibSpecs[column], varMeta[column].type),
     );
-  /**
-   * Der Bericht ist auch für den synthetischen Demo-Datensatz erzeugbar — er
-   * trägt dann ein unübersehbares Warnbanner („nicht zitierfähig"). Sonst sähe
-   * niemand, der das Werkzeug prüft, jemals das Ergebnisdokument. Der
-   * Protokoll-/R-Export bleibt bewusst gesperrt: Er ist das Replikations-
-   * artefakt und behauptet Provenienz, die synthetische Daten nicht haben.
-   */
-  const reportAvailable = demoMode || calibrationResearchReady;
   const step4Done = step3Done && !!necessity; // Analyse-Schritt: bereit = Ergebnis liegt vor
   const step5Done = step3Done && !!(tt && sol);
+  /**
+   * Der Bericht ist da, sobald Lösungen da sind — für Demo-Daten wie für eigene.
+   * Ist die Kalibrierung noch nicht vollständig dokumentiert, trägt er das
+   * Kennzeichen „vorläufig" (`provisional`); der synthetische Demo-Datensatz
+   * trägt weiterhin sein eigenes „nicht zitierfähig"-Banner. Der Protokoll-/
+   * R-Export bleibt gesperrt: Er ist das Replikationsartefakt und behauptet
+   * Provenienz, die undokumentierte oder synthetische Daten nicht haben.
+   */
+  const reportAvailable = step5Done && !!necessity;
+  const reportProvisional = !demoMode && !calibrationResearchReady;
   const step6Done = false; // Terminal-Schritt: bleibt „aktiv", solange man hier arbeitet
 
   const s1 = statusOf(true, step1Done);
@@ -706,40 +762,88 @@ export default function Home() {
       <Step n={3} id={stepMeta[2].id} title={t(locale, stepMeta[2].titleKey)} status={s3} lockedReason={t(locale, lockedReasonKeys[2]!)} intro={t(locale, "step.intro.3")}>
         {ds && (
           <>
-            {demoMode ? (
-              <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>
-            ) : (
-              !calibrationResearchReady && (
-                <Diag kind="warn">{t(locale, "calib.protocol.pageIncomplete")}</Diag>
-              )
-            )}
+            {demoMode && <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>}
             {calibMigrateBanner && (
               <Diag kind="warn">{t(locale, "calib.migrate.banner")}</Diag>
             )}
+            <Card>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <span
+                  role="group"
+                  aria-label={t(locale, "calib.view.aria")}
+                  style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}
+                >
+                  {(["quick", "doc"] as const).map((view) => {
+                    const active = calibView === view;
+                    return (
+                      <button
+                        key={view}
+                        type="button"
+                        aria-pressed={active}
+                        data-testid={`calibration-view-${view}`}
+                        onClick={() => chooseCalibView(view)}
+                        style={{
+                          font: "inherit",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          padding: "4px 12px",
+                          border: "none",
+                          cursor: "pointer",
+                          lineHeight: 1.4,
+                          background: active ? "var(--brand)" : "var(--panel)",
+                          color: active ? "#fff" : "var(--ink-2)",
+                        }}
+                      >
+                        {t(locale, view === "quick" ? "calib.view.quick" : "calib.view.doc")}
+                      </button>
+                    );
+                  })}
+                </span>
+              </div>
+              <DocumentationMeter
+                columns={activeAnalysisCols}
+                doneCount={documentedCols.length}
+                documented={(column) => documentedCols.includes(column)}
+                onDocument={documentVariable}
+              />
+            </Card>
             {setCols.length > 0 && (
               <Card id="deskriptiv">
                 <H2>{t(locale, "descriptives.title")}</H2>
                 <Descriptives columns={setCols} cases={cases} />
               </Card>
             )}
-            <CalibrationWorkbench
-              ds={ds}
-              varMeta={varMeta}
-              setVarMeta={setVarMeta}
-              calibSpecs={calibSpecs}
-              setCalibSpecs={setCalibSpecs}
-              anchors={anchors}
-              setAnchors={setAnchors}
-              focusVar={focusVar}
-              setFocusVar={setFocusVar}
-              evaluation={evaluation}
-              sensitivity={sensitivity}
-              conditions={conditions}
-              outcome={outcome}
-              excludedMissingCount={excludedMissingCount}
-              freqCut={freqCut}
-              consCut={consCut}
-            />
+            {calibView === "quick" ? (
+              <CalibrationQuick
+                ds={ds}
+                varMeta={varMeta}
+                calibSpecs={calibSpecs}
+                setCalibSpecs={setCalibSpecs}
+                anchors={anchors}
+                setAnchors={setAnchors}
+                evaluation={evaluation}
+                onDocument={documentVariable}
+              />
+            ) : (
+              <CalibrationWorkbench
+                ds={ds}
+                varMeta={varMeta}
+                setVarMeta={setVarMeta}
+                calibSpecs={calibSpecs}
+                setCalibSpecs={setCalibSpecs}
+                anchors={anchors}
+                setAnchors={setAnchors}
+                focusVar={focusVar}
+                setFocusVar={setFocusVar}
+                evaluation={evaluation}
+                sensitivity={sensitivity}
+                conditions={conditions}
+                outcome={outcome}
+                excludedMissingCount={excludedMissingCount}
+                freqCut={freqCut}
+                consCut={consCut}
+              />
+            )}
           </>
         )}
       </Step>
@@ -837,8 +941,12 @@ export default function Home() {
             <Card>
               <H2>{t(locale, "report.title")}</H2>
               <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
-              {demoMode && (
+              {demoMode ? (
                 <Diag kind="warn">{t(locale, "report.demoNotice")}</Diag>
+              ) : (
+                reportProvisional && (
+                  <p className="hint" style={hintStyle}>{t(locale, "report.provisionalNotice")}</p>
+                )
               )}
               <ReportButton
                 disabled={!reportAvailable}
@@ -846,6 +954,7 @@ export default function Home() {
                   if (!reportAvailable || !ds || !tt || !sol || !necessity) return null;
                   return {
                     demo: demoMode,
+                    provisional: reportProvisional,
                     datasetName: ds.name,
                     caseCount: ds.rows.length,
                     anchors: rawAnchorsOf(ds, varMeta, calibSpecs),
@@ -989,6 +1098,79 @@ function ContinueButton({ targetN, targetTitle, targetId }: { targetN: number; t
       >
         {t(locale, "step.next", { n: targetN, title: targetTitle })}
       </button>
+    </div>
+  );
+}
+
+/* ---------- Dokumentations-Meter ---------- */
+
+/**
+ * Zeigt in BEIDEN Kalibrier-Ansichten, wie weit die Dokumentation ist: eine
+ * Zeile „X von Y Sets dokumentiert" plus je ein Chip pro Set. Der Chip führt in
+ * die Dokumentations-Ansicht und fokussiert dort das Set. Bewusst kein
+ * Warnhinweis: Fortschritt statt Sperre.
+ */
+function DocumentationMeter({
+  columns,
+  doneCount,
+  documented,
+  onDocument,
+}: {
+  columns: string[];
+  doneCount: number;
+  documented: (column: string) => boolean;
+  onDocument: (column: string) => void;
+}) {
+  const [locale] = useLocale();
+  if (columns.length === 0) return null;
+  return (
+    <div data-testid="calibration-doc-meter">
+      <p
+        data-testid="calibration-doc-meter-title"
+        style={{ fontSize: 13.5, fontWeight: 600, margin: "0 0 8px" }}
+      >
+        {t(locale, "calib.meter.title", { done: doneCount, total: columns.length })}
+      </p>
+      <div
+        role="group"
+        aria-label={t(locale, "calib.meter.aria")}
+        style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+      >
+        {columns.map((column) => {
+          const isDone = documented(column);
+          const color = isDone ? "var(--good-text)" : "var(--warn-text)";
+          return (
+            <button
+              key={column}
+              type="button"
+              className="oq-btn oq-btn--quiet"
+              data-testid={`calibration-doc-chip-${column}`}
+              data-documented={isDone ? "true" : "false"}
+              // Eigener zugänglicher Name: In der Ansicht „Dokumentation" trägt der
+              // Werkbank-Variablenknopf sonst praktisch denselben Namen bei anderer
+              // Wirkung — Screenreader hörten zwei gleichnamige Knöpfe.
+              aria-label={t(locale, "calib.meter.chipAria", { col: column })}
+              onClick={() => onDocument(column)}
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "2px 9px",
+                borderRadius: 999,
+                border: `1px solid ${color}`,
+                color,
+                maxWidth: "100%",
+                overflowWrap: "anywhere",
+                textAlign: "left",
+              }}
+            >
+              {column} · {t(locale, isDone ? "calib.meter.chipDone" : "calib.meter.chipOpen")}
+            </button>
+          );
+        })}
+      </div>
+      <p style={{ fontSize: 12, color: "var(--muted)", margin: "8px 0 0", maxWidth: "70ch", lineHeight: 1.55 }}>
+        {t(locale, "calib.meter.hint")}
+      </p>
     </div>
   );
 }
