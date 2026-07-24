@@ -14,10 +14,11 @@ Stand: 2026-07-22 · Ausführung: lokale Implementierung, deterministische Prüf
 ### A1 — Korrektheit (bereits abgedeckt, bleibt Pflicht)
 | # | Kriterium | Prüfung |
 |---|---|---|
-| A1.1 | Engine-Unit-Tests grün | `node --test` in `packages/engine` (29+) |
+| A1.1 | Engine-Unit-Tests grün | `node --test` in `packages/engine` (43) |
 | A1.2 | Referenz-Suite grün | `node scripts/reference-check.mjs` |
 | A1.3 | **R-Kreuzvalidierung exakt** (konservativ/intermediär/sparsam, fuzzy+crisp) | `node scripts/cross-validate.mjs` (12/12) |
 | A1.4 | Produktions-Build fehlerfrei | `npm run build --workspace web` |
+| A1.5 | **Kalibrierungs-Kreuzvalidierung** (crisp/piecewise-linear exakt; direkt-logistisch mit dokumentierter Restabweichung) | `node scripts/calibrate-cross-validate.mjs` — Engine nutzt Ragins ±3-Logit-Fixpunkte (≈0,0474/0,9526), R QCA zielt auf ≈0,05/0,95; Restabweichung ≤ 0,01 wird akzeptiert und dokumentiert |
 
 ### A2 — Funktionale Flüsse (E2E, Chromium)
 | # | Kriterium | Test |
@@ -59,9 +60,17 @@ Geprüft in **4 Matrizen**: Light/Dark × Desktop (1280) / Mobile (390).
 | A5.1 | Service-Worker-Cache-Name trägt die Build-ID; alte Caches werden beim Aktivieren gelöscht → kein tagelang veralteter Stand | Build-Zeit-Ersetzung in `sw.js` + `PwaRegister` mit `updatefound`-Reload-Hinweis |
 
 ### A6 — CI
-| # | Kriterium |
-|---|---|
-| A6.1 | `.github/workflows/ci.yml` führt zusätzlich die Playwright-Suite aus (Chromium); PRs ohne grüne Suite gelten als rot |
+`.github/workflows/ci.yml` führt bei jedem Push auf `main` und jedem Pull Request folgende Gates
+in dieser Reihenfolge aus; PRs ohne grüne Kette gelten als rot.
+| # | Kriterium | Schritt in `ci.yml` |
+|---|---|---|
+| A6.1 | Engine-Unit-Tests grün | „Engine — unit tests" |
+| A6.2 | Referenz-Suite grün | „Engine — reference/validation check" |
+| A6.3 | R-Kreuzvalidierung grün (A1.3) | „Engine — R-Kreuzvalidierung (QUALITY-SPEC A1.3)" |
+| A6.4 | R-Kalibrierungs-Kreuzvalidierung grün (A1.5) | „Engine — R-Kalibrierungs-Kreuzvalidierung (QUALITY-SPEC A1.5)" |
+| A6.5 | Lint fehlerfrei | „Web — Lint" |
+| A6.6 | Produktions-Build fehlerfrei | „Web — production build" |
+| A6.7 | Playwright-Suite grün (Chromium, A2–A4) | „E2E — Playwright suite (QUALITY-SPEC A2–A4)" |
 
 ---
 

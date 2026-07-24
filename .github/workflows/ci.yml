@@ -25,6 +25,15 @@ jobs:
       - name: Engine — reference/validation check
         run: node scripts/reference-check.mjs
 
+      - name: Engine — R-Kreuzvalidierung (QUALITY-SPEC A1.3)
+        run: node scripts/cross-validate.mjs
+
+      - name: Engine — R-Kalibrierungs-Kreuzvalidierung (QUALITY-SPEC A1.5)
+        run: node scripts/calibrate-cross-validate.mjs
+
+      - name: Web — Lint
+        run: npm run lint --workspace web
+
       - name: Web — production build
         run: npm run build --workspace web
 

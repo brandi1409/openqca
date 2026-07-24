@@ -10,21 +10,13 @@ tags:
   - reproducible research
   - TypeScript
 authors:
-  # TODO: Replace all placeholders below with real authors, affiliations and ORCIDs.
-  - name: "[Given Name Family Name]"
-    orcid: "0000-0000-0000-0000"   # TODO: placeholder ORCID
+  - name: "John Brandauer"
     affiliation: 1
     corresponding: true
-  - name: "[Second Author]"
-    orcid: "0000-0000-0000-0000"   # TODO: placeholder ORCID
-    affiliation: 2
 affiliations:
-  # TODO: Replace with real institution names.
-  - name: "[Institution / Department, City, Country]"
+  - name: "Independent researcher, Eberndorf, Austria"
     index: 1
-  - name: "[Institution / Department, City, Country]"
-    index: 2
-date: "14 July 2026"   # TODO: update to the submission date
+date: "24 July 2026"
 bibliography: paper.bib
 ---
 

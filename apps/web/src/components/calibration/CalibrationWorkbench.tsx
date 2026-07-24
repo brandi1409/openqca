@@ -605,7 +605,10 @@ export function CalibrationWorkbench({
   };
 
   return (
-    <Card id="kalibrierung">
+    // Kein id="kalibrierung" hier: Der umgebende Schritt-Abschnitt in app/page.tsx
+    // trägt den Anker für Schritt-Navigation, Scroll-Spy und Tour. Eine zweite
+    // gleichnamige id wäre ungültiges HTML und würde die Sprungziele doppeln.
+    <Card>
       <SectionHeading>{t(locale, "calib.title")}</SectionHeading>
       <p style={{ color: "var(--ink-2)", maxWidth: "70ch", marginTop: 0 }}>
         {t(locale, "calib.descGuided")}

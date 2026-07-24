@@ -9,12 +9,10 @@ abstract: >-
   necessity analysis, together with a reproducibility protocol.
 type: software
 version: "0.1.0"
-date-released: "2026-01-01"
+date-released: "2026-07-16"
 license: MIT
-# TODO: Bitte durch die tatsächliche URL des Repositories ersetzen (Platzhalter).
 repository-code: "https://github.com/brandi1409/openqca"
-# TODO: Optionale Projekt-Website (Platzhalter) — sonst Zeile entfernen.
-url: "https://example.org/PLATZHALTER/openqca"
+url: "https://openqca.vercel.app"
 keywords:
   - "qualitative comparative analysis"
   - "QCA"
@@ -24,9 +22,7 @@ keywords:
   - "social science methods"
   - "reproducible research"
 authors:
-  # TODO: Platzhalter — durch reale Autor*innen ersetzen. ORCID im Format
-  # https://orcid.org/0000-0000-0000-0000 angeben oder die Zeile entfernen.
-  - given-names: "[Vorname]"
-    family-names: "[Nachname]"
-    # affiliation: "[Institution / Affiliation]"
-    # orcid: "https://orcid.org/0000-0000-0000-0000"
+  # ORCID und Affiliation sind optionale CFF-Felder und können vom Eigentümer
+  # bei Bedarf ergänzt werden.
+  - given-names: "John"
+    family-names: "Brandauer"

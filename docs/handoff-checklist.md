@@ -4,7 +4,7 @@ Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft 
 
 ## 0. Grundlage
 - [x] Repo auf GitHub anlegen und pushen (`openqca`).
-- [ ] Lokal prüfen: `npm install`, dann `npm test --workspace @openqca/engine` (43/43) und `npm run build --workspace web`.
+- [x] Lokal prüfen: `npm install`, dann `npm run verify` (Engine-Tests 43/43, Referenz-Check, beide R-Kreuzvalidierungen, Lint, Build) — geprüft.
 
 ## 1. Supabase (Konto & Datenbank — P3)
 - [x] Konto auf **supabase.com**, neues Projekt anlegen. Region wählen (EU für DSGVO). → OpenQCA `yuhsxueaafugixeiausy` eu-central-1
@@ -35,7 +35,8 @@ Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft 
 - [ ] Rust installieren (`rustup`), dann Tauri bauen (siehe `src-tauri/README.md`). Signierte Builds brauchen Apple-/Microsoft-Entwicklerkonten.
 
 ## 7. Optional — Wissenschaftliche Verankerung
-- [ ] `CITATION.cff` + `paper/paper.md` mit echten Autor:innen/ORCID/DOIs füllen; Zenodo-DOI erzeugen; JOSS-Einreichung.
+- [x] `CITATION.cff` + `paper/paper.md` sind mit echten Angaben gefüllt (Autor, Repository-/Website-URL, Release-Datum).
+- [ ] Nur der Eigentümer kann noch ergänzen: optionale ORCID/Affiliation in beiden Dateien, eine Zenodo-DOI, die JOSS-Einreichung.
 
 ---
 **Prüf-Schnelltest ohne Konten:** Läuft die App unter `npm run dev --workspace web` und zeigt „Cloud-Tarif · nicht konfiguriert", ist alles korrekt — die Cloud-Features aktivieren sich automatisch, sobald die Schlüssel gesetzt sind.
