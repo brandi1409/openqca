@@ -174,9 +174,20 @@ function hasImportPlaceholder(spec: CalibrationSpec, varType?: VarType): boolean
       spec.crisp?.meaningInclusion ?? "",
     );
   }
+  // Erkennung MUSS sprachunabhängig sein: Die Platzhalter beim Import kommen
+  // aus dict.ts (`calib.ph.*`) und damit in der Sprache der Oberfläche. Würde
+  // hier nur auf die englischen Wörter geprüft, gälten deutsche Platzhalter
+  // fälschlich als ausformulierte Begründung — das Dokumentations-Gate wäre
+  // still ausgehebelt. Marker daher je Sprache pflegen.
+  const PLACEHOLDER_MARKERS = [
+    "provisional",
+    "confirm provenance before publication",
+    "vorläufig",
+    "provenienz vor publikation bestätigen",
+  ];
   return texts.some((value) => {
     const normalized = value.toLowerCase();
-    return normalized.includes("provisional") || normalized.includes("confirm provenance before publication");
+    return PLACEHOLDER_MARKERS.some((marker) => normalized.includes(marker));
   });
 }
 

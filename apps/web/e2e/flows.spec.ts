@@ -14,10 +14,15 @@ test("A2.2 Demo — komplexe Lösung enthält WOHLSTAND*URBAN*BILDUNG", async ({
   await loadDemo(page);
 
   await expect(page.getByText(/WOHLSTAND\*URBAN\*BILDUNG/).first()).toBeVisible();
+  // Replikationsartefakte bleiben für synthetische Daten gesperrt — sie würden
+  // eine Provenienz behaupten, die es nicht gibt.
   await expect(
     page.getByRole("button", { name: "Rohdaten als CSV herunterladen" }),
   ).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Bericht erzeugen (Druck/PDF)" })).toBeDisabled();
+  // Der Bericht ist dagegen erzeugbar und weist sich selbst als synthetisch aus
+  // (Warnbanner, geprüft in A2.16) — sonst sähe niemand, der das Werkzeug prüft,
+  // jemals das Ergebnisdokument.
+  await expect(page.getByRole("button", { name: "Bericht erzeugen (Druck/PDF)" })).toBeEnabled();
   expect(pageErrors, pageErrors.join(" | ")).toEqual([]);
 });
 
@@ -75,7 +80,7 @@ test("A2.11 Raw calibration keeps editing open until research checklist is compl
   page,
 }) => {
   await loadExample(page, /Rohwerte Demokratie/);
-  await page.getByRole("button", { name: /Lehr-Seed anwenden/ }).click();
+  await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
 
   const methodConfirm = page.locator('[data-testid="calibration-method-confirm"]');
   await expect(methodConfirm).toBeVisible();
@@ -95,7 +100,7 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
   page,
 }) => {
   await loadRawRohwerte(page);
-  await page.getByRole("button", { name: /Lehr-Seed anwenden/ }).click();
+  await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
   await expect(page.getByTestId("calibration-progress")).toBeVisible();
   await expect(page.getByTestId("calibration-progress")).not.toContainText("6 von 6");
   await expect(page.locator("#notwendigkeit")).toContainText("gesperrt");
@@ -322,7 +327,7 @@ test("A2.12 Raw calibration — crisp, fuzzy, outcome, cases, sensitivity and pr
 
 test("A2.13 Evidence gate and method reset stay explicit", async ({ page }) => {
   await loadRawRohwerte(page);
-  await page.getByRole("button", { name: /Lehr-Seed anwenden/ }).click();
+  await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
 
   const evidenceRows = page.locator('[data-testid^="calibration-evidence-row-"]');
   const diagnosticIndex = await evidenceRows.count();
@@ -392,7 +397,7 @@ test("A2.14 Local project persistence survives reload", async ({ page }) => {
 
 test("A2.15 Calibration provenance and missing policy survive reload", async ({ page }) => {
   await loadRawRohwerte(page);
-  await page.getByRole("button", { name: /Lehr-Seed anwenden/ }).click();
+  await page.getByRole("button", { name: /Lehrbeispiel übernehmen/ }).click();
   await page.getByTestId("calibration-missing-policy").selectOption("leave_unresolved");
   await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustratives Lehrbeispiel/i);
 
@@ -405,4 +410,37 @@ test("A2.15 Calibration provenance and missing policy survive reload", async ({ 
   await expect(page.getByTestId("calibration-missing-policy")).toHaveValue("leave_unresolved");
   await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustratives Lehrbeispiel/i);
   await page.evaluate(() => localStorage.removeItem("openqca_local_project"));
+});
+
+/**
+ * A2.16 — Der Demo-Bericht ist erzeugbar, weist sich aber unmissverständlich als
+ * synthetisch aus. Hintergrund: Wer das Werkzeug über die Landing-CTA
+ * „Beispiel-Analyse öffnen" prüft, muss das Ergebnisdokument sehen können; die
+ * Zahlen dürfen dabei nie als Forschungsergebnis durchgehen. Der Protokoll- und
+ * R-Export bleibt für Demodaten gesperrt (Replikationsartefakt).
+ */
+test("A2.16 Demo-Bericht ist erzeugbar und als nicht zitierfähig markiert", async ({
+  page,
+  context,
+}) => {
+  await loadDemo(page);
+
+  // Hinweis in der App selbst.
+  await expect(page.getByText(/nicht zitierfähig/i).first()).toBeVisible();
+
+  const generate = page.getByRole("button", { name: /Bericht erzeugen/ });
+  await expect(generate).toBeEnabled();
+
+  const popupPromise = context.waitForEvent("page");
+  await generate.click();
+  const report = await popupPromise;
+  await report.waitForLoadState("domcontentloaded");
+
+  // Das Warnbanner steht im Bericht selbst, vor allen Ergebnissen.
+  const banner = report.locator(".demo-banner");
+  await expect(banner).toContainText(/Synthetische Lehrdaten/i);
+  await expect(banner).toContainText(/nicht zitiert/i);
+  // Und der Rechenweg ist trotzdem vollständig enthalten.
+  await expect(report.locator("body")).toContainText(/WOHLSTAND/);
+  await report.close();
 });

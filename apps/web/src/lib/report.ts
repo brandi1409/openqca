@@ -25,6 +25,12 @@ export interface ReportInput {
   expectations: Record<string, string>;
   rScript: string;
   locale?: "de" | "en";
+  /**
+   * Synthetischer Demo-/Lehrdatensatz. Der Bericht wird dann erzeugt, trägt aber
+   * einen unübersehbaren Warnhinweis: Rechenweg zeigen ja — als Forschungs-
+   * ergebnis durchgehen nein.
+   */
+  demo?: boolean;
 }
 
 /** HTML-Escaping für alle dynamischen Strings (Namen, Fälle, Ausdrücke). */
@@ -76,8 +82,8 @@ const REPORT_COPY = {
     provenance: "Herkunft",
     already: "bereits",
     crisp: "crisp",
-    linear: "linear",
-    direct: "direct",
+    linear: "linear (stückweise)",
+    direct: "direkt (logistisch)",
     remainder: "Remainder (unbeobachtet)",
     n: "n",
     consistency: "Konsistenz",
@@ -108,6 +114,16 @@ const REPORT_COPY = {
     necessityHint: "Konvention: Konsistenz ≥ 0,9 als Hinweis auf Notwendigkeit — mit Coverage und Fallkenntnis interpretieren.",
     reproducibility: "Reproduzierbarkeit",
     footer: "Dieser Bericht dokumentiert Rechenschritte und Parameter einer fsQCA-Analyse. Die inhaltliche Interpretation der Ergebnisse — insbesondere Kausalitätsannahmen, Fallauswahl und theoretische Einordnung — liegt in der wissenschaftlichen Verantwortung der Nutzerin bzw. des Nutzers.",
+    roles: { condition: "Bedingung", outcome: "Outcome", ignore: "ignoriert" } as Record<string, string>,
+    statuses: {
+      unresolved: "offen",
+      provisional: "vorläufig",
+      sourced: "belegt",
+      external: "extern geprüft",
+    } as Record<string, string>,
+    demoBannerTitle: "Synthetische Lehrdaten — nicht zitierfähig",
+    demoBannerBody:
+      "Dieser Bericht wurde aus einem synthetischen Demonstrationsdatensatz erzeugt. Er zeigt den vollständigen Rechenweg von openQCA, belegt aber keine empirischen Befunde. Die Zahlen dürfen nicht zitiert, veröffentlicht oder als Forschungsergebnis verwendet werden. Für eine belastbare Analyse eigene Daten laden und die Kalibrierung inhaltlich begründen.",
   },
   en: {
     fullOut: "full non-membership (0.05)",
@@ -160,6 +176,16 @@ const REPORT_COPY = {
     necessityHint: "Convention: consistency ≥ 0.9 is a candidate signal for necessity; interpret it with coverage and case knowledge.",
     reproducibility: "Reproducibility",
     footer: "This report documents the calculation steps and parameters of an fsQCA analysis. Substantive interpretation of the results—especially causal assumptions, case selection, and theoretical positioning—remains the scientific responsibility of the user.",
+    roles: { condition: "condition", outcome: "outcome", ignore: "ignored" } as Record<string, string>,
+    statuses: {
+      unresolved: "unresolved",
+      provisional: "provisional",
+      sourced: "sourced",
+      external: "externally verified",
+    } as Record<string, string>,
+    demoBannerTitle: "Synthetic teaching data — not citable",
+    demoBannerBody:
+      "This report was generated from a synthetic demonstration dataset. It shows openQCA's full calculation path but establishes no empirical findings. The numbers must not be cited, published, or used as research results. For a defensible analysis, load your own data and justify the calibration substantively.",
   },
 } as const;
 
@@ -210,9 +236,9 @@ function calibrationTable(
                   ? `${copy.provenance}: ${s.alreadyCalibratedProvenance}`
                   : "";
         return `<div class="set-block">
-          <h3>${esc(s.set.setLabel || s.column)} <span class="hint">(${esc(role)} · ${esc(s.column)})</span></h3>
+          <h3>${esc(s.set.setLabel || s.column)} <span class="hint">(${esc(copy.roles[role] ?? role)} · ${esc(s.column)})</span></h3>
           <p>${esc(s.set.definition || "—")}</p>
-          <p class="hint">${copy.status}: ${esc(s.status)} · ${copy.method}: ${esc(method)} · ${copy.direction}: ${direction}</p>
+          <p class="hint">${copy.status}: ${esc(copy.statuses[s.status] ?? s.status)} · ${copy.method}: ${esc(method)} · ${copy.direction}: ${direction}</p>
           ${meanings ? `<p class="hint">${esc(meanings)}</p>` : ""}
         </div>`;
       })
@@ -325,6 +351,19 @@ const STYLE = `
   .subtitle { color: #444; font-size: 13px; margin: 0 0 2px; }
   .note { color: #666; font-size: 12px; margin-top: 10px; }
   .hint { color: #555; font-size: 12.5px; }
+  /* Warnbanner für synthetische Lehrdaten — muss auch im Schwarzweiß-Ausdruck
+     auffallen, daher kräftiger Rahmen statt reiner Farbfläche. */
+  .demo-banner {
+    border: 2px solid #935600;
+    background: #fdf3e3;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 0 0 18px;
+    color: #4a3000;
+    page-break-inside: avoid;
+  }
+  .demo-banner strong { display: block; font-size: 14px; margin-bottom: 4px; letter-spacing: 0.01em; }
+  .demo-banner span { font-size: 12.5px; }
   table {
     border-collapse: collapse;
     width: 100%;
@@ -401,11 +440,16 @@ export function generateReportHtml(input: ReportInput): string {
 <html lang="${locale}">
 <head>
 <meta charset="utf-8" />
-<title>openQCA — ${copy.analysisTitle}: ${esc(label(input.datasetName))}</title>
+<title>${input.demo ? `[${copy.demoBannerTitle}] ` : ""}openQCA — ${copy.analysisTitle}: ${esc(label(input.datasetName))}</title>
 <style>${STYLE}</style>
 </head>
 <body>
   <h1>openQCA — ${copy.analysisTitle}</h1>
+  ${
+    input.demo
+      ? `<div class="demo-banner" role="note"><strong>${copy.demoBannerTitle}</strong><span>${copy.demoBannerBody}</span></div>`
+      : ""
+  }
   <p class="subtitle">${copy.dataset}: <strong>${esc(input.datasetName)}</strong> &nbsp;·&nbsp; ${copy.cases}: <strong>${input.caseCount}</strong> &nbsp;·&nbsp; ${copy.created}: ${esc(created)}</p>
   <p class="note">${copy.createdWith}</p>
 

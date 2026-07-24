@@ -357,7 +357,19 @@ const de = {
   "calib.allCalibrated": "Ihre Daten sind bereits kalibriert — nichts zu tun.",
   "calib.descGuided":
     "Von der Set-Definition über Methode und begründete Anker zur Fallprüfung und Sensitivität. Empirische Verteilungen sind Hilfen — keine inhaltliche Begründung allein.",
-  "calib.seed.apply": "Lehr-Seed anwenden (editierbar, vorläufig)",
+  "calib.seed.apply": "Ausgefülltes Lehrbeispiel übernehmen (editierbar, vorläufig)",
+  // Vorläufige Platzhalter beim Import. Das Wort „vorläufig" bzw. die Wendung
+  // „Provenienz vor Publikation bestätigen" ist der Marker, an dem
+  // hasImportPlaceholder() sie wiedererkennt — beim Übersetzen erhalten.
+  "calib.ph.definition":
+    "Zugehörigkeit zur Menge «{col}» (vorläufiger Platzhalter — durch eine inhaltliche Definition ersetzen).",
+  "calib.ph.fullOut": "Klar außerhalb der Menge (vorläufig)",
+  "calib.ph.crossover": "Maximale Unentschiedenheit (vorläufig)",
+  "calib.ph.fullIn": "Klar innerhalb der Menge (vorläufig)",
+  "calib.ph.provenance":
+    "Bereits kalibrierte {type}-Werte aus «{dataset}» (Provenienz vor Publikation bestätigen).",
+  "calib.ph.precalibratedDefinition":
+    "Vorkalibrierte Zugehörigkeit für «{col}» (vorläufig — ursprüngliche Kalibrierung dokumentieren).",
   "calib.seed.hint":
     "Synthetische Begründungen für rohwerte-demokratie.csv — keine Literaturbehauptung. Vor Publikation ersetzen.",
   "calib.missing.excluded": "{n} Fall/Fälle wegen fehlender Werte aus der Analyse ausgeschlossen.",
@@ -730,6 +742,8 @@ const de = {
   // -- Bericht ----------------------------------------------------------------
   "report.title": "Bericht",
   "report.desc": "Öffnet einen druckfähigen Bericht (PDF über den Druckdialog).",
+  "report.demoNotice":
+    "Demo-Datensatz: Der Bericht lässt sich erzeugen und zeigt den vollständigen Rechenweg — er trägt dann den Hinweis „Synthetische Lehrdaten — nicht zitierfähig“. Protokoll- und R-Export bleiben gesperrt, bis Sie mit eigenen Daten arbeiten und die Kalibrierung begründet haben.",
   "report.missingData":
     "Für den Bericht fehlen noch Daten (Truth Table & Lösungen berechnen).",
   "report.generateBtn": "Bericht erzeugen (Druck/PDF)",
@@ -1346,7 +1360,16 @@ const en: Record<DictKey, string> = {
   "calib.allCalibrated": "Your data is already calibrated — nothing to do.",
   "calib.descGuided":
     "From set definition through method and justified anchors to case review and sensitivity. Distributional plots are aids — not substantive proof on their own.",
-  "calib.seed.apply": "Apply teaching seed (editable, provisional)",
+  "calib.seed.apply": "Use the filled-in teaching example (editable, provisional)",
+  "calib.ph.definition":
+    "Membership in the set «{col}» (provisional placeholder — replace with a substantive definition).",
+  "calib.ph.fullOut": "Clearly out of the set (provisional)",
+  "calib.ph.crossover": "Maximum ambiguity (provisional)",
+  "calib.ph.fullIn": "Clearly in the set (provisional)",
+  "calib.ph.provenance":
+    "Already calibrated {type} values from «{dataset}» (confirm provenance before publication).",
+  "calib.ph.precalibratedDefinition":
+    "Pre-calibrated membership for «{col}» (provisional — document original calibration).",
   "calib.seed.hint":
     "Synthetic rationales for rohwerte-demokratie.csv — not a literature claim. Replace before publication.",
   "calib.missing.excluded": "{n} case(s) excluded from analysis due to missing values.",
@@ -1719,6 +1742,8 @@ const en: Record<DictKey, string> = {
   // -- Report -----------------------------------------------------------------
   "report.title": "Report",
   "report.desc": "Opens a print-ready report (PDF via the print dialog).",
+  "report.demoNotice":
+    "Demo dataset: the report can be generated and shows the full calculation path — it then carries the notice “Synthetic teaching data — not citable”. Protocol and R export stay locked until you work with your own data and justify the calibration.",
   "report.missingData":
     "Data is still missing for the report (compute the truth table & solutions).",
   "report.generateBtn": "Generate report (print/PDF)",

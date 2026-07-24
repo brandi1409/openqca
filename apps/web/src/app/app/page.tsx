@@ -228,14 +228,14 @@ export default function Home() {
         const s = specs[col];
         if (!s.set.setLabel.trim()) s.set.setLabel = col;
         if (!s.set.definition.trim()) {
-          s.set.definition = `Membership in the set «${col}» (provisional placeholder — replace with a substantive definition).`;
+          s.set.definition = t(locale, "calib.ph.definition", { col });
         }
         const fuzzyAnchors =
           s.method === "direct" ? s.direct : s.method === "linear" ? s.linear : undefined;
         if (fuzzyAnchors) {
-          if (!fuzzyAnchors.meaningFullOut.trim()) fuzzyAnchors.meaningFullOut = "Clearly out of the set (provisional)";
-          if (!fuzzyAnchors.meaningCrossover.trim()) fuzzyAnchors.meaningCrossover = "Maximum ambiguity (provisional)";
-          if (!fuzzyAnchors.meaningFullIn.trim()) fuzzyAnchors.meaningFullIn = "Clearly in the set (provisional)";
+          if (!fuzzyAnchors.meaningFullOut.trim()) fuzzyAnchors.meaningFullOut = t(locale, "calib.ph.fullOut");
+          if (!fuzzyAnchors.meaningCrossover.trim()) fuzzyAnchors.meaningCrossover = t(locale, "calib.ph.crossover");
+          if (!fuzzyAnchors.meaningFullIn.trim()) fuzzyAnchors.meaningFullIn = t(locale, "calib.ph.fullIn");
         }
         specs[col] = {
           ...s,
@@ -248,13 +248,12 @@ export default function Home() {
         ...specs[col],
         method: undefined,
         alreadyCalibratedProvenance: specs[col].alreadyCalibratedProvenance?.trim() ||
-          `Already calibrated ${m.type} values from «${dataset.name}» (confirm provenance before publication).`,
+          t(locale, "calib.ph.provenance", { type: m.type, dataset: dataset.name }),
         set: {
           ...specs[col].set,
           setLabel: specs[col].set.setLabel || col,
           definition:
-            specs[col].set.definition ||
-            `Pre-calibrated membership for «${col}» (provisional — document original calibration).`,
+            specs[col].set.definition || t(locale, "calib.ph.precalibratedDefinition", { col }),
         },
         provisionalDefaults: true,
         status: specs[col].status === "unresolved" ? "provisional" : specs[col].status,
@@ -567,6 +566,14 @@ export default function Home() {
     activeAnalysisCols.every((column) =>
       specIsProtocolReady(calibSpecs[column], varMeta[column].type),
     );
+  /**
+   * Der Bericht ist auch für den synthetischen Demo-Datensatz erzeugbar — er
+   * trägt dann ein unübersehbares Warnbanner („nicht zitierfähig"). Sonst sähe
+   * niemand, der das Werkzeug prüft, jemals das Ergebnisdokument. Der
+   * Protokoll-/R-Export bleibt bewusst gesperrt: Er ist das Replikations-
+   * artefakt und behauptet Provenienz, die synthetische Daten nicht haben.
+   */
+  const reportAvailable = demoMode || calibrationResearchReady;
   const step4Done = step3Done && !!necessity; // Analyse-Schritt: bereit = Ergebnis liegt vor
   const step5Done = step3Done && !!(tt && sol);
   const step6Done = false; // Terminal-Schritt: bleibt „aktiv", solange man hier arbeitet
@@ -830,11 +837,15 @@ export default function Home() {
             <Card>
               <H2>{t(locale, "report.title")}</H2>
               <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
+              {demoMode && (
+                <Diag kind="warn">{t(locale, "report.demoNotice")}</Diag>
+              )}
               <ReportButton
-                disabled={!calibrationResearchReady}
+                disabled={!reportAvailable}
                 getInput={(): ReportInput | null => {
-                  if (!calibrationResearchReady || !ds || !tt || !sol || !necessity) return null;
+                  if (!reportAvailable || !ds || !tt || !sol || !necessity) return null;
                   return {
+                    demo: demoMode,
                     datasetName: ds.name,
                     caseCount: ds.rows.length,
                     anchors: rawAnchorsOf(ds, varMeta, calibSpecs),
