@@ -27,15 +27,6 @@ const labelStyle: React.CSSProperties = { fontSize: 12, color: "var(--muted)" };
 const textStyle: React.CSSProperties = { fontSize: 13.5, color: "var(--muted)" };
 // Formel-Boxen sitzen bereits in einer Karte mit eigenem Rand — keine
 // zusätzliche eigene Border (Verschachtelungs-Regel).
-const formulaStyle: React.CSSProperties = {
-  fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-  fontSize: 15,
-  background: "var(--panel-2)",
-  borderRadius: 8,
-  padding: "10px 14px",
-  overflowX: "auto",
-};
-
 function SolutionBlock({ title, sol, negOutLabel, locale }: { title: string; sol: Solution | null; negOutLabel: string; locale: Locale }) {
   return (
     <div style={{ marginTop: 12 }}>
@@ -49,7 +40,7 @@ function SolutionBlock({ title, sol, negOutLabel, locale }: { title: string; sol
       ) : (
         sol.models.map((m, mi) => (
           <div key={mi} style={{ marginBottom: mi < sol.models.length - 1 ? 12 : 0 }}>
-            <div style={formulaStyle}>
+            <div className="oq-formula oq-formula--sub">
               {m.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join(" + ")} → {negOutLabel}
             </div>
             <div style={{ display: "flex", gap: 20, marginTop: 8 }}>

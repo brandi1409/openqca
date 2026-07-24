@@ -1,25 +1,51 @@
 /**
  * Explicit teaching seed for rohwerte-demokratie.csv.
  * Labelled provisional — not literature claims.
+ *
+ * All texts are bilingual (de/en). German is authoritative for the app's
+ * teaching audience; English is kept for completeness. Values, anchors,
+ * numbers, structures, and thresholds are locale-independent and must not
+ * change between locales.
  */
 
 import type { CalibSpecs, CalibrationSpec } from "@/lib/calibration-model";
 import { newEvidenceId } from "@/lib/calibration-model";
 import type { VarMeta } from "@/lib/protocol-export";
 
-const TEACHING_NOTE =
-  "Illustrative teaching seed, not a literature claim. Replace with project-specific sources before publication.";
+type Locale = "de" | "en";
 
-function theoryEvidence(supports: CalibrationSpec["evidence"][0]["supports"]): CalibrationSpec["evidence"][0] {
+interface Localized {
+  de: string;
+  en: string;
+}
+
+function pick(locale: Locale, text: Localized): string {
+  return locale === "de" ? text.de : text.en;
+}
+
+const TEACHING_NOTE: Localized = {
+  de: "Illustratives Lehrbeispiel, keine Literaturbehauptung. Vor einer Publikation durch projekteigene Quellen ersetzen.",
+  en: "Illustrative teaching seed, not a literature claim. Replace with project-specific sources before publication.",
+};
+
+const EVIDENCE_TITLE: Localized = {
+  de: "openQCA-Lehrbeispiel (synthetisch)",
+  en: "openQCA teaching seed (synthetic)",
+};
+
+function theoryEvidence(
+  locale: Locale,
+  supports: CalibrationSpec["evidence"][0]["supports"],
+): CalibrationSpec["evidence"][0] {
   return {
     id: newEvidenceId(),
     type: "theory",
     supports,
     citation: {
-      title: "openQCA teaching seed (synthetic)",
+      title: pick(locale, EVIDENCE_TITLE),
       year: "2026",
     },
-    note: TEACHING_NOTE,
+    note: pick(locale, TEACHING_NOTE),
     isSubstantive: true,
   };
 }
@@ -28,10 +54,12 @@ export function isRohwerteDataset(name: string): boolean {
   return /rohwerte-demokratie/i.test(name);
 }
 
-export function applyRohwerteTeachingSeed(): {
+export function applyRohwerteTeachingSeed(locale: Locale = "de"): {
   varMeta: Record<string, VarMeta>;
   calibSpecs: CalibSpecs;
 } {
+  const note = pick(locale, TEACHING_NOTE);
+
   const varMeta: Record<string, VarMeta> = {
     BIP_pKopf: { type: "raw", role: "condition" },
     URBANISIERUNG: { type: "raw", role: "ignore" },
@@ -44,48 +72,80 @@ export function applyRohwerteTeachingSeed(): {
     BIP_pKopf: {
       column: "BIP_pKopf",
       set: {
-        setLabel: "Relatively wealthy countries",
-        definition:
-          "Cases with high GDP per capita relative to a mid-20th-century development threshold (synthetic teaching set).",
-        unit: "fictional GDP per capita units",
-        scopePopulation: "16 synthetic countries in rohwerte-demokratie",
-        timePeriod: "illustrative cross-section",
+        setLabel: pick(locale, {
+          de: "Relativ wohlhabende Länder",
+          en: "Relatively wealthy countries",
+        }),
+        definition: pick(locale, {
+          de: "Fälle mit hohem BIP pro Kopf relativ zu einer Entwicklungsschwelle Mitte des 20. Jahrhunderts (synthetisches Lehrbeispiel-Set).",
+          en: "Cases with high GDP per capita relative to a mid-20th-century development threshold (synthetic teaching set).",
+        }),
+        unit: pick(locale, {
+          de: "fiktive Einheiten des BIP pro Kopf",
+          en: "fictional GDP per capita units",
+        }),
+        scopePopulation: pick(locale, {
+          de: "16 synthetische Länder in rohwerte-demokratie",
+          en: "16 synthetic countries in rohwerte-demokratie",
+        }),
+        timePeriod: pick(locale, {
+          de: "illustrativer Querschnitt",
+          en: "illustrative cross-section",
+        }),
         highIsMembership: true,
-        notes: TEACHING_NOTE,
+        notes: note,
       },
       method: "direct",
       direct: {
         fullOut: 300,
         crossover: 600,
         fullIn: 1000,
-        meaningFullOut: "Clearly not in the set of relatively wealthy cases",
-        meaningCrossover: "Maximum ambiguity about relative wealth",
-        meaningFullIn: "Clearly in the set of relatively wealthy cases",
+        meaningFullOut: pick(locale, {
+          de: "Klar außerhalb der Menge relativ wohlhabender Fälle",
+          en: "Clearly not in the set of relatively wealthy cases",
+        }),
+        meaningCrossover: pick(locale, {
+          de: "Maximale Unentschiedenheit über relativen Wohlstand",
+          en: "Maximum ambiguity about relative wealth",
+        }),
+        meaningFullIn: pick(locale, {
+          de: "Klar innerhalb der Menge relativ wohlhabender Fälle",
+          en: "Clearly in the set of relatively wealthy cases",
+        }),
       },
       missing: { kind: "exclude_case" },
-      evidence: [theoryEvidence("set"), theoryEvidence("crossover")],
+      evidence: [theoryEvidence(locale, "set"), theoryEvidence(locale, "crossover")],
       status: "provisional",
       methodConfirmed: false,
       caseReviewConfirmed: false,
       exceptionalCases: [
         {
           caseLabel: "Mittelreich",
-          note: "High wealth with lower democracy index — useful deviant case for discussion.",
+          note: pick(locale, {
+            de: "Hoher Wohlstand bei niedrigerem Demokratie-Index — nützlicher abweichender Fall für die Diskussion.",
+            en: "High wealth with lower democracy index — useful deviant case for discussion.",
+          }),
         },
       ],
       sensitivity: {
         alternatives: [
           {
             id: "crossover-lower",
-            label: "Crossover 60 units lower",
+            label: pick(locale, {
+              de: "Kreuzungspunkt 60 Einheiten niedriger",
+              en: "Crossover 60 units lower",
+            }),
             delta: -60,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
           {
             id: "crossover-higher",
-            label: "Crossover 60 units higher",
+            label: pick(locale, {
+              de: "Kreuzungspunkt 60 Einheiten höher",
+              en: "Crossover 60 units higher",
+            }),
             delta: 60,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
         ],
         notes: "",
@@ -95,23 +155,36 @@ export function applyRohwerteTeachingSeed(): {
     INDUSTRIEANTEIL: {
       column: "INDUSTRIEANTEIL",
       set: {
-        setLabel: "Industrial society (employment share)",
-        definition:
-          "Cases at or above a crisp industrial employment share are members of the industrial-society set.",
-        unit: "percent industrial employment",
-        scopePopulation: "16 synthetic countries",
-        timePeriod: "illustrative",
+        setLabel: pick(locale, {
+          de: "Industriegesellschaft (Beschäftigungsanteil)",
+          en: "Industrial society (employment share)",
+        }),
+        definition: pick(locale, {
+          de: "Fälle mit einem industriellen Beschäftigungsanteil auf oder über der Schwelle gehören zur Menge der Industriegesellschaften.",
+          en: "Cases at or above a crisp industrial employment share are members of the industrial-society set.",
+        }),
+        unit: pick(locale, {
+          de: "Prozent industrielle Beschäftigung",
+          en: "percent industrial employment",
+        }),
+        scopePopulation: pick(locale, {
+          de: "16 synthetische Länder",
+          en: "16 synthetic countries",
+        }),
+        timePeriod: pick(locale, { de: "illustrativ", en: "illustrative" }),
         highIsMembership: true,
-        notes: TEACHING_NOTE,
+        notes: note,
       },
       method: "crisp",
       crisp: {
         threshold: 40,
-        meaningInclusion:
-          "Industrial employment share indicates industrial society (≥ 40%)",
+        meaningInclusion: pick(locale, {
+          de: "Industrieller Beschäftigungsanteil zeigt Industriegesellschaft an (≥ 40 %)",
+          en: "Industrial employment share indicates industrial society (≥ 40%)",
+        }),
       },
       missing: { kind: "exclude_case" },
-      evidence: [theoryEvidence("threshold")],
+      evidence: [theoryEvidence(locale, "threshold")],
       status: "provisional",
       methodConfirmed: false,
       caseReviewConfirmed: false,
@@ -120,15 +193,21 @@ export function applyRohwerteTeachingSeed(): {
         alternatives: [
           {
             id: "threshold-lower",
-            label: "Threshold 5 points lower",
+            label: pick(locale, {
+              de: "Schwelle 5 Punkte niedriger",
+              en: "Threshold 5 points lower",
+            }),
             delta: -5,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
           {
             id: "threshold-higher",
-            label: "Threshold 5 points higher",
+            label: pick(locale, {
+              de: "Schwelle 5 Punkte höher",
+              en: "Threshold 5 points higher",
+            }),
             delta: 5,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
         ],
         notes: "",
@@ -138,25 +217,40 @@ export function applyRohwerteTeachingSeed(): {
     ALPHABETISIERUNG: {
       column: "ALPHABETISIERUNG",
       set: {
-        setLabel: "High literacy",
-        definition: "Membership in the set of highly literate societies.",
-        unit: "percent",
-        scopePopulation: "16 synthetic countries",
-        timePeriod: "illustrative",
+        setLabel: pick(locale, { de: "Hohe Alphabetisierung", en: "High literacy" }),
+        definition: pick(locale, {
+          de: "Zugehörigkeit zur Menge hoch alphabetisierter Gesellschaften.",
+          en: "Membership in the set of highly literate societies.",
+        }),
+        unit: pick(locale, { de: "Prozent", en: "percent" }),
+        scopePopulation: pick(locale, {
+          de: "16 synthetische Länder",
+          en: "16 synthetic countries",
+        }),
+        timePeriod: pick(locale, { de: "illustrativ", en: "illustrative" }),
         highIsMembership: true,
-        notes: TEACHING_NOTE,
+        notes: note,
       },
       method: "direct",
       direct: {
         fullOut: 50,
         crossover: 75,
         fullIn: 95,
-        meaningFullOut: "Clearly not highly literate",
-        meaningCrossover: "Ambiguous literacy membership",
-        meaningFullIn: "Clearly highly literate",
+        meaningFullOut: pick(locale, {
+          de: "Klar nicht hoch alphabetisiert",
+          en: "Clearly not highly literate",
+        }),
+        meaningCrossover: pick(locale, {
+          de: "Unentschiedene Zugehörigkeit zur Alphabetisierung",
+          en: "Ambiguous literacy membership",
+        }),
+        meaningFullIn: pick(locale, {
+          de: "Klar hoch alphabetisiert",
+          en: "Clearly highly literate",
+        }),
       },
       missing: { kind: "exclude_case" },
-      evidence: [theoryEvidence("set")],
+      evidence: [theoryEvidence(locale, "set")],
       status: "provisional",
       methodConfirmed: false,
       caseReviewConfirmed: false,
@@ -165,15 +259,21 @@ export function applyRohwerteTeachingSeed(): {
         alternatives: [
           {
             id: "literacy-lower",
-            label: "Crossover 5 points lower",
+            label: pick(locale, {
+              de: "Kreuzungspunkt 5 Punkte niedriger",
+              en: "Crossover 5 points lower",
+            }),
             delta: -5,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
           {
             id: "literacy-higher",
-            label: "Crossover 5 points higher",
+            label: pick(locale, {
+              de: "Kreuzungspunkt 5 Punkte höher",
+              en: "Crossover 5 points higher",
+            }),
             delta: 5,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
         ],
         notes: "",
@@ -183,26 +283,40 @@ export function applyRohwerteTeachingSeed(): {
     DEMOKRATIE_INDEX: {
       column: "DEMOKRATIE_INDEX",
       set: {
-        setLabel: "Stable democracy",
-        definition:
-          "Outcome set: membership in stable democracy. This is a set-membership judgment, not a truth-table consistency cutoff.",
-        unit: "democracy index 0–100",
-        scopePopulation: "16 synthetic countries",
-        timePeriod: "illustrative",
+        setLabel: pick(locale, { de: "Stabile Demokratie", en: "Stable democracy" }),
+        definition: pick(locale, {
+          de: "Outcome-Set: Zugehörigkeit zur stabilen Demokratie. Dies ist ein Zugehörigkeitsurteil, kein Konsistenz-Cutoff der Wahrheitstafel.",
+          en: "Outcome set: membership in stable democracy. This is a set-membership judgment, not a truth-table consistency cutoff.",
+        }),
+        unit: pick(locale, { de: "Demokratie-Index 0–100", en: "democracy index 0–100" }),
+        scopePopulation: pick(locale, {
+          de: "16 synthetische Länder",
+          en: "16 synthetic countries",
+        }),
+        timePeriod: pick(locale, { de: "illustrativ", en: "illustrative" }),
         highIsMembership: true,
-        notes: TEACHING_NOTE,
+        notes: note,
       },
       method: "direct",
       direct: {
         fullOut: 25,
         crossover: 50,
         fullIn: 75,
-        meaningFullOut: "Clearly not a stable democracy",
-        meaningCrossover: "Maximum ambiguity about democratic stability",
-        meaningFullIn: "Clearly a stable democracy",
+        meaningFullOut: pick(locale, {
+          de: "Klar keine stabile Demokratie",
+          en: "Clearly not a stable democracy",
+        }),
+        meaningCrossover: pick(locale, {
+          de: "Maximale Unentschiedenheit über demokratische Stabilität",
+          en: "Maximum ambiguity about democratic stability",
+        }),
+        meaningFullIn: pick(locale, {
+          de: "Klar eine stabile Demokratie",
+          en: "Clearly a stable democracy",
+        }),
       },
       missing: { kind: "exclude_case" },
-      evidence: [theoryEvidence("set"), theoryEvidence("crossover")],
+      evidence: [theoryEvidence(locale, "set"), theoryEvidence(locale, "crossover")],
       status: "provisional",
       methodConfirmed: false,
       caseReviewConfirmed: false,
@@ -211,15 +325,21 @@ export function applyRohwerteTeachingSeed(): {
         alternatives: [
           {
             id: "democracy-lower",
-            label: "Crossover 10 points lower",
+            label: pick(locale, {
+              de: "Kreuzungspunkt 10 Punkte niedriger",
+              en: "Crossover 10 points lower",
+            }),
             delta: -10,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
           {
             id: "democracy-higher",
-            label: "Crossover 10 points higher",
+            label: pick(locale, {
+              de: "Kreuzungspunkt 10 Punkte höher",
+              en: "Crossover 10 points higher",
+            }),
             delta: 10,
-            rationale: TEACHING_NOTE,
+            rationale: note,
           },
         ],
         notes: "",
@@ -229,7 +349,7 @@ export function applyRohwerteTeachingSeed(): {
     URBANISIERUNG: {
       column: "URBANISIERUNG",
       set: {
-        setLabel: "Urbanized",
+        setLabel: pick(locale, { de: "Urbanisiert", en: "Urbanized" }),
         definition: "",
         unit: "%",
         scopePopulation: "",

@@ -394,15 +394,15 @@ test("A2.15 Calibration provenance and missing policy survive reload", async ({ 
   await loadRawRohwerte(page);
   await page.getByRole("button", { name: /Lehr-Seed anwenden/ }).click();
   await page.getByTestId("calibration-missing-policy").selectOption("leave_unresolved");
-  await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustrative teaching seed/i);
+  await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustratives Lehrbeispiel/i);
 
   await page.getByRole("button", { name: "Projekt lokal speichern" }).click();
   await expect(page.getByText("Lokal gespeichert.")).toBeVisible();
   await page.reload();
 
   await expect(page.getByTestId("calibration-variable-BIP_pKopf")).toBeVisible();
-  await expect(page.getByLabel("Set-Bezeichnung")).toHaveValue("Relatively wealthy countries");
+  await expect(page.getByLabel("Set-Bezeichnung")).toHaveValue("Relativ wohlhabende Länder");
   await expect(page.getByTestId("calibration-missing-policy")).toHaveValue("leave_unresolved");
-  await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustrative teaching seed/i);
+  await expect(page.getByTestId("calibration-evidence-row-0")).toContainText(/Illustratives Lehrbeispiel/i);
   await page.evaluate(() => localStorage.removeItem("openqca_local_project"));
 });

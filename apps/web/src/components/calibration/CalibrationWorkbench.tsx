@@ -107,6 +107,48 @@ function substepStatusKey(status: SubstepStatus): DictKey {
   return "calib.guide.status.incomplete";
 }
 
+/** Statuspunkt der Teilschritt-Leiste — erledigt / offen / nicht zutreffend. */
+function substepDotColor(status: SubstepStatus): string {
+  if (status === "complete") return "var(--good-text)";
+  if (status === "not-applicable") return "var(--muted)";
+  return "var(--warn-text)";
+}
+
+/**
+ * Höhe der klebenden Schritt-Navigation (`SectionNav`, position: sticky,
+ * top: 0, z-index 30) auf /app — gemessen, nicht geraten. Die Teilschritt-
+ * Leiste klebt exakt darunter; ihr z-index liegt darüber, aber unter dem
+ * InfoHint-Popover (z-index 70).
+ */
+const CALIBRATION_STICKY_TOP = 48;
+const CALIBRATION_STICKY_Z = 20;
+
+/** Nur die bewusste Nutzerentscheidung wird gemerkt, nie eine Vorbelegung. */
+const COLLAPSE_STORAGE_KEY = "openqca_calibration_collapse_done";
+
+/**
+ * Liest die gespeicherte Entscheidung „Erledigte einklappen". Ohne Eintrag
+ * (= erster Besuch) bleibt jeder Teilschritt ausgeklappt.
+ */
+function readCollapseDecision(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1";
+  } catch {
+    // Kein localStorage (privater Modus) — Standard bleibt „alles offen".
+    return false;
+  }
+}
+
+const anchorText = (value: number) =>
+  Number.isFinite(value) ? String(value).replace(".", ",") : "—";
+
+/** Teilschritt-Abschnitt: Sprungziel unterhalb der klebenden Leiste. */
+const substepSectionStyle: React.CSSProperties = {
+  marginBottom: 18,
+  scrollMarginTop: CALIBRATION_STICKY_TOP + 110,
+};
+
 function hasImportPlaceholder(spec: CalibrationSpec, varType?: VarType): boolean {
   const texts = [spec.set.definition];
   if (varType === "raw" && (spec.method === "direct" || spec.method === "linear")) {
@@ -213,6 +255,68 @@ function Field({
   );
 }
 
+/**
+ * Kopfzeile eines Teilschritts: klickbar zum Ein-/Ausklappen (Disclosure-
+ * Muster, `aria-expanded`), Überschrift bleibt eine echte `h3` und damit
+ * Sprungziel für die Teilschritt-Navigation. Eingeklappt zeigt sie eine
+ * knappe Zusammenfassung.
+ */
+function SubstepHeading({
+  title,
+  collapsed,
+  onToggle,
+  summary,
+  testId,
+  children,
+}: {
+  title: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  summary?: string;
+  testId?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <h3
+      tabIndex={-1}
+      style={{
+        fontSize: 15,
+        margin: "0 0 10px",
+        outline: "none",
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 8,
+      }}
+    >
+      <button
+        type="button"
+        className="oq-btn oq-btn--quiet"
+        data-testid={testId}
+        aria-expanded={!collapsed}
+        onClick={onToggle}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "2px 6px 2px 2px",
+          color: "var(--ink)",
+          textAlign: "left",
+        }}
+      >
+        <span aria-hidden style={{ fontSize: 11, color: "var(--muted)" }}>
+          {collapsed ? "▶" : "▼"}
+        </span>
+        {title}
+      </button>
+      {children}
+      {collapsed && summary ? (
+        <span style={{ fontSize: 12, fontWeight: 400, color: "var(--muted)" }}>{summary}</span>
+      ) : null}
+    </h3>
+  );
+}
+
 export function CalibrationWorkbench({
   ds,
   varMeta,
@@ -250,6 +354,14 @@ export function CalibrationWorkbench({
 }) {
   const [locale] = useLocale();
   const [activeStep, setActiveStep] = useState<CalibrationSubstepId>("definition");
+  const substepperRef = useRef<HTMLElement>(null);
+  // Dichte-Steuerung: Standard ist IMMER ausgeklappt. `collapseDone` ist die
+  // bewusste Entscheidung „Erledigte einklappen" (und nur diese wird gemerkt),
+  // `manualCollapsed` sind einzelne Kopfzeilen-Klicks je Variable.
+  const [collapseDone, setCollapseDone] = useState(readCollapseDecision);
+  const [manualCollapsed, setManualCollapsed] = useState<
+    Record<string, Partial<Record<CalibrationSubstepId, boolean>>>
+  >({});
 
   const activeCols = useMemo(
     () =>
@@ -287,6 +399,7 @@ export function CalibrationWorkbench({
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
   }, [v]);
+
 
   useEffect(() => {
     if (sensitivityContextRef.current === sensitivityContext) return;
@@ -340,7 +453,7 @@ export function CalibrationWorkbench({
   }
 
   function applyTeachingSeed() {
-    const seeded = applyRohwerteTeachingSeed();
+    const seeded = applyRohwerteTeachingSeed(locale);
     setVarMeta({ ...varMeta, ...seeded.varMeta });
     const merged = { ...calibSpecs, ...seeded.calibSpecs };
     setCalibSpecs(merged);
@@ -561,11 +674,39 @@ export function CalibrationWorkbench({
 
 
 
+  // Ein Teilschritt ist eingeklappt, wenn die Kopfzeile ihn explizit
+  // eingeklappt hat oder „Erledigte einklappen" aktiv und er vollständig ist.
+  const isSubstepCollapsed = (id: CalibrationSubstepId) =>
+    manualCollapsed[v]?.[id] ?? (collapseDone && stepStatuses[id] === "complete");
+
+  function toggleSubstep(id: CalibrationSubstepId) {
+    const next = !isSubstepCollapsed(id);
+    setManualCollapsed((prev) => ({ ...prev, [v]: { ...prev[v], [id]: next } }));
+  }
+
+  function toggleCollapseDone() {
+    const next = !collapseDone;
+    setCollapseDone(next);
+    setManualCollapsed({});
+    try {
+      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      // Ohne localStorage bleibt die Entscheidung auf diese Sitzung beschränkt.
+    }
+  }
+
   function goToSubstep(id: CalibrationSubstepId) {
     setActiveStep(id);
     const section = document.getElementById(`calibration-substep-${id}`);
     if (!section) return;
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Die klebende Leiste verdeckt sonst genau die Überschrift, zu der wir
+    // springen: Sprungziel um Leistenhöhe + Schritt-Navigation versetzen.
+    const barHeight = substepperRef.current?.getBoundingClientRect().height ?? 0;
+    const top =
+      window.scrollY +
+      section.getBoundingClientRect().top -
+      (CALIBRATION_STICKY_TOP + barHeight + 10);
+    window.scrollTo({ top: Math.max(top, 0), behavior: "smooth" });
     const heading = section.querySelector<HTMLElement>("h2, h3");
     if (heading) {
       heading.tabIndex = -1;
@@ -675,20 +816,46 @@ export function CalibrationWorkbench({
         {t(locale, isOutcome ? "calib.guide.context.outcome" : "calib.guide.context.condition")}
       </div>
 
+      {/*
+        Orientierungsleiste: klebt unter der Schritt-Navigation (48px, z 30)
+        und bleibt damit während der gesamten Teilschritt-Arbeit sichtbar.
+        z-index bleibt unter dem InfoHint-Popover (70).
+      */}
       <nav
+        ref={substepperRef}
         aria-label={t(locale, "calib.guide.aria")}
         data-testid="calibration-substepper"
         style={{
-          borderTop: "1px solid var(--line-soft)",
-          borderBottom: "1px solid var(--line-soft)",
-          padding: "10px 0",
-          marginBottom: 14,
+          position: "sticky",
+          top: CALIBRATION_STICKY_TOP,
+          zIndex: CALIBRATION_STICKY_Z,
+          background: "var(--panel)",
+          borderBottom: "1px solid var(--line)",
+          padding: "10px 20px 9px",
+          margin: "0 -20px 14px",
         }}
       >
+        {/*
+          Schmale Viewports: statt sechs umbrechender Zeilen (die die halbe
+          Höhe fressen würden) scrollt die Leiste horizontal in sich — der
+          Seiten-Overflow bleibt dabei bei 0.
+        */}
+        <style>{`
+          .oq-substep-list { flex-wrap: wrap; }
+          @media (max-width: 700px) {
+            .oq-substep-list {
+              flex-wrap: nowrap;
+              overflow-x: auto;
+              scrollbar-width: thin;
+              padding-bottom: 2px;
+            }
+            .oq-substep-list > li { flex: none; }
+          }
+        `}</style>
         <ol
+          className="oq-substep-list"
           style={{
             display: "flex",
-            flexWrap: "wrap",
             gap: 6,
             listStyle: "none",
             padding: 0,
@@ -702,8 +869,22 @@ export function CalibrationWorkbench({
             const statusLabel = t(locale, substepStatusKey(stepStatus));
             const content = (
               <>
-                <span style={{ fontWeight: 600 }}>{label}</span>
-                <span style={{ fontSize: 11, color: "var(--muted)" }}>{statusLabel}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 8,
+                      height: 8,
+                      flex: "none",
+                      borderRadius: 999,
+                      background: substepDotColor(stepStatus),
+                    }}
+                  />
+                  <span style={{ fontWeight: 600 }}>{label}</span>
+                </span>
+                <span style={{ fontSize: 11, color: "var(--muted)", paddingLeft: 14 }}>
+                  {statusLabel}
+                </span>
               </>
             );
             return (
@@ -754,13 +935,23 @@ export function CalibrationWorkbench({
         </ol>
         <div
           data-testid="calibration-progress"
-          style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, fontSize: 13.5 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 8,
+            marginTop: 8,
+            fontSize: 13.5,
+          }}
         >
-          <span>
-            {t(locale, "calib.guide.progress", {
-              done: completeSteps,
-              total: applicableSteps.length,
-            })}
+          <span style={{ color: "var(--ink)" }}>
+            <span style={{ fontWeight: 600 }}>
+              {t(locale, "calib.guide.progress", {
+                done: completeSteps,
+                total: applicableSteps.length,
+              })}
+            </span>{" "}
+            <span style={{ color: "var(--ink-2)" }}>{t(locale, "calib.guide.progressLabel")}</span>
           </span>
           {completeSteps < applicableSteps.length ? (
             <button
@@ -777,6 +968,16 @@ export function CalibrationWorkbench({
               {t(locale, "calib.guide.complete")}
             </span>
           )}
+          <button
+            type="button"
+            className="oq-btn oq-btn--quiet"
+            data-testid="calibration-collapse-done"
+            aria-pressed={collapseDone}
+            onClick={toggleCollapseDone}
+            style={{ fontSize: 12, padding: "4px 8px", marginLeft: "auto" }}
+          >
+            {t(locale, collapseDone ? "calib.guide.expandAll" : "calib.guide.collapseDone")}
+          </button>
         </div>
       </nav>
 
@@ -820,25 +1021,32 @@ export function CalibrationWorkbench({
       </div>
 
       {/* 1. Set definition */}
-      <section id="calibration-substep-definition" style={{ marginBottom: 18 }}>
-        <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-          {t(locale, "calib.set.title")}{" "}
+      <section id="calibration-substep-definition" style={substepSectionStyle}>
+        <SubstepHeading
+          title={t(locale, "calib.set.title")}
+          collapsed={isSubstepCollapsed("definition")}
+          onToggle={() => toggleSubstep("definition")}
+          summary={spec.set.setLabel || "—"}
+          testId="calibration-substep-toggle-definition"
+        >
           <span
             data-testid="calibration-set-role"
             style={{
               display: "inline-block",
-              marginLeft: 6,
               padding: "2px 7px",
               borderRadius: 999,
               background: isOutcome ? "var(--accent-wash)" : "var(--panel-2)",
               color: isOutcome ? "var(--accent-deep)" : "var(--muted)",
               fontSize: 11,
+              fontWeight: 400,
               verticalAlign: "middle",
             }}
           >
             {roleLabel}
           </span>
-        </h3>
+        </SubstepHeading>
+        {!isSubstepCollapsed("definition") && (
+          <>
         {isOutcome && (
           <div style={{ marginBottom: 10 }}>
             <InfoHint
@@ -927,13 +1135,21 @@ export function CalibrationWorkbench({
           />
           {t(locale, "calib.set.highIsIn")}
         </label>
+          </>
+        )}
       </section>
 
       {/* 2. Method / provenance */}
-      <section id="calibration-substep-method" style={{ marginBottom: 18 }}>
-        <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-          {t(locale, "calib.method.title")}
-        </h3>
+      <section id="calibration-substep-method" style={substepSectionStyle}>
+        <SubstepHeading
+          title={t(locale, "calib.method.title")}
+          collapsed={isSubstepCollapsed("method")}
+          onToggle={() => toggleSubstep("method")}
+          summary={modeLabel}
+          testId="calibration-substep-toggle-method"
+        />
+        {!isSubstepCollapsed("method") && (
+          <>
         {meta.type === "raw" ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {(
@@ -1009,6 +1225,8 @@ export function CalibrationWorkbench({
             ? t(locale, "calib.method.confirmed")
             : t(locale, "calib.method.confirm")}
         </button>
+          </>
+        )}
       </section>
 
       {/* 3. Anchors / threshold */}
@@ -1018,11 +1236,19 @@ export function CalibrationWorkbench({
           <section
             id="calibration-substep-mapping"
             data-testid={spec.method === "linear" ? "calibration-mapping-linear" : "calibration-mapping-direct"}
-            style={{ marginBottom: 18 }}
+            style={substepSectionStyle}
           >
-            <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-              {t(locale, "calib.anchors.title")}
-            </h3>
+            <SubstepHeading
+              title={t(locale, "calib.anchors.title")}
+              collapsed={isSubstepCollapsed("mapping")}
+              onToggle={() => toggleSubstep("mapping")}
+              summary={`${anchorText(fuzzyAnchors.fullOut)} / ${anchorText(
+                fuzzyAnchors.crossover,
+              )} / ${anchorText(fuzzyAnchors.fullIn)}`}
+              testId="calibration-substep-toggle-mapping"
+            />
+            {!isSubstepCollapsed("mapping") && (
+              <>
             <p style={{ fontSize: 13.5, color: "var(--ink-2)", marginTop: 0 }}>
               {t(locale, "calib.anchors.qualFirst")}
             </p>
@@ -1101,14 +1327,28 @@ export function CalibrationWorkbench({
             ) : (
               <Diag kind="bad">{t(locale, "calib.badOrder")}</Diag>
             )}
+              </>
+            )}
           </section>
         )}
 
       {meta.type === "raw" && spec.method === "crisp" && spec.crisp && (
-        <section id="calibration-substep-mapping" data-testid="calibration-mapping-crisp" style={{ marginBottom: 18 }}>
-          <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-            {t(locale, "calib.crisp.title")}
-          </h3>
+        <section
+          id="calibration-substep-mapping"
+          data-testid="calibration-mapping-crisp"
+          style={substepSectionStyle}
+        >
+          <SubstepHeading
+            title={t(locale, "calib.crisp.title")}
+            collapsed={isSubstepCollapsed("mapping")}
+            onToggle={() => toggleSubstep("mapping")}
+            summary={t(locale, "calib.guide.summary.threshold", {
+              value: anchorText(spec.crisp.threshold),
+            })}
+            testId="calibration-substep-toggle-mapping"
+          />
+          {!isSubstepCollapsed("mapping") && (
+            <>
           <Field label={t(locale, "calib.crisp.meaning")}>
             <textarea
               data-testid="calibration-crisp-meaning"
@@ -1142,16 +1382,31 @@ export function CalibrationWorkbench({
             threshold={spec.crisp.threshold}
             highIsMembership={spec.set.highIsMembership}
           />
+            </>
+          )}
         </section>
       )}
 
       <section
         id={meta.type !== "raw" || !spec.method ? "calibration-substep-mapping" : undefined}
-        style={{ marginBottom: 18 }}
+        style={substepSectionStyle}
       >
-        <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-          {t(locale, "calib.missing.title")}
-        </h3>
+        <SubstepHeading
+          title={t(locale, "calib.missing.title")}
+          collapsed={isSubstepCollapsed("mapping")}
+          onToggle={() => toggleSubstep("mapping")}
+          summary={t(
+            locale,
+            spec.missing.kind === "assign"
+              ? "calib.missing.assign"
+              : spec.missing.kind === "leave_unresolved"
+                ? "calib.missing.unresolved"
+                : "calib.missing.exclude",
+          )}
+          testId="calibration-substep-toggle-missing"
+        />
+        {!isSubstepCollapsed("mapping") && (
+          <>
         <div style={{ maxWidth: 320 }}>
           <Field label={t(locale, "calib.missing.policy")}>
             <select
@@ -1198,6 +1453,8 @@ export function CalibrationWorkbench({
         <p style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 0 }}>
           {t(locale, "calib.missing.help")}
         </p>
+          </>
+        )}
       </section>
 
       {/* 4. Evidence + status */}
@@ -1257,10 +1514,16 @@ export function CalibrationWorkbench({
           <Diag kind="warn">{t(locale, "calib.evidence.diagnosticWarning")}</Diag>
         </div>
       )}
-      <section id="calibration-substep-evidence" style={{ marginBottom: 18 }}>
-        <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-          {t(locale, "calib.evidence.title")}
-        </h3>
+      <section id="calibration-substep-evidence" style={substepSectionStyle}>
+        <SubstepHeading
+          title={t(locale, "calib.evidence.title")}
+          collapsed={isSubstepCollapsed("evidence")}
+          onToggle={() => toggleSubstep("evidence")}
+          summary={t(locale, "calib.guide.summary.evidence", { n: spec.evidence.length })}
+          testId="calibration-substep-toggle-evidence"
+        />
+        {!isSubstepCollapsed("evidence") && (
+          <>
         <p style={{ fontSize: 13.5, color: "var(--muted)", marginTop: 0 }}>
           {t(locale, "calib.evidence.help")}
         </p>
@@ -1499,13 +1762,21 @@ export function CalibrationWorkbench({
             </div>
           </div>
         )}
+          </>
+        )}
       </section>
 
       {/* 5. Case table */}
-      <section id="calibration-substep-cases" style={{ marginBottom: 18 }}>
-        <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 10px", outline: "none" }}>
-          {t(locale, "calib.cases.title")}
-        </h3>
+      <section id="calibration-substep-cases" style={substepSectionStyle}>
+        <SubstepHeading
+          title={t(locale, "calib.cases.title")}
+          collapsed={isSubstepCollapsed("cases")}
+          onToggle={() => toggleSubstep("cases")}
+          summary={t(locale, "calib.guide.summary.cases", { n: caseRows.length })}
+          testId="calibration-substep-toggle-cases"
+        />
+        {!isSubstepCollapsed("cases") && (
+          <>
         <CaseMembershipTable
           rows={caseRows}
           anchors={
@@ -1548,6 +1819,8 @@ export function CalibrationWorkbench({
           />
           {t(locale, "calib.cases.review")}
         </label>
+          </>
+        )}
       </section>
 
       {/* Diagnostics */}
@@ -1597,6 +1870,8 @@ export function CalibrationWorkbench({
           (spec.method === "crisp" && !!spec.crisp && Number.isFinite(spec.crisp.threshold))) ? (
           <AnchorSensitivityPanel
             id="calibration-substep-sensitivity"
+            collapsed={isSubstepCollapsed("sensitivity")}
+            onToggleCollapsed={() => toggleSubstep("sensitivity")}
             focusCol={v}
             isOutcome={isOutcome}
             baseThresholds={
@@ -1647,19 +1922,29 @@ export function CalibrationWorkbench({
             }
           />
         ) : (
-          <section id="calibration-substep-sensitivity" style={{ marginBottom: 12 }}>
-            <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 8px", outline: "none" }}>
-              {t(locale, "calib.sens.title")}
-            </h3>
-            <Diag kind="warn">{t(locale, "calib.sens.waitForMapping")}</Diag>
+          <section id="calibration-substep-sensitivity" style={substepSectionStyle}>
+            <SubstepHeading
+              title={t(locale, "calib.sens.title")}
+              collapsed={isSubstepCollapsed("sensitivity")}
+              onToggle={() => toggleSubstep("sensitivity")}
+              testId="calibration-substep-toggle-sensitivity"
+            />
+            {!isSubstepCollapsed("sensitivity") && (
+              <Diag kind="warn">{t(locale, "calib.sens.waitForMapping")}</Diag>
+            )}
           </section>
         )
       ) : meta.type === "raw" ? (
-        <section id="calibration-substep-sensitivity" style={{ marginBottom: 12 }}>
-          <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 8px", outline: "none" }}>
-            {t(locale, "calib.sens.title")}
-          </h3>
-          <Diag kind="warn">{t(locale, "calib.sens.waitForAnalysis")}</Diag>
+        <section id="calibration-substep-sensitivity" style={substepSectionStyle}>
+          <SubstepHeading
+            title={t(locale, "calib.sens.title")}
+            collapsed={isSubstepCollapsed("sensitivity")}
+            onToggle={() => toggleSubstep("sensitivity")}
+            testId="calibration-substep-toggle-sensitivity"
+          />
+          {!isSubstepCollapsed("sensitivity") && (
+            <Diag kind="warn">{t(locale, "calib.sens.waitForAnalysis")}</Diag>
+          )}
         </section>
       ) : null}
 
@@ -1901,6 +2186,8 @@ function CrispStrip({
 
 function AnchorSensitivityPanel({
   id,
+  collapsed,
+  onToggleCollapsed,
   focusCol,
   isOutcome,
   baseThresholds,
@@ -1917,6 +2204,8 @@ function AnchorSensitivityPanel({
   onAddAlternative,
 }: {
   id: string;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   focusCol: string;
   isOutcome: boolean;
   baseThresholds: number[];
@@ -1934,11 +2223,29 @@ function AnchorSensitivityPanel({
 }) {
   const [locale] = useLocale();
 
+  if (collapsed) {
+    return (
+      <section id={id} style={substepSectionStyle} data-testid="calibration-sensitivity">
+        <SubstepHeading
+          title={t(locale, "calib.sens.title")}
+          collapsed
+          onToggle={onToggleCollapsed}
+          summary={t(locale, "calib.guide.summary.sensitivity", { n: alternatives.length })}
+          testId="calibration-substep-toggle-sensitivity"
+        />
+      </section>
+    );
+  }
+
   return (
-    <section id={id} style={{ marginBottom: 12 }} data-testid="calibration-sensitivity">
-      <h3 tabIndex={-1} style={{ fontSize: 15, margin: "0 0 8px", outline: "none" }}>
-        {t(locale, "calib.sens.title")}
-      </h3>
+    <section id={id} style={substepSectionStyle} data-testid="calibration-sensitivity">
+      <SubstepHeading
+        title={t(locale, "calib.sens.title")}
+        collapsed={false}
+        onToggle={onToggleCollapsed}
+        summary={t(locale, "calib.guide.summary.sensitivity", { n: alternatives.length })}
+        testId="calibration-substep-toggle-sensitivity"
+      />
       <p style={{ fontSize: 13.5, color: "var(--ink-2)", marginTop: 0 }}>
         {t(locale, "calib.sens.help", { col: focusCol })}
       </p>

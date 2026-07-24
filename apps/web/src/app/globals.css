@@ -115,6 +115,57 @@ body {
   color: var(--ink);
 }
 
+/* ----------------------------------------------------------------------------
+   Ergebnisflächen: Was die App BERECHNET, muss sich von dem unterscheiden, was
+   der Nutzer EINGIBT. Eingaben liegen auf --panel mit --line-Rahmen; Ergebnisse
+   tragen den Marken-Ton. Ohne diese Trennung hat die Lösungsformel dasselbe
+   Gewicht wie ein Textfeld.
+---------------------------------------------------------------------------- */
+
+/* Die Lösungsformel ist das Ergebnis der gesamten Analyse — sie ist die
+   größte Schrift der App-Oberfläche (20px, Skala-konform). */
+.oq-formula {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--brand-wash);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+
+/* Nachgeordnete Ergebnisse (z. B. die Analyse des negierten Outcomes ~Y) lesen
+   sich als Ergebnis, treten aber hinter die Hauptlösung zurück. */
+.oq-formula--sub {
+  font-size: 16.5px;
+  font-weight: 600;
+  padding: 11px 14px;
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+
+/* Auf schmalen Viewports darf die Formel kleiner werden, statt zu drängen. */
+@media (max-width: 560px) {
+  .oq-formula {
+    font-size: 16.5px;
+    padding: 12px 13px;
+  }
+  .oq-formula--sub {
+    font-size: 15px;
+  }
+}
+
+/* Hebt die intermediäre Lösung hervor: Sie ist die Lösung, die in Aufsätzen
+   berichtet wird (Ragin & Sonnett 2005; Schneider & Wagemann 2012). */
+.oq-card--primary-result {
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--brand);
+}
+
 /* Global, konsistent sichtbarer Fokus — ersetzt alle lokalen outline:none. */
 :focus-visible {
   outline: 2px solid var(--accent);

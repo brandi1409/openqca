@@ -907,7 +907,10 @@ function Step({
         ? { label: t(locale, "step.status.active"), color: "var(--accent-deep)", bg: "var(--accent-wash)" }
         : { label: t(locale, "step.status.locked"), color: "var(--muted)", bg: "var(--line-soft)" };
   return (
-    <section id={id} style={{ scrollMarginTop: 56, marginBottom: 32 }}>
+    // Rhythmus: Karten innerhalb eines Schritts bleiben eng (18px), die Schritte
+    // selbst stehen weit auseinander (44px). Der Kontrast der Abstände gruppiert —
+    // nicht mehr Weißraum überall, der die ohnehin lange Seite nur streckt.
+    <section id={id} style={{ scrollMarginTop: 56, marginBottom: 44 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: locked ? 6 : 14 }}>
         <span
           aria-hidden
@@ -1336,7 +1339,9 @@ function SolutionSection({
               ? t(locale, "info.solIntermediate.body")
               : t(locale, "info.solParsimonious.body");
         return (
-          <Card key={kind}>
+          // Die intermediäre Lösung wird in Aufsätzen berichtet — sie bekommt die
+          // Ergebnis-Hervorhebung, die anderen beiden bleiben ruhig daneben.
+          <Card key={kind} className={kind === "intermediate" ? "oq-card--primary-result" : undefined}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{title}</h2>
               <InfoHint title={infoTitle} body={infoBody} />
@@ -1346,7 +1351,7 @@ function SolutionSection({
             ) : (
               s.models.map((m, mi) => (
                 <div key={mi}>
-                  <div className="mono" style={{ fontSize: 15, background: "var(--panel-2)", borderRadius: 8, padding: "10px 14px", overflowX: "auto" }}>
+                  <div className="oq-formula">
                     {m.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → {outLabel}
                   </div>
                   <div style={{ display: "flex", gap: 26, margin: "12px 0" }}>
@@ -1638,10 +1643,20 @@ function Header() {
   );
 }
 
-function Card({ children, id }: { children: React.ReactNode; id?: string }) {
+function Card({
+  children,
+  id,
+  className,
+}: {
+  children: React.ReactNode;
+  id?: string;
+  /** Für Sonderflächen wie `oq-card--primary-result` (hervorgehobenes Ergebnis). */
+  className?: string;
+}) {
   return (
     <div
       id={id}
+      className={className}
       style={{
         background: "var(--panel)",
         border: "1px solid var(--line)",
