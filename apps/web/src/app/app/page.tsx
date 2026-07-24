@@ -1624,7 +1624,10 @@ function Header() {
         open<span style={{ color: "var(--brand)" }}>QCA</span>
       </Link>
       <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{t(locale, "header.tagline")}</span>
-      <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12 }}>
+      {/* Die Gruppe muss selbst umbrechen dürfen: Bei 390px blieben zuvor nur ~7px
+          Reserve, sodass sie auf Linux-Schriftmetrik (CI) um 9px überlief. Wrap +
+          justify-end hält sie unabhängig von der Schriftbreite im Viewport. */}
+      <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: 12, minWidth: 0 }}>
         <a href="/methodik" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.methodik")}</a>
         <a href="/preise" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.tarife")}</a>
         <a href="/download" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.download")}</a>
