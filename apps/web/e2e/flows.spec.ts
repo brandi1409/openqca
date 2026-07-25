@@ -623,3 +623,36 @@ test("A2.20 Landing-Hero und App-Demo zeigen dieselbe Lösungsformel", async ({ 
     heroNumbers,
   );
 });
+
+/**
+ * A2.21 — Die didaktische Falle des Schnellpfads ist markiert.
+ *
+ * Beim Import setzt die App die Anker automatisch auf die 10./50./90. Perzentile.
+ * Datengetriebene Schwellen sind in der QCA-Methodik KEINE Begründung. Seit
+ * Ergebnisse sofort erscheinen, käme man sonst in zwei Klicks zu einer
+ * Lösungsformel aus unbegründeten Ankern. Geprüft wird deshalb: Die Herkunft ist
+ * ausgewiesen, verschwindet beim Anfassen eines Ankers, und die Ergebniskarten
+ * tragen die „vorläufig"-Marke, solange nicht dokumentiert ist.
+ */
+test("A2.21 Anker-Herkunft und Vorläufig-Marke am Ergebnis", async ({ page }) => {
+  await loadRawRohwerte(page);
+
+  // 1. Herkunft der automatischen Anker ist sichtbar.
+  const origin = page.getByTestId("calibration-quick-origin-BIP_pKopf");
+  await expect(origin).toBeVisible();
+  await expect(origin).toContainText(/Perzentil/i);
+
+  // 2. Die Ergebniskarten weisen sich als vorläufig aus — dort entstehen
+  //    Screenshots, nicht am Export.
+  await expect(page.getByTestId("provisional-result-mark").first()).toBeVisible();
+  expect(await page.getByTestId("provisional-result-mark").count()).toBeGreaterThanOrEqual(2);
+
+  // 3. Sobald ein Anker angefasst wird, ist er eine eigene Entscheidung —
+  //    der Herkunftshinweis verschwindet.
+  const anchor = page.getByTestId("calibration-quick-anchor-BIP_pKopf-crossover");
+  await anchor.fill("640");
+  await expect(origin).toHaveCount(0);
+
+  // Die Vorläufig-Marke bleibt: Anker gesetzt ≠ Kalibrierung dokumentiert.
+  await expect(page.getByTestId("provisional-result-mark").first()).toBeVisible();
+});

@@ -95,6 +95,8 @@ export function CalibrationQuick({
   function patchSpec(column: string, patch: Partial<CalibrationSpec>) {
     const prev = calibSpecs[column];
     if (!prev) return;
+    const touchesAnchors =
+      patch.direct !== undefined || patch.linear !== undefined || patch.crisp !== undefined;
     const nextSpec: CalibrationSpec = {
       ...prev,
       ...patch,
@@ -103,6 +105,8 @@ export function CalibrationQuick({
         ? { ...prev.sensitivity, ...patch.sensitivity }
         : prev.sensitivity,
       caseReviewConfirmed: false,
+      // Sobald ein Anker angefasst wird, ist er keine Perzentil-Vorgabe mehr.
+      anchorsFromData: touchesAnchors ? false : prev.anchorsFromData,
     };
     nextSpec.sensitivity = { ...nextSpec.sensitivity, reviewed: false };
     const next = { ...calibSpecs, [column]: nextSpec };
@@ -287,6 +291,32 @@ export function CalibrationQuick({
                     })}
                   </span>
                 </div>
+
+                {/* Herkunft der Anker ausweisen, solange sie unverändert aus der
+                    Perzentil-Heuristik des Imports stammen. Verschwindet, sobald
+                    ein Anker angefasst wurde — datengetriebene Schwellen sind in
+                    der QCA-Methodik keine Begründung. */}
+                {spec.anchorsFromData && (
+                  <p
+                    data-testid={`calibration-quick-origin-${column}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 7,
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      color: "var(--warn-text)",
+                      background: "var(--warn-wash)",
+                      border: "1px solid color-mix(in srgb, var(--warn-text) 30%, transparent)",
+                      borderRadius: 8,
+                      padding: "7px 10px",
+                      margin: "0 0 10px",
+                    }}
+                  >
+                    <span aria-hidden>⚠</span>
+                    <span>{t(locale, "calib.quick.anchorsFromData")}</span>
+                  </p>
+                )}
 
                 {(spec.method === "direct" || spec.method === "linear") && fuzzyAnchors ? (
                   <>

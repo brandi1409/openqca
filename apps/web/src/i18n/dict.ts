@@ -482,6 +482,8 @@ const de = {
   "calib.quick.title": "Anker setzen, Ergebnisse sehen",
   "calib.quick.desc":
     "Je Set: Methode wählen und die drei Anker setzen — per Zahlenfeld oder durch Ziehen der Griffe unter der Kurve. Notwendigkeit, Truth Table und Lösungen rechnen sofort mit.",
+  "calib.quick.anchorsFromData":
+    "Diese Anker sind automatisch aus der Verteilung Ihrer Daten vorgeschlagen (10./50./90. Perzentil) — noch keine inhaltliche Entscheidung. Datengetriebene Schwellen sind in der QCA-Methodik keine Begründung: Setzen Sie die Anker dort, wo es fachlich Sinn ergibt. Der Hinweis verschwindet, sobald Sie einen Anker anfassen.",
   "calib.quick.method": "Methode",
   "calib.quick.method.direct": "Direkt",
   "calib.quick.method.linear": "Linear",
@@ -772,6 +774,9 @@ const de = {
   // -- Bericht ----------------------------------------------------------------
   "report.title": "Bericht",
   "report.desc": "Öffnet einen druckfähigen Bericht (PDF über den Druckdialog).",
+  "result.provisional.chip": "vorläufig",
+  "result.provisional.title":
+    "Die Berechnung ist exakt, aber die Kalibrierung ist noch nicht inhaltlich dokumentiert. Für zitierfähige Ergebnisse die Anker begründen (Ansicht „Dokumentation“).",
   "report.demoNotice":
     "Demo-Datensatz: Der Bericht lässt sich erzeugen und zeigt den vollständigen Rechenweg — er trägt dann den Hinweis „Synthetische Lehrdaten — nicht zitierfähig“. Protokoll- und R-Export bleiben gesperrt, bis Sie mit eigenen Daten arbeiten und die Kalibrierung begründet haben.",
   "report.provisionalNotice":
@@ -1514,6 +1519,8 @@ const en: Record<DictKey, string> = {
   "calib.quick.title": "Set anchors, see results",
   "calib.quick.desc":
     "Per set: choose a method and place the three anchors — by typing a value or by dragging the handles below the curve. Necessity, truth table, and solutions recompute right away.",
+  "calib.quick.anchorsFromData":
+    "These anchors were suggested automatically from your data distribution (10th/50th/90th percentile) — not yet a substantive decision. Data-driven thresholds are not a justification in QCA: set the anchors where they make sense substantively. This notice disappears once you touch an anchor.",
   "calib.quick.method": "Method",
   "calib.quick.method.direct": "Direct",
   "calib.quick.method.linear": "Linear",
@@ -1802,6 +1809,9 @@ const en: Record<DictKey, string> = {
   // -- Report -----------------------------------------------------------------
   "report.title": "Report",
   "report.desc": "Opens a print-ready report (PDF via the print dialog).",
+  "result.provisional.chip": "provisional",
+  "result.provisional.title":
+    "The calculation is exact, but the calibration is not yet substantively documented. For citable results, justify the anchors (view \u201cDocumentation\u201d).",
   "report.demoNotice":
     "Demo dataset: the report can be generated and shows the full calculation path — it then carries the notice “Synthetic teaching data — not citable”. Protocol and R export stay locked until you work with your own data and justify the calibration.",
   "report.provisionalNotice":

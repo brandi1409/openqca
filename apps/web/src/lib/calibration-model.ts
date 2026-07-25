@@ -99,6 +99,17 @@ export interface CalibrationSpec {
   status: CalibrationDecisionStatus;
   /** True when import-time placeholders still need substantive replacement. */
   provisionalDefaults?: boolean;
+  /**
+   * Die Anker stammen unverändert aus der Perzentil-Heuristik des Imports
+   * (`lib/csv.ts`/`lib/xlsx.ts`), nicht aus einer inhaltlichen Entscheidung.
+   *
+   * Das ist ausdrücklich KEINE Begründung: Datengetriebene Schwellen sind in der
+   * QCA-Methodik kein zulässiger Kalibrierungsgrund. Seit Ergebnisse sofort
+   * erscheinen, kann man in zwei Klicks zu einer Lösungsformel kommen, deren
+   * Anker niemand begründet hat — deshalb muss die Herkunft sichtbar bleiben,
+   * bis der Nutzer einen Anker selbst anfasst.
+   */
+  anchorsFromData?: boolean;
   methodConfirmed: boolean;
   caseReviewConfirmed: boolean;
   externalReview?: ExternalReviewAttestation;

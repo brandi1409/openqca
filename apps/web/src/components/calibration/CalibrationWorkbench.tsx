@@ -450,6 +450,10 @@ export function CalibrationWorkbench({
     if (patch.direct) nextSpec.direct = { ...prev.direct!, ...patch.direct };
     if (patch.linear) nextSpec.linear = { ...prev.linear!, ...patch.linear };
     if (patch.crisp) nextSpec.crisp = { ...prev.crisp!, ...patch.crisp };
+    // Wer einen Anker anfasst, hat ihn selbst gewählt — die Perzentil-Herkunft
+    // aus dem Import gilt dann nicht mehr (gleiches Verhalten wie in der
+    // Schnell-Ansicht).
+    if (patch.direct || patch.linear || patch.crisp) nextSpec.anchorsFromData = false;
     if (
       nextSpec.provisionalDefaults &&
       !hasImportPlaceholder(nextSpec, varMeta[column]?.type)

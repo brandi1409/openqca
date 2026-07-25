@@ -255,6 +255,9 @@ export default function Home() {
         specs[col] = {
           ...s,
           provisionalDefaults: true,
+          // Die Anker kommen aus der Perzentil-Heuristik des Imports — bis der
+          // Nutzer einen davon anfasst, bleibt diese Herkunft ausgewiesen.
+          anchorsFromData: true,
           status: s.status === "unresolved" ? "provisional" : s.status,
         };
         continue;
@@ -634,6 +637,12 @@ export default function Home() {
    */
   const reportAvailable = step5Done && !!necessity;
   const reportProvisional = !demoMode && !calibrationResearchReady;
+  /**
+   * Ergebnisse sind erzeugt, aber die Kalibrierung ist nicht dokumentiert.
+   * Beim synthetischen Demo-Datensatz trägt bereits ein eigener Hinweis; dort
+   * wäre die Marke doppelt.
+   */
+  const showProvisionalMark = step3Done && reportProvisional;
   const step6Done = false; // Terminal-Schritt: bleibt „aktiv", solange man hier arbeitet
 
   const s1 = statusOf(true, step1Done);
@@ -862,12 +871,14 @@ export default function Home() {
 
       {/* Schritt 4 — Notwendigkeit */}
       <Step n={4} id={stepMeta[3].id} title={t(locale, stepMeta[3].titleKey)} status={s4} lockedReason={t(locale, lockedReasonKeys[3]!)} intro={t(locale, "step.intro.4")}>
+        {showProvisionalMark && <ProvisionalMark />}
         {necessity ? <NecessitySection necessity={necessity} /> : <p className="hint" style={hintStyle}>{t(locale, "step.pending")}</p>}
       </Step>
       {renderContinue(4)}
 
       {/* Schritt 5 — Truth Table & Lösungen */}
       <Step n={5} id={stepMeta[4].id} title={t(locale, stepMeta[4].titleKey)} status={s5} lockedReason={t(locale, lockedReasonKeys[4]!)} intro={t(locale, "step.intro.5")}>
+        {showProvisionalMark && <ProvisionalMark />}
         <TruthTableSection
           freqCut={freqCut}
           setFreqCut={setFreqCut}
@@ -890,6 +901,7 @@ export default function Home() {
 
       {/* Schritt 6 — Robustheit, Bericht & Export */}
       <Step n={6} id={stepMeta[5].id} title={t(locale, stepMeta[5].titleKey)} status={s6} lockedReason={t(locale, lockedReasonKeys[5]!)} intro={t(locale, "step.intro.6")}>
+        {showProvisionalMark && <ProvisionalMark />}
         {sol && tt && ds && (
           <>
             <Card>
@@ -2088,6 +2100,39 @@ function Button({
 function Kpi({ v, l }: { v: string; l: React.ReactNode }) {
   return <UiKpi value={v} label={l} />;
 }
+/**
+ * „Vorläufig"-Marke an den ERGEBNIS-Karten (Schritte 4-6).
+ *
+ * Der Hinweis an der Bericht-Karte allein genügt nicht: Screenshots entstehen an
+ * der Lösung, nicht am Export. Solange die Kalibrierung nicht dokumentiert ist,
+ * muss das Ergebnis selbst sagen, worauf es beruht.
+ */
+function ProvisionalMark() {
+  const [locale] = useLocale();
+  return (
+    <span
+      data-testid="provisional-result-mark"
+      title={t(locale, "result.provisional.title")}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 11,
+        fontWeight: 600,
+        color: "var(--warn-text)",
+        background: "var(--warn-wash)",
+        border: "1px solid color-mix(in srgb, var(--warn-text) 30%, transparent)",
+        borderRadius: 999,
+        padding: "2px 9px",
+        marginBottom: 10,
+      }}
+    >
+      <span aria-hidden>⚠</span>
+      {t(locale, "result.provisional.chip")}
+    </span>
+  );
+}
+
 function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React.ReactNode }) {
   const map = { ok: ["var(--good)", "rgba(12,163,12,0.09)"], warn: ["#b26a00", "var(--warn-wash)"], bad: ["var(--bad)", "var(--bad-wash)"] } as const;
   const [icon, wash] = map[kind];

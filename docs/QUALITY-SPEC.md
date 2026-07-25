@@ -57,6 +57,7 @@ unverändert scharf, nur eben nach `openDocumentationView()` (Helper in `e2e/hel
 | A2.18 | **„Vorläufig"-Banner**: Bericht aus dem Schnellpfad trägt `Vorläufig — Kalibrierung noch nicht vollständig dokumentiert`, **kein** Demo-Banner, und enthält den vollständigen Rechenweg | `flows.spec` |
 | A2.19 | **Dokumentation schaltet Export frei**: nach vollständiger Dokumentation aller Sets meldet das Meter „4 von 4", alle vier Export-Buttons sind bedienbar, der Sperrgrund verschwindet und der Bericht trägt **kein** Banner mehr | `flows.spec` (im A2.12-Durchlauf geprüft — der vollständige Dokumentationslauf ist dort bereits vorhanden; ein eigener Test wäre reine Wiederholung) |
 | A2.20 | **Landing = App**: Lösungsformel und die beiden Kennzahlen im Hero-Beweisstreifen auf `/` sind identisch mit der intermediären Lösung auf `/app?demo=1` (Text normalisiert). Geprüft wird die **Identität**, kein eingefrorener Zahlenwert — Datensatz und Engine dürfen sich ändern, aber nie unterschiedlich auf beiden Seiten | `flows.spec` |
+| A2.21 | **Anker-Herkunft und Vorläufig-Marke**: Nach dem Import ist ausgewiesen, dass die Anker aus Perzentilen stammen; der Hinweis verschwindet, sobald ein Anker angefasst wird. Die Ergebniskarten (Schritte 4–6) tragen die „vorläufig"-Marke, solange die Kalibrierung nicht dokumentiert ist | `flows.spec` |
 
 **Rollen-Vorbelegung (verbindlich):** Beim Laden eines Datensatzes ist die **letzte** numerische
 Spalte das Outcome und **jede** weitere numerische Spalte eine Bedingung. Es gibt kein stilles
