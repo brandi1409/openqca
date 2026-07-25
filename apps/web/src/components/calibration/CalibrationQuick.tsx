@@ -156,6 +156,10 @@ export function CalibrationQuick({
     });
   }
 
+  const anyAnchorsFromData = activeCols.some(
+    (column) => varMeta[column]?.type === "raw" && calibSpecs[column]?.anchorsFromData,
+  );
+
   return (
     <div data-testid="calibration-quick">
       <div
@@ -171,6 +175,31 @@ export function CalibrationQuick({
         <p style={{ color: "var(--ink-2)", fontSize: 13.5, maxWidth: "70ch", margin: 0 }}>
           {t(locale, "calib.quick.desc")}
         </p>
+        {/* Die Begründung steht einmal hier, nicht an jeder Set-Karte: sie ist für
+            alle Sets dieselbe und stand sonst fünfmal untereinander. An der Karte
+            bleibt nur die kurze Marke, damit die Herkunft am Anker sichtbar ist. */}
+        {anyAnchorsFromData && (
+          <p
+            data-testid="calibration-quick-origin-note"
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 7,
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: "var(--warn-text)",
+              background: "var(--warn-wash)",
+              border: "1px solid color-mix(in srgb, var(--warn-text) 30%, transparent)",
+              borderRadius: 8,
+              padding: "7px 10px",
+              margin: "12px 0 0",
+              maxWidth: "70ch",
+            }}
+          >
+            <span aria-hidden>⚠</span>
+            <span>{t(locale, "calib.quick.anchorsFromData")}</span>
+          </p>
+        )}
       </div>
 
       {activeCols.map((column) => {
@@ -248,6 +277,20 @@ export function CalibrationQuick({
               >
                 {t(locale, documented ? "calib.meter.chipDone" : "calib.meter.chipOpen")}
               </span>
+              {/* Herkunft der Anker ausweisen, solange sie unverändert aus der
+                  Perzentil-Heuristik des Imports stammen. Verschwindet, sobald ein
+                  Anker angefasst wurde — datengetriebene Schwellen sind in der
+                  QCA-Methodik keine Begründung. Die Begründung dazu steht einmal
+                  oben im Schritt. */}
+              {meta.type === "raw" && spec.anchorsFromData && (
+                <span
+                  data-testid={`calibration-quick-origin-${column}`}
+                  style={pillStyle("warn")}
+                  title={t(locale, "calib.quick.anchorsFromData")}
+                >
+                  {t(locale, "calib.quick.anchorsFromData.chip")}
+                </span>
+              )}
               <button
                 type="button"
                 className="oq-btn oq-btn--quiet"
@@ -291,32 +334,6 @@ export function CalibrationQuick({
                     })}
                   </span>
                 </div>
-
-                {/* Herkunft der Anker ausweisen, solange sie unverändert aus der
-                    Perzentil-Heuristik des Imports stammen. Verschwindet, sobald
-                    ein Anker angefasst wurde — datengetriebene Schwellen sind in
-                    der QCA-Methodik keine Begründung. */}
-                {spec.anchorsFromData && (
-                  <p
-                    data-testid={`calibration-quick-origin-${column}`}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 7,
-                      fontSize: 12,
-                      lineHeight: 1.5,
-                      color: "var(--warn-text)",
-                      background: "var(--warn-wash)",
-                      border: "1px solid color-mix(in srgb, var(--warn-text) 30%, transparent)",
-                      borderRadius: 8,
-                      padding: "7px 10px",
-                      margin: "0 0 10px",
-                    }}
-                  >
-                    <span aria-hidden>⚠</span>
-                    <span>{t(locale, "calib.quick.anchorsFromData")}</span>
-                  </p>
-                )}
 
                 {(spec.method === "direct" || spec.method === "linear") && fuzzyAnchors ? (
                   <>

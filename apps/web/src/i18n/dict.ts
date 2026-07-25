@@ -483,7 +483,8 @@ const de = {
   "calib.quick.desc":
     "Je Set: Methode wählen und die drei Anker setzen — per Zahlenfeld oder durch Ziehen der Griffe unter der Kurve. Notwendigkeit, Truth Table und Lösungen rechnen sofort mit.",
   "calib.quick.anchorsFromData":
-    "Diese Anker sind automatisch aus der Verteilung Ihrer Daten vorgeschlagen (10./50./90. Perzentil) — noch keine inhaltliche Entscheidung. Datengetriebene Schwellen sind in der QCA-Methodik keine Begründung: Setzen Sie die Anker dort, wo es fachlich Sinn ergibt. Der Hinweis verschwindet, sobald Sie einen Anker anfassen.",
+    "Sets mit der Marke „10./50./90. Perzentil“ tragen noch Anker, die beim Import automatisch aus der Verteilung Ihrer Daten vorgeschlagen wurden — das ist keine inhaltliche Entscheidung. Datengetriebene Schwellen sind in der QCA-Methodik keine Begründung: Setzen Sie die Anker dort, wo es fachlich Sinn ergibt. Die Marke verschwindet, sobald Sie einen Anker des Sets anfassen.",
+  "calib.quick.anchorsFromData.chip": "10./50./90. Perzentil",
   "calib.quick.method": "Methode",
   "calib.quick.method.direct": "Direkt",
   "calib.quick.method.linear": "Linear",
@@ -1567,7 +1568,8 @@ const en: Record<DictKey, string> = {
   "calib.quick.desc":
     "Per set: choose a method and place the three anchors — by typing a value or by dragging the handles below the curve. Necessity, truth table, and solutions recompute right away.",
   "calib.quick.anchorsFromData":
-    "These anchors were suggested automatically from your data distribution (10th/50th/90th percentile) — not yet a substantive decision. Data-driven thresholds are not a justification in QCA: set the anchors where they make sense substantively. This notice disappears once you touch an anchor.",
+    "Sets marked “10th/50th/90th percentile” still carry anchors that were suggested automatically from your data distribution on import — that is not yet a substantive decision. Data-driven thresholds are not a justification in QCA: set the anchors where they make sense substantively. The mark disappears once you touch an anchor of that set.",
+  "calib.quick.anchorsFromData.chip": "10th/50th/90th percentile",
   "calib.quick.method": "Method",
   "calib.quick.method.direct": "Direct",
   "calib.quick.method.linear": "Linear",
