@@ -51,8 +51,9 @@ openqca/
 - **Engine** (43 Tests): Kalibrierung (direkt, linear, crisp, Vier-Werte), Konsistenz/Coverage/PRI,
   Truth Table, Quine-McCluskey-Minimierung, komplexe + **intermediäre** (Enhanced Standard Analysis
   mit Richtungserwartungen) + sparsame Lösung, Notwendigkeitsanalyse, kombinierte Robustheitsraster.
-- **Validierung:** Die Lösungslogik ist in **17 von 19 Szenarien gegen das R-Paket `QCA`**
-  kreuzvalidiert (Formeln und Fit-Kennzahlen, Toleranz `1e-6`); die zwei Abweichungen — beide aus
+- **Validierung:** Lösungslogik und Notwendigkeitsanalyse sind in **23 von 25 Szenarien gegen das
+  R-Paket `QCA`** kreuzvalidiert (Formeln und Fit-Kennzahlen, Toleranz `1e-6`; Notwendigkeit inkl.
+  Disjunktionen/SUIN und RoN gegen `superSubset`); die zwei Abweichungen — beide aus
   derselben ESA-Ursache, eine davon auf dem kanonischen Lipset-Datensatz — sind analysiert
   und offen dokumentiert.
   Crisp- und lineare Fuzzy-Kalibrierung stimmen
@@ -73,6 +74,11 @@ openqca/
 Vier-Werte-Kalibrierung (kein passendes Orakel im R-Paket), Zeitreihen-/Panel-QCA (Datenmodell fehlt),
 Desktop-Build via Tauri (braucht Rust + Signierzertifikate), juristische Prüfung der `[PRÜFEN]`-Punkte
 unter `legal/`, eigene Domain, Zenodo-DOI und JOSS-Einreichung.
+
+## Änderungen
+
+Nennenswerte Änderungen stehen im [`CHANGELOG.md`](CHANGELOG.md); offene Punkte werden als
+[GitHub-Issues](https://github.com/brandi1409/openqca/issues) geführt.
 
 ## Mitmachen
 
