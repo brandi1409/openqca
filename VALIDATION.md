@@ -137,27 +137,53 @@ Geprüft wurde `LF` aus dem R-Paket (Ragins Lehrbeispiel, 18 Fälle, `incl.cut =
 Damit ist die Abweichung **kein Randfall mit exotischen Erwartungen**, sondern trifft
 den Standardfall auf dem bekanntesten Datensatz des Fachs.
 
-**Stand der Ursachenanalyse.** Die Konstruktion ist inzwischen geklärt, die
-Klassifikationsregel nicht:
+**Stand der Ursachenanalyse (2026-07-25).** Die Konstruktion ist geklärt, die
+Klassifikationsregel nicht. Der Kenntnisstand ist präzise genug, dass ein nächster
+Anlauf nicht bei null beginnen muss.
 
-1. *Geklärt:* R bildet die intermediäre Lösung **nicht** durch Justieren der Literale
-   konservativer Primimplikanten gegen subsumierende sparsame (so arbeitet die Engine
-   heute), sondern durch **erneute Minimierung über (positive Minterme ∪ einfache
-   Counterfactuals)**. Nachgewiesen: Mit R's eigener EC-Liste
-   (`minimize(...)$i.sol[[k]]$EC`) als zugelassenen Remaindern liefert die vorhandene
-   Minimierungspipeline der Engine auf Lipset **exakt** R's intermediäre Lösung.
-2. *Offen:* Wie R einen Remainder als einfach oder schwierig einstuft. Die naheliegende
-   Regel nach Ragin & Sonnett — einfach ist, was aus einer beobachteten hinreichenden
-   Konfiguration entsteht, indem nur Bedingungen in ihren **erwarteten** Zustand geändert
-   werden — reproduziert R's Einstufung auf Lipset zwar exakt (ein einfacher, elf
-   schwierige Counterfactuals), führt aber bei anderen Szenarien zu Abweichungen
-   (`fuzzy_intermediate_all_absent` schlägt damit fehl). Eine Einschränkung auf die von
-   der sparsamen Lösung tatsächlich genutzten Vereinfachungsannahmen ändert daran nichts.
+**1. Geklärt — die Konstruktion.** R bildet die intermediäre Lösung **nicht** durch
+Justieren der Literale konservativer Primimplikanten gegen subsumierende sparsame (so
+arbeitet die Engine heute), sondern durch **erneute Minimierung über (positive Minterme
+∪ einfache Counterfactuals)**. Nachgewiesen: Speist man die vorhandene
+Minimierungspipeline der Engine mit R's eigener EC-Liste
+(`minimize(...)$i.sol[[k]]$EC`) als zugelassenen Remaindern, liefert sie auf Lipset
+**exakt** R's intermediäre Lösung. Die Umstellung der Konstruktion allein genügt also —
+es fehlt nur die Regel, die EC bestimmt.
 
-Ein Umbau wurde deshalb **bewusst zurückgenommen**: Er hätte ein zuvor übereinstimmendes
-Szenario gebrochen und die Gesamtübereinstimmung verschlechtert. Solange die
-Klassifikationsregel nicht vollständig verstanden ist, bleibt die bestehende, an zwölf
-Szenarien validierte Implementierung stehen — mit dieser offenen Dokumentation.
+**2. Offen — die Klassifikationsregel.** Zwei Kandidaten wurden implementiert und gegen
+die volle Prüfkette gestellt. Jeder trifft einen realen Mechanismus, keiner alle Fälle:
+
+| Kandidat | Kreuzvalidierung | Engine-Tests |
+|---|---|---|
+| **A — gerichtet:** einfach nur, wenn eine Bedingung von *abwesend* auf *anwesend* wechselt und „present" erwartet wird | **16/16**, inkl. Lipset und `ambig_intermediate_mixed` | 2 Fehlschläge |
+| **B — symmetrisch:** einfach, wenn eine Bedingung in ihren erwarteten Zustand wechselt (beide Richtungen) | 14/16 | 43/43 |
+| **bestehend (Literal-Justierung)** | 15/16 | 43/43 |
+
+Die beiden Engine-Tests, die Kandidat A bricht, wurden gegen R **nachgeprüft und sind
+korrekt**: Für den Test-Datensatz (einzige positive Ecke `W*B*S`) liefert R mit
+`dir.exp = (0,1,1)` die Lösung `B*S` und mit `(0,0,0)` die Lösung `S`. Das *Entfernen*
+eines Literals, dessen Abwesenheit erwartet wird, ist dort also sehr wohl einfach —
+Kandidat A schließt das aus.
+
+**3. Der entscheidende Widerspruch.** Dieselbe Konstellation wird von R unterschiedlich
+eingestuft, abhängig von den **übrigen** positiven Konfigurationen:
+
+- Test-Datensatz, Erwartungen alle „absent", einzige positive Ecke `111`: Der Remainder
+  `011` (Wechsel von `111`, Bedingung in den erwarteten Zustand) ist **einfach**.
+- `fuzzy_intermediate_all_absent`, Erwartungen alle „absent", positive Ecken
+  `001, 110, 111`: Derselbe Remainder `011`, erreichbar aus derselben Ecke `111` durch
+  denselben Wechsel, ist **schwierig** (R führt ihn unter `$DC`).
+
+Der Unterschied liegt allein in den zusätzlichen positiven Ecken. R's Einstufung hängt
+also **nicht** nur an der paarweisen Erreichbarkeit aus *irgendeiner* positiven Ecke,
+sondern an der Gesamtkonstellation. Genau hier muss der nächste Anlauf ansetzen —
+sinnvollerweise mit einem Skript, das R's `$EC`/`$DC` über viele generierte Datensätze
+einsammelt und Regelkandidaten dagegen prüft, statt sie einzeln zu erraten.
+
+Der Umbau wurde **bewusst zurückgenommen**: Kandidat A hätte R-geprüfte Engine-Tests
+gebrochen, Kandidat B die Gesamtübereinstimmung verschlechtert. Solange die Regel nicht
+vollständig verstanden ist, bleibt die bestehende Implementierung stehen — mit dieser
+offenen Dokumentation.
 
 Bis zur Klärung gilt: Der Fall ist als Szenario **eingecheckt und sichtbar**.
 `scripts/cross-validate.mjs` führt ihn in `KNOWN_DIVERGENCES`, meldet ihn bei jedem Lauf
