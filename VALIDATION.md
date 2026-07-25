@@ -1,7 +1,8 @@
 # Validierung des QCA-Rechenkerns
 
 Die eigenständige Referenz-Suite wird aus dem Repository-Wurzelverzeichnis mit
-Node.js 26 ausgeführt:
+Node.js ≥ 22.18 ausgeführt (ab dieser Version wird TypeScript
+ohne Zusatz-Flag direkt ausgeführt; die Skripte importieren die Engine-Quellen):
 
 ```sh
 node scripts/reference-check.mjs
@@ -123,11 +124,40 @@ Erwartung entfernt (hier stimmen Literal `~D` und Erwartung „absent" überein)
 den zugehörigen Remainder (`A*B*C*D`, Zeile 16) hingegen als *easy counterfactual* ein
 und entfernt `~D`.
 
-Die Regel der Engine ist an den zwölf ursprünglichen Szenarien R-validiert und dort
-korrekt; sie ist in diesem Randfall unvollständig. Die Ursache ist noch nicht
-abschließend geklärt — insbesondere, wie R die Einstufung easy/difficult für Literale
-bildet, deren Polarität mit der Erwartung übereinstimmt, deren Remainder aber die
-Gegenrichtung darstellt.
+**Zweiter Fall, gefunden am 2026-07-25: der kanonische Lipset-Datensatz.**
+Geprüft wurde `LF` aus dem R-Paket (Ragins Lehrbeispiel, 18 Fälle, `incl.cut = 0,8`,
+`n.cut = 1`, alle Erwartungen „present"). Konservative und sparsame Lösung stimmen
+**exakt** mit R überein; die intermediäre nicht:
+
+| | Lösung |
+|---|---|
+| R (`i.sol[[1]]`) | `DEV*URB*LIT*STB + DEV*LIT*~IND*STB` |
+| Engine | `DEV*URB*LIT*IND*STB + DEV*LIT*~IND*STB` |
+
+Damit ist die Abweichung **kein Randfall mit exotischen Erwartungen**, sondern trifft
+den Standardfall auf dem bekanntesten Datensatz des Fachs.
+
+**Stand der Ursachenanalyse.** Die Konstruktion ist inzwischen geklärt, die
+Klassifikationsregel nicht:
+
+1. *Geklärt:* R bildet die intermediäre Lösung **nicht** durch Justieren der Literale
+   konservativer Primimplikanten gegen subsumierende sparsame (so arbeitet die Engine
+   heute), sondern durch **erneute Minimierung über (positive Minterme ∪ einfache
+   Counterfactuals)**. Nachgewiesen: Mit R's eigener EC-Liste
+   (`minimize(...)$i.sol[[k]]$EC`) als zugelassenen Remaindern liefert die vorhandene
+   Minimierungspipeline der Engine auf Lipset **exakt** R's intermediäre Lösung.
+2. *Offen:* Wie R einen Remainder als einfach oder schwierig einstuft. Die naheliegende
+   Regel nach Ragin & Sonnett — einfach ist, was aus einer beobachteten hinreichenden
+   Konfiguration entsteht, indem nur Bedingungen in ihren **erwarteten** Zustand geändert
+   werden — reproduziert R's Einstufung auf Lipset zwar exakt (ein einfacher, elf
+   schwierige Counterfactuals), führt aber bei anderen Szenarien zu Abweichungen
+   (`fuzzy_intermediate_all_absent` schlägt damit fehl). Eine Einschränkung auf die von
+   der sparsamen Lösung tatsächlich genutzten Vereinfachungsannahmen ändert daran nichts.
+
+Ein Umbau wurde deshalb **bewusst zurückgenommen**: Er hätte ein zuvor übereinstimmendes
+Szenario gebrochen und die Gesamtübereinstimmung verschlechtert. Solange die
+Klassifikationsregel nicht vollständig verstanden ist, bleibt die bestehende, an zwölf
+Szenarien validierte Implementierung stehen — mit dieser offenen Dokumentation.
 
 Bis zur Klärung gilt: Der Fall ist als Szenario **eingecheckt und sichtbar**.
 `scripts/cross-validate.mjs` führt ihn in `KNOWN_DIVERGENCES`, meldet ihn bei jedem Lauf
@@ -135,10 +165,22 @@ als Warnung und **schlägt fehl, sobald die Abweichung verschwindet** (dann ist 
 Eintrag zu entfernen und dieser Abschnitt zu aktualisieren). Die Abweichung wurde nicht
 durch Anpassen von Erwartungswerten, Toleranzen oder des Orakels „grün gemacht".
 
-Praktische Reichweite: Betroffen sind ausschließlich intermediäre Lösungen mit
-**gemischten** Richtungserwartungen in Konstellationen mit Modell-Ambiguität. Die
-konservative und die sparsame Lösung sind nicht betroffen, ebenso wenig intermediäre
-Lösungen mit durchgängig gleichen Erwartungen.
+Praktische Reichweite — **am 2026-07-25 nach oben korrigiert.** Ursprünglich war hier
+vermerkt, betroffen seien nur gemischte Richtungserwartungen bei Modell-Ambiguität. Der
+Lipset-Fall widerlegt das: Er hat durchgängig gleiche Erwartungen, keine
+Modell-Ambiguität — und weicht dennoch ab.
+
+Betroffen ist die **intermediäre Lösung allgemein**, sobald ein konservativer
+Primimplikant Literale enthält, deren Wegfall von R als einfaches Counterfactual
+eingestuft wird, von der Engine aber nicht. Die Engine liefert dann eine **zu
+spezifische** (nicht zu allgemeine) Lösung — sie behält Literale, die R entfernt. Das
+ist die methodisch weniger gefährliche Richtung: Es werden keine Vereinfachungsannahmen
+getroffen, die R nicht auch trifft. Ein Ergebnis ist damit nicht ungültig, aber es kann
+konservativer ausfallen als die kanonische intermediäre Lösung — und weicht in dieser
+Form von einer Replikation mit dem R-Paket ab.
+
+**Konservative und sparsame Lösung sind nachweislich nicht betroffen**: Sie stimmen auf
+allen 16 Szenarien und auf Lipset exakt mit R überein.
 
 ### Kanonik-Hinweis: Semantik von „either"/fehlender Erwartung
 

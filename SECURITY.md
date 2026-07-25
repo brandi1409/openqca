@@ -14,7 +14,7 @@ veröffentlichte Version bereitgestellt.
 Bitte melde vermutete Sicherheitslücken **vertraulich** und **nicht** über ein
 öffentliches Issue, einen Pull Request oder in öffentlichen Diskussionen.
 
-- **Kontakt:** [Kontakt-Platzhalter: security@example.org]
+- **Kontakt:** office@grillrocker.com (Betreff: openQCA Security)
 - Alternativ, falls aktiviert, über die private Meldefunktion des Repositories
   („Report a vulnerability" / GitHub Security Advisories).
 

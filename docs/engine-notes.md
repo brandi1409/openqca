@@ -246,6 +246,11 @@ interface NecessityEntry {
 ```ts
 function complexSolution(tt: TruthTableResult, cases: QcaCase[]): Solution;
 function parsimoniousSolution(tt: TruthTableResult, cases: QcaCase[]): Solution;
+function intermediateSolution(
+  tt: TruthTableResult,
+  cases: QcaCase[],
+  expectations: Record<string, Expectation>, // "present" | "absent" | "either"
+): Solution;
 function necessityAnalysis(
   conditions: string[],
   outcome: string,
@@ -259,9 +264,12 @@ function necessityAnalysis(
 - `necessityAnalysis` prüft **jede** Bedingung **und ihre Negation** einzeln und
   markiert Kandidaten ab Konsistenz `≥ 0.9` (`isCandidate`).
 
-> **Nicht vorhanden:** Eine Funktion für die **intermediäre** Lösung existiert im
-> Rechenkern derzeit nicht. Verfügbar sind nur die komplexe und die sparsame
-> Lösung. (Konzept der intermediären Lösung: siehe `qca-primer.md`, Abschnitt 6.)
+- `intermediateSolution` liefert die **intermediäre** Lösung nach der Enhanced
+  Standard Analysis (Ragin & Sonnett 2005; Schneider & Wagemann 2012, Kap. 8):
+  je Paar aus konservativem und sparsamem Modell wird ein intermediärer Term
+  gebildet, anschließend kanonisch dedupliziert. Sie ist gegen das R-Paket `QCA`
+  kreuzvalidiert — Umfang und die eine dokumentierte Abweichung stehen in
+  `VALIDATION.md`. (Konzept: siehe `qca-primer.md`, Abschnitt 6.)
 
 ```ts
 import {

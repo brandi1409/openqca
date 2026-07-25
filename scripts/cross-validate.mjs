@@ -12,7 +12,7 @@
 //   1  mindestens ein Szenario FAIL
 //   2  expected.json fehlt (R-Orakel noch nicht erzeugt)
 //
-// Ausführung (aus dem Repository-Wurzelverzeichnis, Node 26 mit Type-Stripping):
+// Ausführung (aus dem Repository-Wurzelverzeichnis, Node >= 22.18 mit Type-Stripping):
 //   node scripts/cross-validate.mjs
 // =============================================================================
 
@@ -176,6 +176,11 @@ async function checkPublicClaims(passed, total) {
   const files = [
     fileURLToPath(new URL("apps/web/src/i18n/dict.ts", rootUrl)),
     fileURLToPath(new URL("apps/web/src/components/Landing.tsx", rootUrl)),
+    // Auch die Doku driftet: README und ROADMAP nannten laenger "12 Szenarien",
+    // waehrend VALIDATION.md bereits 15/16 auswies.
+    fileURLToPath(new URL("README.md", rootUrl)),
+    fileURLToPath(new URL("docs/ROADMAP.md", rootUrl)),
+    fileURLToPath(new URL("VALIDATION.md", rootUrl)),
   ];
   const problems = [];
   for (const file of files) {
