@@ -73,7 +73,9 @@ and reusable, enabling cross-validation against reference implementations.
 - **Boolean minimization.** Logical reduction of the outcome-consistent rows
   using the Quine–McCluskey algorithm [@mccluskey1956], producing both the
   **complex** solution and the **parsimonious** solution (which incorporates
-  logical remainders).
+  logical remainders), as well as the **intermediate** solution derived under
+  Enhanced Standard Analysis with directional expectations
+  [@ragin2005; @schneider2012].
 - **Consistency and coverage.** Set-theoretic measures of the strength and
   empirical relevance of sufficiency relations, including consistency, raw and
   unique coverage, and PRI (proportional reduction in inconsistency)
@@ -81,17 +83,41 @@ and reusable, enabling cross-validation against reference implementations.
 - **Necessity analysis.** Assessment of individual conditions and their
   negations as necessary for the outcome, with the corresponding consistency
   and coverage of necessity.
+- **Guided calibration with provenance.** A workbench that records, per set,
+  the substantive definition, the chosen method, the qualitative anchors, the
+  evidence behind each decision (with citation fields), a case-level review, and
+  a sensitivity analysis over plausible alternative anchors. Results compute as
+  soon as the calibration is computable; the documentation is what makes them
+  publication-ready and unlocks the replication artefacts.
+- **Robustness and negated outcome.** A combined grid over frequency,
+  consistency, and PRI thresholds reporting stable and unstable solution terms,
+  and a separate analysis of the negated outcome (~Y) [@schneider2012].
 - **Reproducibility protocol.** Export of the full analysis — data,
   calibration settings, thresholds, and results — as a JSON protocol together
   with a generated R script, so that the analysis can be re-run and verified.
 
-The computation core ships with a unit-test suite and a standalone reference
-suite (`scripts/reference-check.mjs`) that checks documented calibration fixed
-points, truth table construction, the complex and parsimonious solutions, and
-necessity results against documented example datasets. The scope and current
-limits of this validation — in particular that full cross-validation against
-*fsQCA 4.1* and the R package `QCA` remains future work — are documented in the
-repository.
+The computation core is cross-validated against the canonical R package `QCA`
+[@dusa2019], which serves as the reference oracle. An R script generates
+expected solutions, and a comparison script checks the engine against them:
+solution formulas plus solution- and path-level fit parameters (`inclS`,
+`covS`, `incl`, `cov`, `covU`) at a tolerance of `1e-6`. The comparison covers
+conservative, parsimonious, and intermediate (Enhanced Standard Analysis)
+solutions under several directional-expectation settings, a constructed
+model-ambiguity case, and Lipset's classic interwar-democracy dataset
+[@lipset1959] in the form distributed with the R package. Conservative and
+parsimonious solutions match the reference exactly on all scenarios, including
+the Lipset case; two intermediate-solution scenarios diverge from a single,
+documented cause in the selection of easy counterfactuals.
+
+The project deliberately separates what is *externally validated* from what is
+an *internal regression snapshot*: PRI is not externally validated, calibration
+has its own separate evidence chain with a documented residual below 0.01 for
+the direct method, and necessity measures remain internal snapshots. All of
+this — including the open divergence and its analysed cause — is stated in the
+repository's validation document rather than implied by a summary claim. A
+build-time check binds the numbers used in the project's public
+self-description to the actual result of the validation run, so that a claim
+cannot silently drift away from what the software does.
 
 # Comparison to related software
 
@@ -106,10 +132,5 @@ repository.
 - **Tosmana** [@cronqvist2019]: a graphical tool with a focus on crisp-set and
   multi-value QCA (mvQCA). `openQCA` focuses on the crisp/fuzzy-set workflow
   with an emphasis on reproducibility and a browser-based, local-first design.
-
-# Acknowledgements
-
-<!-- TODO: Add funding sources, contributors, and acknowledgements, or remove
-this section. -->
 
 # References

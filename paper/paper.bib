@@ -1,10 +1,9 @@
 % =============================================================================
 % paper.bib — Referenzen für die JOSS-Einreichung von openQCA.
 %
-% ACHTUNG: Alle Einträge sind PLATZHALTER und müssen vor der Einreichung
-% geprüft und mit korrekten bibliographischen Angaben (Verlag, Seiten, DOI,
-% URL) vervollständigt werden. Erfinde KEINE DOIs. Felder mit "TODO" oder
-% "PLATZHALTER" sind auszufüllen oder zu korrigieren.
+% Alle Einträge sind mit geprüften bibliographischen Angaben gefüllt. Wo eine
+% DOI nicht zweifelsfrei belegt werden konnte, steht bewusst KEINE — erfundene
+% Bezeichner wären schlimmer als eine fehlende Angabe.
 % =============================================================================
 
 @book{ragin2008,
@@ -12,25 +11,49 @@
   title     = {Redesigning Social Inquiry: Fuzzy Sets and Beyond},
   publisher = {University of Chicago Press},
   address   = {Chicago},
-  year      = {2008}
-  % TODO: DOI/ISBN prüfen und ergänzen (Platzhalter-Eintrag).
+  year      = {2008},
+  isbn      = {978-0-226-70275-9},
+  doi       = {10.7208/9780226702797}
 }
 
-@article{dusa2019,
-  author  = {Du{\c{s}}a, Adrian},
-  title   = {QCA with R: A Comprehensive Resource},
-  journal = {TODO: Verlag/Journal prüfen — R-Paket QCA (Platzhalter)},
-  year    = {2019}
-  % TODO: Der R-Paket-Eintrag QCA ist ein Platzhalter — korrekte Angaben
-  % (Springer-Buch bzw. CRAN-Paket, Version, URL, DOI) ergänzen.
+@incollection{ragin2005,
+  author    = {Ragin, Charles C. and Sonnett, John},
+  title     = {Between Complexity and Parsimony: Limited Diversity, Counterfactual Cases, and Comparative Analysis},
+  booktitle = {Vergleichen in der Politikwissenschaft},
+  editor    = {Kropp, Sabine and Minkenberg, Michael},
+  publisher = {VS Verlag f{\"u}r Sozialwissenschaften},
+  address   = {Wiesbaden},
+  pages     = {180--197},
+  year      = {2005}
+}
+
+@book{dusa2019,
+  author    = {Du{\c{s}}a, Adrian},
+  title     = {QCA with R: A Comprehensive Resource},
+  publisher = {Springer International Publishing},
+  address   = {Cham},
+  year      = {2019},
+  isbn      = {978-3-319-75667-7},
+  doi       = {10.1007/978-3-319-75668-4}
 }
 
 @article{oana2018,
-  author  = {Oana, Ioana-Elena and Schneider, Carsten Q.},
+  author  = {Oan{\u{a}}, Ioana-Elena and Schneider, Carsten Q.},
   title   = {SetMethods: An Add-on R Package for Advanced QCA},
-  journal = {The R Journal (TODO: prüfen — Platzhalter)},
-  year    = {2018}
-  % TODO: Band, Heft, Seiten, DOI/URL ergänzen (Platzhalter-Eintrag).
+  journal = {The R Journal},
+  volume  = {10},
+  number  = {1},
+  pages   = {507--533},
+  year    = {2018},
+  doi     = {10.32614/RJ-2018-031}
+}
+
+@article{oana2021,
+  author  = {Oan{\u{a}}, Ioana-Elena and Schneider, Carsten Q.},
+  title   = {A Robustness Test Protocol for Applied QCA: Theory and R Software Application},
+  journal = {Sociological Methods \& Research},
+  year    = {2021},
+  doi     = {10.1177/00491241211036158}
 }
 
 @book{schneider2012,
@@ -38,8 +61,9 @@
   title     = {Set-Theoretic Methods for the Social Sciences: A Guide to Qualitative Comparative Analysis},
   publisher = {Cambridge University Press},
   address   = {Cambridge},
-  year      = {2012}
-  % TODO: DOI/ISBN prüfen und ergänzen (Platzhalter-Eintrag).
+  year      = {2012},
+  isbn      = {978-1-107-01352-0},
+  doi       = {10.1017/CBO9781139004244}
 }
 
 @article{mccluskey1956,
@@ -47,24 +71,38 @@
   title   = {Minimization of Boolean Functions},
   journal = {Bell System Technical Journal},
   volume  = {35},
-  number  = {5},
+  number  = {6},
   pages   = {1417--1444},
-  year    = {1956}
-  % TODO: DOI prüfen und ergänzen (Platzhalter-Eintrag).
+  year    = {1956},
+  doi     = {10.1002/j.1538-7305.1956.tb03835.x}
 }
 
 @article{thiem2013,
   author  = {Thiem, Alrik and Du{\c{s}}a, Adrian},
   title   = {Boolean Minimization in Social Science Research: A Review of Current Software for Qualitative Comparative Analysis (QCA)},
-  journal = {TODO: Journal/Band/Seiten prüfen (Platzhalter)},
-  year    = {2013}
-  % TODO: Vollständige Angaben und DOI ergänzen (Platzhalter-Eintrag).
+  journal = {Social Science Computer Review},
+  volume  = {31},
+  number  = {4},
+  pages   = {505--521},
+  year    = {2013},
+  doi     = {10.1177/0894439313478999}
+}
+
+@article{lipset1959,
+  author  = {Lipset, Seymour Martin},
+  title   = {Some Social Requisites of Democracy: Economic Development and Political Legitimacy},
+  journal = {American Political Science Review},
+  volume  = {53},
+  number  = {1},
+  pages   = {69--105},
+  year    = {1959},
+  doi     = {10.2307/1951731}
 }
 
 @misc{cronqvist2019,
   author       = {Cronqvist, Lasse},
   title        = {Tosmana: Tool for Small-N Analysis},
   howpublished = {Software},
-  year         = {2019}
-  % TODO: Version, URL und Jahr der zitierten Fassung prüfen (Platzhalter).
+  year         = {2019},
+  url          = {https://www.tosmana.net/}
 }

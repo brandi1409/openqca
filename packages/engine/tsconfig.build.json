@@ -1,0 +1,31 @@
+{
+  // Build-Konfiguration NUR für die npm-Veröffentlichung. Im Monorepo wird der
+  // Rechenkern weiterhin direkt aus `src/*.ts` konsumiert (Next transpiliert,
+  // die Skripte nutzen Node-Type-Stripping) — deshalb bleibt package.json.main
+  // auf die Quelle zeigen und nur `publishConfig` verweist auf `dist`.
+  //
+  // `rewriteRelativeImportExtensions` schreibt die `.ts`-Endungen der internen
+  // Importe im Ausgabecode auf `.js` um (TypeScript ≥ 5.7). Ohne das wäre das
+  // veröffentlichte Paket nicht lauffähig.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    // Der Rechenkern ist abhängigkeitsfrei und braucht KEINE ambient types.
+    // Ohne diese Zeile zieht tsc alle @types aus dem Monorepo-Wurzelverzeichnis
+    // (React, Node …) herein und meldet Fehler aus fremdem Code.
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

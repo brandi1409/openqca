@@ -1,14 +1,49 @@
 {
   "name": "@openqca/engine",
   "version": "0.1.0",
-  "description": "Reiner QCA-Rechenkern: Kalibrierung, Truth Table, Quine-McCluskey-Minimierung, Konsistenz- und Coverage-Maße. Ohne Abhängigkeiten, läuft in Browser, Node und Desktop.",
+  "description": "Dependency-free QCA engine: calibration, truth tables, Quine-McCluskey minimization, consistency/coverage/PRI, necessity and robustness. Cross-validated against the R package QCA.",
+  "keywords": [
+    "qca",
+    "qualitative-comparative-analysis",
+    "fuzzy-sets",
+    "set-theoretic-methods",
+    "quine-mccluskey",
+    "social-science",
+    "reproducible-research"
+  ],
+  "homepage": "https://openqca.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brandi1409/openqca.git",
+    "directory": "packages/engine"
+  },
+  "bugs": {
+    "url": "https://github.com/brandi1409/openqca/issues"
+  },
+  "author": "John Brandauer",
+  "license": "MIT",
   "type": "module",
-  "main": "src/index.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "//": "Der Einstiegspunkt zeigt auf das gebaute dist — nur so ist das Paket ueberall installierbar (Node kann TypeScript unter node_modules nicht strippen). Das `prepare`-Skript baut dist bei jedem npm install, auch im Monorepo und in CI. Skripte und Tests importieren weiterhin direkt aus src/ und sind davon unberuehrt.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build"
   },
-  "license": "MIT"
+  "types": "./dist/index.d.ts"
 }

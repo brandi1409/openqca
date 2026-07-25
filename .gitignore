@@ -20,3 +20,7 @@ apps/web/playwright-report/
 # Lokal erzeugte Referenzdaten aus dem GPL-lizenzierten R-Paket QCA
 # (siehe scripts/r-oracle/lipset-export.R) — bewusst NICHT versioniert.
 datasets/local/
+
+# Build-Ausgabe des Engine-Pakets (wird per prepare-Skript erzeugt)
+packages/engine/dist/
+*.tgz
