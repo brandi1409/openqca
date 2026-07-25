@@ -74,6 +74,45 @@ for (const colorScheme of SCHEMES) {
           }
         }
       });
+
+      /**
+       * A3.5 — Die Ankergriffe unter der Kalibrierkurve sind auf schmalen Viewports
+       * bedienbar. Die Trefferfläche steckt im viewBox-Koordinatensystem und
+       * schrumpfte deshalb mit der Grafik: bei fester Breite waren es auf 390px
+       * noch 12 CSS-Pixel. Jetzt reicht jeder Griff bis zur Mitte zum Nachbarn.
+       * Zusätzlich wird geprüft, dass Ziehen den Ankerwert wirklich verändert —
+       * A2.10 deckt nur die Tastatur ab.
+       */
+      test("A3.5 Ankergriffe: Trefferfläche ≥ 44px und Ziehen ändert den Anker", async ({
+        page,
+      }) => {
+        await loadDemo(page);
+        const quick = page.getByTestId("calibration-quick");
+        const sliders = quick.getByRole("slider");
+        const count = await sliders.count();
+        expect(count, "Die Schnell-Ansicht muss Ankergriffe zeigen").toBeGreaterThan(0);
+        for (let i = 0; i < Math.min(count, 3); i++) {
+          const box = await sliders.nth(i).boundingBox();
+          expect(box, `Griff ${i} ohne Bounding-Box`).not.toBeNull();
+          expect(
+            box!.width,
+            `Trefferfläche des Griffs ${i} ist ${Math.round(box!.width)}px breit`,
+          ).toBeGreaterThanOrEqual(44);
+        }
+
+        const field = quick.locator('[data-testid^="calibration-quick-anchor-"]').first();
+        const before = Number(await field.inputValue());
+        // Ohne Scrollen liegt die Bounding-Box außerhalb des Viewports und die
+        // Mausbewegung landet neben der Grafik.
+        await sliders.first().scrollIntoViewIfNeeded();
+        const box = (await sliders.first().boundingBox())!;
+        const cy = box.y + box.height / 2;
+        await page.mouse.move(box.x + box.width / 2, cy);
+        await page.mouse.down();
+        for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + box.width / 2 + i * 4, cy);
+        await page.mouse.up();
+        await expect.poll(async () => Number(await field.inputValue())).toBeGreaterThan(before);
+      });
     });
   }
 }

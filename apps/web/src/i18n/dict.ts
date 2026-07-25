@@ -198,9 +198,9 @@ const de = {
   // -- Startzustand / Hero ----------------------------------------------------
   "hero.title": "Das offene, geführte Werkzeug für Qualitative Comparative Analysis.",
   "hero.desc":
-    "openQCA führt durch Kalibrierung, Truth Table und Minimierung — mit einem Coach, der typische Fehler abfängt, und einem Protokoll, das jede Analyse reproduzierbar macht. Kostenlos, Open Source (MIT), und Ihre Daten bleiben im Browser.",
+    "Kalibrierung, Truth Table, Minimierung — protokolliert für die Replikation. Kostenlos, MIT-lizenziert, Ihre Daten bleiben im Browser.",
   "hero.tourHint":
-    "Am schnellsten geht's mit der Beispiel-Tour — sie führt Sie anhand von Demo-Daten Schritt für Schritt durch die App.",
+    "Neu bei QCA? Die Beispiel-Tour führt Sie anhand von Demo-Daten Schritt für Schritt durch die sechs Schritte.",
 
   "load.title": "Daten laden",
   "load.desc":
@@ -259,6 +259,7 @@ const de = {
   "step.status.done": "✓ erledigt",
   "step.status.active": "aktiv",
   "step.status.locked": "gesperrt",
+  "step.status.provisional": "rechnet — vorläufig",
   "step.locked.2": "Erst Daten laden.",
   "step.locked.3": "Erst Variablen & Rollen festlegen.",
   "step.locked.4": "Erst kalibrieren.",
@@ -670,6 +671,12 @@ const de = {
   "sol.intermediate.title": "Intermediäre Lösung",
   "sol.parsimonious.title": "Sparsame (parsimonious) Lösung",
   "sol.model.n": "Modell {i} von {total} (gleichwertig — die Lösung ist mehrdeutig)",
+  "sol.report.convention":
+    "Berichtet wird üblicherweise die intermediäre Lösung; komplexe und sparsame Lösung dienen der Einordnung (Ragin 2008). Die intermediäre Lösung folgt den Richtungserwartungen, die Sie auf ihrer Karte setzen.",
+  "sol.sameAsComplex":
+    "Identisch mit der komplexen Lösung — bei diesen Richtungserwartungen greift keine Vereinfachungsannahme. Das ist ein Ergebnis, kein Fehler.",
+  "sol.ambiguous.n":
+    "{n} gleichwertige Modelle — die Lösung ist mehrdeutig. Berichten Sie alle {n} oder begründen Sie, warum Sie eines auswählen.",
   "sol.none": "Keine Konfiguration erfüllt die Cutoffs — keine Lösung.",
   "sol.kpi.consistency": "Lösungs-Konsistenz",
   "sol.kpi.coverage": "Lösungs-Coverage",
@@ -692,6 +699,12 @@ const de = {
   "nec.col.coverage": "Coverage",
   "nec.col.relevance": "RoN",
   "nec.candidate": "≥ 0,9 — Kandidat",
+  "nec.finding.none":
+    "Kein Befund: keine Bedingung erreicht Konsistenz ≥ 0,9. Für diesen Datensatz gibt es keinen Kandidaten für Notwendigkeit.",
+  "nec.finding.one":
+    "1 Kandidat: {list}. Notwendigkeit ist damit nicht belegt — sie muss inhaltlich begründbar sein.",
+  "nec.finding.many":
+    "{n} Kandidaten: {list}. Notwendigkeit ist damit nicht belegt — jeder Kandidat muss inhaltlich begründbar sein.",
   "nec.hint":
     "Konvention: Konsistenz ≥ 0,9 als Hinweis auf Notwendigkeit — mit Coverage, RoN und Fallkenntnis interpretieren.",
   "nec.suin.title": "Notwendige Kombinationen (SUIN)",
@@ -703,6 +716,11 @@ const de = {
   "nec.suin.kind.conjunction": "Konjunktion",
   "nec.suin.none":
     "Keine Kombination erreicht bei Konsistenz ≥ 0,9 zugleich eine Coverage ≥ 0,5.",
+  "nec.suin.finding":
+    "{n} Kombinationen erfüllen das Konsistenzkriterium — das macht sie noch nicht berichtenswert. Entscheidend ist RoN: {top} liegt mit {topRon} an der Spitze, der niedrigste Wert beträgt {minRon}. Eine Kombination mit niedrigem RoN ist bei fast allen Fällen erfüllt und erklärt deshalb wenig.",
+  "nec.suin.findingOne":
+    "Eine Kombination erfüllt das Konsistenzkriterium: {top} (RoN {topRon}). Das macht sie noch nicht berichtenswert — Notwendigkeit muss inhaltlich begründbar sein.",
+  "nec.suin.toggle": "{n} geprüfte Kombinationen anzeigen (nach RoN sortiert)",
   "nec.suin.hint":
     "Ein hoher RoN-Wert spricht gegen Trivialität. Notwendigkeit allein ist kein Befund — die Kombination muss substantiell begründbar sein.",
 
@@ -810,6 +828,8 @@ const de = {
   "report.title": "Bericht",
   "report.desc": "Öffnet einen druckfähigen Bericht (PDF über den Druckdialog).",
   "result.provisional.chip": "vorläufig",
+  "result.provisional.reason": "Die Anker sind noch nicht inhaltlich begründet.",
+  "result.provisional.link": "Zu Schritt 3",
   "result.provisional.title":
     "Die Berechnung ist exakt, aber die Kalibrierung ist noch nicht inhaltlich dokumentiert. Für zitierfähige Ergebnisse die Anker begründen (Ansicht „Dokumentation“).",
   "report.demoNotice":
@@ -1286,9 +1306,9 @@ const en: Record<DictKey, string> = {
   // -- Landing / hero ---------------------------------------------------------
   "hero.title": "The open, guided tool for Qualitative Comparative Analysis.",
   "hero.desc":
-    "openQCA walks you through calibration, the truth table and minimization — with a coach that catches common mistakes and a protocol that makes every analysis reproducible. Free, open source (MIT), and your data stays in the browser.",
+    "Calibration, truth table, minimization — logged for replication. Free, MIT-licensed, and your data stays in the browser.",
   "hero.tourHint":
-    "The fastest way in is the example tour — it walks you through the app step by step using demo data.",
+    "New to QCA? The example tour walks you through the six steps with demo data.",
 
   "load.title": "Load data",
   "load.desc":
@@ -1347,6 +1367,7 @@ const en: Record<DictKey, string> = {
   "step.status.done": "✓ done",
   "step.status.active": "active",
   "step.status.locked": "locked",
+  "step.status.provisional": "computing — provisional",
   "step.locked.2": "Load data first.",
   "step.locked.3": "Set variables & roles first.",
   "step.locked.4": "Calibrate first.",
@@ -1755,6 +1776,12 @@ const en: Record<DictKey, string> = {
   "sol.intermediate.title": "Intermediate solution",
   "sol.parsimonious.title": "Parsimonious solution",
   "sol.model.n": "Model {i} of {total} (equivalent — the solution is ambiguous)",
+  "sol.report.convention":
+    "The intermediate solution is the one usually reported; the complex and parsimonious solutions serve as context (Ragin 2008). The intermediate solution follows the directional expectations you set on its card.",
+  "sol.sameAsComplex":
+    "Identical to the complex solution — with these directional expectations no simplifying assumption applies. That is a result, not an error.",
+  "sol.ambiguous.n":
+    "{n} equivalent models — the solution is ambiguous. Report all {n}, or justify why you pick one.",
   "sol.none": "No configuration meets the cutoffs — no solution.",
   "sol.kpi.consistency": "Solution consistency",
   "sol.kpi.coverage": "Solution coverage",
@@ -1777,6 +1804,12 @@ const en: Record<DictKey, string> = {
   "nec.col.coverage": "Coverage",
   "nec.col.relevance": "RoN",
   "nec.candidate": "≥ 0.9 — candidate",
+  "nec.finding.none":
+    "No finding: no condition reaches consistency ≥ 0.9. For this dataset there is no candidate for necessity.",
+  "nec.finding.one":
+    "1 candidate: {list}. That does not establish necessity — it has to make substantive sense.",
+  "nec.finding.many":
+    "{n} candidates: {list}. That does not establish necessity — each candidate has to make substantive sense.",
   "nec.hint":
     "Convention: consistency ≥ 0.9 as an indication of necessity — interpret together with coverage, RoN and case knowledge.",
   "nec.suin.title": "Necessary combinations (SUIN)",
@@ -1788,6 +1821,11 @@ const en: Record<DictKey, string> = {
   "nec.suin.kind.conjunction": "Conjunction",
   "nec.suin.none":
     "No combination reaches consistency ≥ 0.9 together with coverage ≥ 0.5.",
+  "nec.suin.finding":
+    "{n} combinations meet the consistency criterion — that alone does not make them worth reporting. RoN is what decides: {top} leads with {topRon}, the lowest value is {minRon}. A combination with low RoN holds for nearly every case and therefore explains little.",
+  "nec.suin.findingOne":
+    "One combination meets the consistency criterion: {top} (RoN {topRon}). That alone does not make it worth reporting — necessity has to make substantive sense.",
+  "nec.suin.toggle": "Show {n} tested combinations (sorted by RoN)",
   "nec.suin.hint":
     "A high RoN speaks against triviality. Necessity alone is not a finding — the combination has to make substantive sense.",
 
@@ -1893,6 +1931,8 @@ const en: Record<DictKey, string> = {
   "report.title": "Report",
   "report.desc": "Opens a print-ready report (PDF via the print dialog).",
   "result.provisional.chip": "provisional",
+  "result.provisional.reason": "The anchors have not been justified substantively yet.",
+  "result.provisional.link": "Go to step 3",
   "result.provisional.title":
     "The calculation is exact, but the calibration is not yet substantively documented. For citable results, justify the anchors (view \u201cDocumentation\u201d).",
   "report.demoNotice":

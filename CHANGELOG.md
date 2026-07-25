@@ -55,6 +55,24 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   `SetMethods::robustness()` als externes Orakel voraus, das hier nicht installiert ist.
 
 ### Geändert
+- **Befund vor Material.** Notwendigkeit, SUIN und Lösungen nannten ihr Ergebnis
+  nirgends — man musste es sich aus Tabellen selbst erschließen. Jetzt steht über jeder
+  Tabelle, was gefunden wurde: Kandidaten der Notwendigkeitsanalyse namentlich, die
+  SUIN-Kombinationen nach RoN sortiert und hinter einem Aufklapper (eine RoN-Schwelle wird
+  bewusst nicht behauptet — die Literatur nennt keine), und über den drei Lösungen die
+  Konvention, dass die intermediäre berichtet wird. Sind komplexe und intermediäre Lösung
+  identisch, sagt die App das ausdrücklich, statt zwei gleiche Formeln kommentarlos
+  nebeneinanderzustellen. Modell-Mehrdeutigkeit steht nicht mehr als 12-px-Grauzeile neben
+  28-px-Kennzahlen, sondern als eigener Hinweis.
+- **Häkchen nur, wenn es stimmt.** Die Schritte 3–5 trugen ein grünes „erledigt", während
+  darunter „0 von 5 Sets dokumentiert" stand. Solange die Kalibrierung nicht begründet ist,
+  bleibt die Ziffer stehen und der Schritt trägt „rechnet — vorläufig"; die
+  Vorläufig-Marke nennt jetzt Grund und Weg statt nur eines Warnzeichens.
+- **Ankergriffe auf Touch bedienbar.** Die Trefferfläche steckte im viewBox und schrumpfte
+  auf 390px auf 12 CSS-Pixel. Jeder Griff reicht jetzt bis zur Mitte zum Nachbarn (≥ 44px,
+  maschinell geprüft), Ziehen ist relativ zum Griff statt springend, und vertikales
+  Scrollen über der Grafik bleibt möglich. Die Export-Buttons lagen auf schmalen Breiten
+  auf der Plotfläche und stehen jetzt darunter; die drei Anker brechen nicht mehr 2+1 um.
 - **Flow umgekehrt: Ergebnisse sofort.** Notwendigkeit, Truth Table und Lösungen rechnen,
   sobald die Kalibrierung berechenbar ist — nicht erst, wenn sie vollständig dokumentiert
   ist. Die vollständige Dokumentation schaltet weiterhin die Replikationsartefakte frei

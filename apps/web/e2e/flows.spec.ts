@@ -688,8 +688,20 @@ test("A2.22 SUIN/RoN, Fall-Diagnostik und Pfad-XY-Plot", async ({ page }) => {
   // 1b. Notwendige Disjunktion mit ihren drei Kennzahlen.
   const suin = page.locator("#suin");
   await expect(suin).toBeVisible({ timeout: 15_000 });
+  // Der Befund steht vor dem Material; die Tabelle liegt darunter im Aufklapper.
+  await expect(page.getByTestId("suin-finding")).toContainText("RoN");
+  await suin.locator("summary").first().click();
   const suinTable = page.getByTestId("suin-table");
   await expect(suinTable).toBeVisible();
+  // Nach RoN absteigend sortiert: die erste Zeile trägt den höchsten Wert.
+  const ronValues = await suinTable
+    .locator("tbody tr td:last-child")
+    .allTextContents();
+  const asNumbers = ronValues.map((v) => Number(v.replace(",", ".")));
+  expect(
+    asNumbers.every((v, i) => i === 0 || asNumbers[i - 1] >= v),
+    `RoN-Spalte muss absteigend sortiert sein: ${ronValues.join(", ")}`,
+  ).toBe(true);
   const row = suinTable.locator("tr", { hasText: "BILDUNG + STAATSKAPAZITAET" }).first();
   await expect(row).toContainText("Disjunktion");
   await expect(row).toContainText("0,965"); // inclN

@@ -80,6 +80,13 @@ export function CalibrationCurve({
   const rafRef = useRef<number | null>(null);
   const pointerX = useRef(0);
   const dragIndex = useRef<number | null>(null);
+  /**
+   * Abstand zwischen Zeigerposition und Ankerwert beim Anfassen. Seit die
+   * Trefferfläche bis zur Mitte zum Nachbarn reicht, liegt der Zeiger beim
+   * Anfassen oft neben dem Griff — ohne diesen Versatz würde der Anker auf die
+   * Zeigerposition springen, statt der Bewegung zu folgen.
+   */
+  const grabOffset = useRef(0);
 
   const [o, c, i] = anchors;
   const finiteVals = values.filter((v) => Number.isFinite(v));
@@ -217,15 +224,28 @@ export function CalibrationCurve({
         })}
         {anchorMeta.map(({ value, name }, idx) => {
           const cx = px(value);
+          // Trefferfläche: Die feste Breite von 24 Einheiten schrumpfte auf 390px
+          // zusammen mit dem viewBox auf 12 CSS-Pixel — für einen Finger zu wenig.
+          // Stattdessen bekommt jeder Griff das Band bis zur Mitte zum Nachbarn:
+          // maximal breit, ohne dass zwei Griffe je um denselben Punkt streiten.
+          // touchAction "pan-y" lässt vertikales Scrollen über der Grafik zu.
+          const others = anchorMeta
+            .map((a) => px(a.value))
+            .filter((_, i) => i !== idx)
+            .sort((a, b) => a - b);
+          const leftNeighbour = Math.max(...others.filter((x) => x < cx), ML - 24);
+          const rightNeighbour = Math.min(...others.filter((x) => x > cx), W - MR + 24);
+          const bandLeft = Math.max(ML - 24, (cx + leftNeighbour) / 2);
+          const bandRight = Math.min(W - MR + 24, (cx + rightNeighbour) / 2);
           return (
             <g key={`handle-${idx}`}>
               <rect
-                x={cx - 12}
+                x={bandLeft}
                 y={MT}
-                width={24}
+                width={Math.max(24, bandRight - bandLeft)}
                 height={H - MB - MT}
                 fill="transparent"
-                style={{ cursor: "ew-resize", touchAction: "none" }}
+                style={{ cursor: "ew-resize", touchAction: "pan-y" }}
                 tabIndex={0}
                 role="slider"
                 aria-label={t(locale, "calib.handle.aria", {
@@ -238,6 +258,7 @@ export function CalibrationCurve({
                 onPointerDown={(e) => {
                   (e.currentTarget as Element).setPointerCapture(e.pointerId);
                   dragIndex.current = idx;
+                  grabOffset.current = clientToValue(e.clientX) - value;
                   e.preventDefault();
                 }}
                 onPointerMove={(e) => {
@@ -247,7 +268,10 @@ export function CalibrationCurve({
                     rafRef.current = requestAnimationFrame(() => {
                       rafRef.current = null;
                       if (dragIndex.current != null)
-                        commit(dragIndex.current, clientToValue(pointerX.current));
+                        commit(
+                          dragIndex.current,
+                          clientToValue(pointerX.current) - grabOffset.current,
+                        );
                     });
                   }
                 }}

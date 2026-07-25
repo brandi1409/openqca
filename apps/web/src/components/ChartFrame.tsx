@@ -179,6 +179,11 @@ export function ChartFrame({ children, filename, caption }: ChartFrameProps) {
 
   return (
     <div style={frameStyle}>
+      <div ref={containerRef}>{children}</div>
+      {caption && <div style={captionStyle}>{caption}</div>}
+      {/* Die Export-Buttons lagen absolut oben rechts und damit auf schmalen
+          Breiten mitten auf der Plotfläche. Unter der Grafik stören sie nie und
+          lesen sich als das, was sie sind: eine Aktion zur fertigen Grafik. */}
       <div style={toolbarStyle}>
         <button
           type="button"
@@ -199,8 +204,6 @@ export function ChartFrame({ children, filename, caption }: ChartFrameProps) {
           {t(locale, "chart.exportPng")}
         </button>
       </div>
-      <div ref={containerRef}>{children}</div>
-      {caption && <div style={captionStyle}>{caption}</div>}
     </div>
   );
 }
@@ -210,12 +213,10 @@ const frameStyle: React.CSSProperties = {
 };
 
 const toolbarStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 0,
-  right: 0,
   display: "flex",
+  justifyContent: "flex-end",
   gap: 6,
-  zIndex: 2,
+  marginTop: 4,
 };
 
 // Sondermaße für die kompakten Toolbar-Buttons; Basisstil kommt aus .oq-btn.

@@ -180,7 +180,7 @@ export function CalibrationQuick({
             bleibt nur die kurze Marke, damit die Herkunft am Anker sichtbar ist. */}
         {anyAnchorsFromData && (
           <p
-            data-testid="calibration-quick-origin-note"
+            data-testid="calibration-origin-note"
             style={{
               display: "flex",
               alignItems: "flex-start",
@@ -340,7 +340,11 @@ export function CalibrationQuick({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(auto-fit, minmax(112px, 1fr))",
+                        // 190px statt 112px: Bei 112px brach die Reihe auf 390px in
+                        // 2+1 um, und die Reihenfolge draußen → Kreuzung → drinnen
+                        // ist genau das, was die drei Anker erklärt. Jetzt kippt sie
+                        // auf schmalen Breiten in eine einzige Spalte.
+                        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
                         gap: 10,
                       }}
                     >

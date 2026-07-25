@@ -713,6 +713,9 @@ export default function Home() {
     id: m.id,
     label: t(locale, m.navKey),
     status: statuses[i],
+    // Schritte 3–5 rechnen, sobald die Kalibrierung berechenbar ist — „erledigt"
+    // sind sie erst, wenn sie auch begründet ist.
+    provisional: showProvisionalMark && i >= 2 && i <= 4,
   }));
   const activeStepId = activeStepNum > 0 ? stepMeta[activeStepNum - 1].id : stepMeta[0].id;
 
@@ -744,16 +747,17 @@ export default function Home() {
       <Header />
       <SectionNav steps={navSteps} activeStepId={activeStepId} />
       {ds && <Glossary />}
+      {/* Die App ist kein zweiter Verkaufsraum: Wer hier ist, hat sich entschieden.
+          Zwei Zeilen statt einer Hero-Wiederholung der Startseite — Schritt 1 muss
+          in die erste Bildschirmhöhe passen. Die Tour-Empfehlung steht dort, wo
+          die Buttons stehen, nicht 600px darüber. */}
       {!ds && (
-        <div style={{ padding: "10px 2px 22px" }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.015em", margin: "0 0 8px", maxWidth: "24ch" }}>
+        <div style={{ padding: "10px 2px 16px" }}>
+          <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em", margin: "0 0 4px", maxWidth: "40ch" }}>
             {t(locale, "hero.title")}
           </h1>
-          <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: 0 }}>
+          <p style={{ color: "var(--ink-2)", maxWidth: "70ch", margin: 0, fontSize: 13.5 }}>
             {t(locale, "hero.desc")}
-          </p>
-          <p style={{ color: "var(--ink-2)", maxWidth: "62ch", margin: "8px 0 0" }}>
-            {t(locale, "hero.tourHint")}
           </p>
         </div>
       )}
@@ -766,6 +770,9 @@ export default function Home() {
               {/* Titel liefert der Step-Wrapper — hier nicht doppeln. */}
               <p style={{ color: "var(--ink-2)", maxWidth: "60ch", marginTop: 0 }}>
                 {t(locale, "load.desc")}
+              </p>
+              <p style={{ color: "var(--ink-2)", maxWidth: "60ch", margin: "8px 0 0", fontSize: 13.5 }}>
+                {t(locale, "hero.tourHint")}
               </p>
               <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <Button primary onClick={loadDemo}>{t(locale, "load.demoBtn")}</Button>
@@ -809,7 +816,7 @@ export default function Home() {
           />
         )}
       </Step>
-      <Step n={3} id={stepMeta[2].id} title={t(locale, stepMeta[2].titleKey)} status={s3} lockedReason={t(locale, lockedReasonKeys[2]!)} intro={t(locale, "step.intro.3")}>
+      <Step n={3} id={stepMeta[2].id} title={t(locale, stepMeta[2].titleKey)} status={s3} lockedReason={t(locale, lockedReasonKeys[2]!)} intro={t(locale, "step.intro.3")} provisional={showProvisionalMark}>
         {ds && (
           <>
             {demoMode && <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>}
@@ -900,14 +907,14 @@ export default function Home() {
       {renderContinue(3)}
 
       {/* Schritt 4 — Notwendigkeit */}
-      <Step n={4} id={stepMeta[3].id} title={t(locale, stepMeta[3].titleKey)} status={s4} lockedReason={t(locale, lockedReasonKeys[3]!)} intro={t(locale, "step.intro.4")}>
+      <Step n={4} id={stepMeta[3].id} title={t(locale, stepMeta[3].titleKey)} status={s4} lockedReason={t(locale, lockedReasonKeys[3]!)} intro={t(locale, "step.intro.4")} provisional={showProvisionalMark}>
         {showProvisionalMark && <ProvisionalMark />}
         {necessity ? <NecessitySection necessity={necessity} suin={suin} /> : <p className="hint" style={hintStyle}>{t(locale, "step.pending")}</p>}
       </Step>
       {renderContinue(4)}
 
       {/* Schritt 5 — Truth Table & Lösungen */}
-      <Step n={5} id={stepMeta[4].id} title={t(locale, stepMeta[4].titleKey)} status={s5} lockedReason={t(locale, lockedReasonKeys[4]!)} intro={t(locale, "step.intro.5")}>
+      <Step n={5} id={stepMeta[4].id} title={t(locale, stepMeta[4].titleKey)} status={s5} lockedReason={t(locale, lockedReasonKeys[4]!)} intro={t(locale, "step.intro.5")} provisional={showProvisionalMark}>
         {showProvisionalMark && <ProvisionalMark />}
         <TruthTableSection
           freqCut={freqCut}
@@ -1127,6 +1134,7 @@ function Step({
   lockedReason,
   id,
   intro,
+  provisional,
   children,
 }: {
   n: number;
@@ -1135,14 +1143,17 @@ function Step({
   lockedReason?: string;
   id: string;
   intro?: string;
+  /** Rechnet, aber noch nicht begründet — dann kein Häkchen. */
+  provisional?: boolean;
   children: React.ReactNode;
 }) {
   const [locale] = useLocale();
-  const done = status === "done";
+  const done = status === "done" && !provisional;
   const locked = status === "locked";
-  const chip =
-    status === "done"
-      ? { label: t(locale, "step.status.done"), color: "var(--good-text)", bg: "rgba(12,163,12,0.10)" }
+  const chip = done
+    ? { label: t(locale, "step.status.done"), color: "var(--good-text)", bg: "rgba(12,163,12,0.10)" }
+    : status === "done" && provisional
+      ? { label: t(locale, "step.status.provisional"), color: "var(--warn-text)", bg: "var(--warn-wash)" }
       : status === "active"
         ? { label: t(locale, "step.status.active"), color: "var(--accent-deep)", bg: "var(--accent-wash)" }
         : { label: t(locale, "step.status.locked"), color: "var(--muted)", bg: "var(--line-soft)" };
@@ -1660,8 +1671,35 @@ function SolutionSection({
   // Grenzfälle bei exakt 0,5 sind eine Eigenschaft des Datensatzes, nicht des
   // Modells — einmal je Schritt, nicht unter jedem Lösungsmodell.
   const atCrossover = tt.rows.flatMap((r) => r.atCrossover ?? []);
+  // Vergleich über die kanonisch sortierten Formeln aller Modelle, nicht über das
+  // erste — bei Mehrdeutigkeit wäre der Vergleich sonst von der Reihenfolge abhängig.
+  const formulaSet = (s: SolBundle["complex"]) =>
+    s.models
+      .map((m) => m.paths.map((p) => p.expression).sort().join("+"))
+      .sort()
+      .join(" | ");
+  const sameAsComplex =
+    sol.intermediate.models.length > 0 &&
+    formulaSet(sol.intermediate) === formulaSet(sol.complex);
   return (
     <div id="loesungen" style={{ scrollMarginTop: 56 }}>
+      {/* Drei Lösungen, gleich aufgebaut — ohne diese Zeile weiß niemand,
+          welche in ein Paper gehört. */}
+      <p
+        data-testid="solution-report-convention"
+        style={{
+          fontSize: 15,
+          lineHeight: 1.5,
+          margin: "0 0 12px",
+          color: "var(--ink)",
+          background: "var(--panel-2)",
+          border: "1px solid var(--line-soft)",
+          borderRadius: 8,
+          padding: "9px 12px",
+        }}
+      >
+        {t(locale, "sol.report.convention")}
+      </p>
       <p className="hint" style={{ ...hintStyle, marginTop: 0, marginBottom: 12 }}>
         {t(locale, "diag.desc")}
         {atCrossover.length > 0 && ` ${t(locale, "diag.crossover", { cases: [...new Set(atCrossover)].join(", ") })}`}
@@ -1694,6 +1732,36 @@ function SolutionSection({
               <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{title}</h2>
               <InfoHint title={infoTitle} body={infoBody} />
             </div>
+            {/* Mehrdeutigkeit muss in einer Publikation berichtet werden — sie stand
+                bisher als 12-px-Grauzeile neben zwei 28-px-Kennzahlen, also leiser
+                als die Sicherheit, die sie einschränkt. */}
+            {s.models.length > 1 && (
+              <p
+                data-testid={`solution-ambiguity-${kind}`}
+                style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                  margin: "0 0 12px",
+                  color: "var(--warn-text)",
+                  background: "var(--warn-wash)",
+                  border: "1px solid color-mix(in srgb, var(--warn-text) 30%, transparent)",
+                  borderRadius: 8,
+                  padding: "9px 12px",
+                }}
+              >
+                {t(locale, "sol.ambiguous.n", { n: s.models.length })}
+              </p>
+            )}
+            {/* Zwei identische Formeln nebeneinander lesen sich wie ein Rechenfehler. */}
+            {kind === "intermediate" && sameAsComplex && (
+              <p
+                data-testid="solution-same-as-complex"
+                style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "0 0 12px", lineHeight: 1.5 }}
+              >
+                {t(locale, "sol.sameAsComplex")}
+              </p>
+            )}
             {s.models.length === 0 ? (
               <p className="hint" style={hintStyle}>{t(locale, "sol.none")}</p>
             ) : (
@@ -1949,12 +2017,38 @@ function NecessitySection({
   suin: NecessityExpressionEntry[] | null;
 }) {
   const [locale] = useLocale();
+  // Der Befund gehört über das Material: die Kandidatenmarke stand bisher als
+  // kleiner Text in der letzten Spalte, und ob überhaupt etwas gefunden wurde,
+  // musste man sich aus acht Zeilen selbst zusammensuchen.
+  const candidates = necessity.filter((n) => n.isCandidate);
+  const candidateList = candidates
+    .map((n) => `${n.condition.replace(/^fs_/, "")} (${fmt(n.consistency)})`)
+    .join(", ");
   return (
     <>
     <Card>
       <H2>{t(locale, "nec.title")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: -6, marginBottom: 12, fontSize: 13.5 }}>
         {t(locale, "nec.orderHint")}
+      </p>
+      <p
+        data-testid="necessity-finding"
+        style={{
+          fontSize: 15,
+          lineHeight: 1.5,
+          margin: "0 0 12px",
+          color: "var(--ink)",
+          background: candidates.length ? "var(--accent-wash)" : "var(--panel-2)",
+          border: "1px solid var(--line-soft)",
+          borderRadius: 8,
+          padding: "9px 12px",
+        }}
+      >
+        {candidates.length === 0
+          ? t(locale, "nec.finding.none")
+          : candidates.length === 1
+            ? t(locale, "nec.finding.one", { list: candidateList })
+            : t(locale, "nec.finding.many", { n: candidates.length, list: candidateList })}
       </p>
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
@@ -1984,7 +2078,10 @@ function NecessitySection({
           </thead>
           <tbody>
             {necessity.map((n) => (
-              <tr key={n.condition}>
+              <tr
+                key={n.condition}
+                style={n.isCandidate ? { background: "var(--accent-wash)" } : undefined}
+              >
                 <td style={tdStyle(false, false)} className="mono">{n.condition.replace(/^fs_/, "")}</td>
                 <td style={tdStyle(true, false)}>{fmt(n.consistency)}</td>
                 <td style={tdStyle(true, false)}>{fmt(n.coverage)}</td>
@@ -2011,7 +2108,27 @@ function NecessitySection({
  */
 function SuinSection({ entries }: { entries: NecessityExpressionEntry[] }) {
   const [locale] = useLocale();
-  const rows = entries.filter((e) => e.literals.length > 1);
+  // Nach RoN absteigend: alle Zeilen erfüllen ohnehin das Konsistenzkriterium,
+  // die Reihenfolge nach RoN ist die einzige, die einen Befund erkennbar macht.
+  // Eine RoN-Schwelle wird bewusst nicht behauptet — die Literatur nennt keine.
+  const rows = entries
+    .filter((e) => e.literals.length > 1)
+    .slice()
+    .sort((a, b) => b.relevance - a.relevance);
+  const top = rows[0];
+  const finding = !top
+    ? null
+    : rows.length === 1
+      ? t(locale, "nec.suin.findingOne", {
+          top: top.expression.replace(/fs_/g, "").toUpperCase(),
+          topRon: fmt(top.relevance),
+        })
+      : t(locale, "nec.suin.finding", {
+          n: rows.length,
+          top: top.expression.replace(/fs_/g, "").toUpperCase(),
+          topRon: fmt(top.relevance),
+          minRon: fmt(rows[rows.length - 1].relevance),
+        });
   return (
     <Card id="suin">
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -2024,6 +2141,26 @@ function SuinSection({ entries }: { entries: NecessityExpressionEntry[] }) {
       {rows.length === 0 ? (
         <p className="hint" style={hintStyle} data-testid="suin-empty">{t(locale, "nec.suin.none")}</p>
       ) : (
+        <>
+        <p
+          data-testid="suin-finding"
+          style={{
+            fontSize: 15,
+            lineHeight: 1.5,
+            margin: "0 0 12px",
+            color: "var(--ink)",
+            background: "var(--panel-2)",
+            border: "1px solid var(--line-soft)",
+            borderRadius: 8,
+            padding: "9px 12px",
+          }}
+        >
+          {finding}
+        </p>
+        <details open={rows.length <= 3}>
+          <summary style={{ fontSize: 13.5, color: "var(--accent-deep)", cursor: "pointer", marginBottom: 10 }}>
+            {t(locale, "nec.suin.toggle", { n: rows.length })}
+          </summary>
         <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }} data-testid="suin-table">
             <thead>
@@ -2052,6 +2189,8 @@ function SuinSection({ entries }: { entries: NecessityExpressionEntry[] }) {
             </tbody>
           </table>
         </div>
+        </details>
+        </>
       )}
       <p className="hint" style={hintStyle}>{t(locale, "nec.suin.hint")}</p>
     </Card>
@@ -2232,7 +2371,7 @@ function SectionNav({
   steps,
   activeStepId,
 }: {
-  steps: { n: number; id: string; label: string; status: StepStatus }[];
+  steps: { n: number; id: string; label: string; status: StepStatus; provisional?: boolean }[];
   activeStepId: string;
 }) {
   const [locale] = useLocale();
@@ -2308,7 +2447,10 @@ function SectionNav({
       >
         {steps.map((s) => {
           const locked = s.status === "locked";
-          const done = s.status === "done";
+          // Das Häkchen ist die stärkste Zusage der App. Solange die Kalibrierung
+          // nicht begründet ist, rechnet der Schritt zwar, ist aber nicht fertig —
+          // dann bleibt die Ziffer stehen.
+          const done = s.status === "done" && !s.provisional;
           const isActive = !locked && activeId === s.id;
           const prefix = done ? "✓" : `${s.n}`;
           const baseStyle: React.CSSProperties = {
@@ -2414,29 +2556,41 @@ function Kpi({ v, l }: { v: string; l: React.ReactNode }) {
  * der Lösung, nicht am Export. Solange die Kalibrierung nicht dokumentiert ist,
  * muss das Ergebnis selbst sagen, worauf es beruht.
  */
+/**
+ * „Vorläufig" stand als freischwebender Chip über den Ergebnissen — ohne Grund
+ * und ohne Ausweg; der Grund lag nur im title-Attribut, also unsichtbar auf
+ * Touch. Chip, Grund und der Weg dorthin stehen jetzt in einer Zeile.
+ */
 function ProvisionalMark() {
   const [locale] = useLocale();
   return (
-    <span
-      data-testid="provisional-result-mark"
-      title={t(locale, "result.provisional.title")}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        fontSize: 11,
-        fontWeight: 600,
-        color: "var(--warn-text)",
-        background: "var(--warn-wash)",
-        border: "1px solid color-mix(in srgb, var(--warn-text) 30%, transparent)",
-        borderRadius: 999,
-        padding: "2px 9px",
-        marginBottom: 10,
-      }}
-    >
-      <span aria-hidden>⚠</span>
-      {t(locale, "result.provisional.chip")}
-    </span>
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      <span
+        data-testid="provisional-result-mark"
+        title={t(locale, "result.provisional.title")}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--warn-text)",
+          background: "var(--warn-wash)",
+          border: "1px solid color-mix(in srgb, var(--warn-text) 30%, transparent)",
+          borderRadius: 999,
+          padding: "2px 9px",
+        }}
+      >
+        <span aria-hidden>⚠</span>
+        {t(locale, "result.provisional.chip")}
+      </span>
+      <span style={{ fontSize: 12, color: "var(--ink-2)" }}>
+        {t(locale, "result.provisional.reason")}{" "}
+        <a href="#kalibrierung" style={{ color: "var(--accent-deep)" }}>
+          {t(locale, "result.provisional.link")}
+        </a>
+      </span>
+    </div>
   );
 }
 
