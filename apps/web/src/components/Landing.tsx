@@ -424,12 +424,13 @@ function Rigor() {
   const [locale] = useLocale();
   const rows: [string, DictKey][] = [
     // ACHTUNG: Diese Zahl ist eine Behauptung über `scripts/cross-validate.mjs`.
-    // Sie MUSS mit dem Status in VALIDATION.md übereinstimmen — Stand: 16
-    // Szenarien, 15 PASS, eine analysierte und dort dokumentierte Abweichung
-    // (ESA mit gemischten Richtungserwartungen bei Modell-Ambiguität). Wer ein
-    // Szenario hinzufügt oder eine Abweichung behebt, zieht diesen Wert und
-    // `landing.h.proof` nach.
-    ["17/19", "landing.rigor.r1"],
+    // Sie MUSS mit dem Status in VALIDATION.md übereinstimmen — Stand: 25
+    // Szenarien (19 Lösungsmodelle + 6 Notwendigkeit/superSubset), 23 PASS,
+    // zwei analysierte und dort dokumentierte Abweichungen derselben
+    // ESA-Ursache. Wer ein Szenario hinzufügt oder eine Abweichung behebt,
+    // zieht diesen Wert und `landing.h.proof` nach; `scripts/cross-validate.mjs`
+    // erzwingt das bei jedem Lauf.
+    ["23/25", "landing.rigor.r1"],
     ["m(c) = 0,500", "landing.rigor.r2"],
     ["3", "landing.rigor.r3"],
     ["MIT", "landing.rigor.r4"],

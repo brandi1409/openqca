@@ -25,6 +25,7 @@ import {
   complexSolution,
   parsimoniousSolution,
   intermediateSolution,
+  necessarySupersets,
 } from "../packages/engine/src/index.ts";
 
 const NUM_TOL = 1e-6;
@@ -164,6 +165,24 @@ const SCENARIOS = [
 ];
 
 /**
+ * Notwendigkeits-Szenarien — EIGENER Vergleichspfad.
+ *
+ * Referenz ist `superSubset(..., relation = "necessity")`. Dessen Ausgabe ist
+ * keine Lösungsmenge mit Pfad-Kennzahlen, sondern eine Liste von Ausdrücken mit
+ * inclN/RoN/covN. Die Vergleichslogik für Lösungsmodelle (compareModels) passt
+ * darauf nicht und wird deshalb bewusst NICHT umgebogen; stattdessen gibt es
+ * compareNecessity.
+ */
+const NECESSITY_SCENARIOS = [
+  { name: "nec_fuzzy_incl90_cov60", ds: "fuzzy", inclCut: 0.9, covCut: 0.6, depth: 3 },
+  { name: "nec_fuzzy_incl80_cov50", ds: "fuzzy", inclCut: 0.8, covCut: 0.5, depth: 3 },
+  { name: "nec_crisp_incl90_cov50", ds: "crisp", inclCut: 0.9, covCut: 0.5, depth: 4 },
+  { name: "nec_ambig_incl90_cov50", ds: "ambig", inclCut: 0.9, covCut: 0.5, depth: 4 },
+  { name: "nec_lipset_incl90_cov50", ds: "lipset", inclCut: 0.9, covCut: 0.5, depth: 5 },
+  { name: "nec_lipset_incl75_depth3", ds: "lipset", inclCut: 0.75, covCut: 0, depth: 3 },
+];
+
+/**
  * Dokumentierte, noch nicht verstandene Abweichungen von der Referenz.
  * Sie werden NICHT versteckt: Das Skript meldet sie sichtbar als Warnung und
  * schlägt fehl, sobald eine davon VERSCHWINDET (dann ist der Eintrag zu
@@ -288,6 +307,56 @@ function compareModels(ourModels, expectedModels) {
   return problems;
 }
 
+/**
+ * Kanonischer Schluessel eines Notwendigkeits-Ausdrucks. R schreibt
+ * Disjunktionen als "A + ~B" und Konjunktionen als "A*B"; die Engine ebenso.
+ * Verglichen wird operatorbewusst und literalsortiert, damit die Reihenfolge
+ * der Literale keine Rolle spielt.
+ */
+function canonNecExpression(expression) {
+  const text = expression.replace(/\s+/g, "");
+  if (text.includes("+")) return `+:${text.split("+").sort().join("+")}`;
+  return `*:${text.split("*").sort().join("*")}`;
+}
+
+/** Vergleicht die Ausdrucksmenge und inclN/RoN/covN je Ausdruck. */
+function compareNecessity(ourEntries, expectedEntries) {
+  const problems = [];
+  const ourByKey = new Map(ourEntries.map((e) => [canonNecExpression(e.expression), e]));
+  const expByKey = new Map(expectedEntries.map((e) => [canonNecExpression(e.expression), e]));
+
+  for (const [key, exp] of expByKey) {
+    if (!ourByKey.has(key)) problems.push(`Ausdruck fehlt in Engine: ${exp.expression}`);
+  }
+  for (const [key, our] of ourByKey) {
+    if (!expByKey.has(key)) problems.push(`Zusaetzlicher Engine-Ausdruck: ${our.expression}`);
+  }
+  for (const [key, exp] of expByKey) {
+    const our = ourByKey.get(key);
+    if (!our) continue;
+    if (!numEq(our.consistency, exp.inclN)) {
+      problems.push(`inclN ${exp.expression}: R=${exp.inclN} Engine=${our.consistency}`);
+    }
+    if (!numEq(our.relevance, exp.RoN)) {
+      problems.push(`RoN ${exp.expression}: R=${exp.RoN} Engine=${our.relevance}`);
+    }
+    if (!numEq(our.coverage, exp.covN)) {
+      problems.push(`covN ${exp.expression}: R=${exp.covN} Engine=${our.coverage}`);
+    }
+  }
+  return problems;
+}
+
+async function computeNecessityScenario(scenario) {
+  const dataset = DATASETS[scenario.ds];
+  const cases = await loadCases(dataset.filename);
+  return necessarySupersets(dataset.conditions, dataset.outcome, cases, {
+    inclCut: scenario.inclCut,
+    covCut: scenario.covCut,
+    depth: scenario.depth,
+  });
+}
+
 async function main() {
   if (!existsSync(expectedPath)) {
     console.error(
@@ -350,7 +419,40 @@ async function main() {
     }
   }
 
-  const considered = SCENARIOS.length - skipped;
+  // --- Notwendigkeit (eigener Vergleichspfad) --------------------------------
+  const expNecByName = new Map((expected.necessity ?? []).map((s) => [s.name, s]));
+  for (const scenario of NECESSITY_SCENARIOS) {
+    const ds = DATASETS[scenario.ds];
+    if (ds.optional && !existsSync(`${datasetsDir}${ds.filename}`)) {
+      skipped += 1;
+      console.log(`– ${scenario.name}: uebersprungen (Daten lokal nicht vorhanden)`);
+      continue;
+    }
+    const exp = expNecByName.get(scenario.name);
+    if (!exp) {
+      console.error(`✗ ${scenario.name}: kein Orakel-Eintrag in expected.json (necessity)`);
+      failed += 1;
+      continue;
+    }
+    let ourEntries;
+    try {
+      ourEntries = await computeNecessityScenario(scenario);
+    } catch (error) {
+      console.error(`✗ ${scenario.name}: Engine-Fehler — ${error.message}`);
+      failed += 1;
+      continue;
+    }
+    const problems = compareNecessity(ourEntries, exp.expressions);
+    if (problems.length === 0) {
+      console.log(`✓ ${scenario.name}: PASS`);
+    } else {
+      failed += 1;
+      console.error(`✗ ${scenario.name}: FAIL`);
+      problems.forEach((p) => console.error(`    - ${p}`));
+    }
+  }
+
+  const considered = SCENARIOS.length + NECESSITY_SCENARIOS.length - skipped;
   const passed = considered - failed - knownFailed;
   console.log(`\n${passed}/${considered} Szenarien PASS` +
     (knownFailed ? ` · ${knownFailed} bekannte, dokumentierte Abweichung(en)` : "") +

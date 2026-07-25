@@ -10,6 +10,23 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
 ## [Unveröffentlicht]
 
 ### Hinzugefügt
+- **Notwendigkeit von Disjunktionen (SUIN) und RoN.** `necessarySupersets` prüft
+  Konjunktionen und minimale Disjunktionen bis zu einer wählbaren Ordnung und weist inclN,
+  covN und **RoN** (Relevance of Necessity) aus; RoN steht zusätzlich je Einzelbedingung.
+  Sechs neue Szenarien (`nec_*`) sind gegen `superSubset` aus dem R-Paket `QCA`
+  kreuzvalidiert — die Kreuzvalidierung umfasst damit **25 statt 19 Szenarien** (23 PASS,
+  zwei unverändert dokumentierte ESA-Abweichungen). Notwendigkeit läuft über einen eigenen
+  Vergleichspfad; die Modell-Vergleichslogik blieb unangetastet.
+- **Fall-Diagnostik je Lösungspfad** (`caseDiagnostics`, Schneider & Rohlfing 2013/2016):
+  typische Fälle, *deviant consistency in kind* und *in degree*, individuell irrelevante
+  Fälle (IIR) sowie auf Lösungsebene *deviant coverage*. In der App kompakt an jeder
+  Lösungskarte, zweisprachig. **Interner Snapshot** — kein externes Orakel verfügbar.
+- **XY-Plot für Lösungsterme.** Die X-Achse lässt sich zwischen Einzelbedingung,
+  Lösungspfad und Gesamtlösung umschalten; die Term-Zugehörigkeit kommt aus der Engine
+  (`termMembership`), nicht aus einer zweiten Implementierung.
+- **Lückenliste „Nicht abgedeckt gegenüber dem R-Paket `QCA`"** in `docs/ROADMAP.md`
+  (mvQCA, temporale QCA, SA/ESA-Vollumfang, RF-Kennzahlen, PRI, Vier-Werte u. a.), mit
+  Kurzfassung im README.
 - **Lipset als kanonischer Referenzfall.** Die Kreuzvalidierung umfasst jetzt 19 statt 12
   Szenarien: ein konstruierter Modell-Ambiguitätsfall (4) und Ragins Lipset-Lehrbeispiel
   (3). Konservative und sparsame Lösung stimmen dort **exakt** mit dem R-Paket `QCA`
@@ -27,6 +44,15 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
 - `@openqca/engine` ist als eigenständiges npm-Paket installierbar (gebautes `dist`,
   Typdeklarationen, eigenes README).
 - `scripts/README.md` — Übersicht über die vier Prüfskripte und die R-Orakel.
+
+### Korrigiert
+- **Robustheits-Behauptung zurückgenommen.** `docs/ROADMAP.md` berief sich auf das
+  Robustness-Test-Protokoll von Oana & Schneider (doi 10.1177/00491241211036158), obwohl
+  dessen Kennzahlen **RF_incl, RF_cov und RF_case nicht implementiert** sind.
+  `runCombinedRobustnessGrid` rechnet ein Szenarien-/Cutoff-Raster und meldet
+  Häufigkeitsanteile stabiler Ausdrücke — das steht jetzt so in Roadmap, `VALIDATION.md`,
+  im Quelltext und in der Literaturangabe des Protokoll-Exports. Eine Ergänzung setzt
+  `SetMethods::robustness()` als externes Orakel voraus, das hier nicht installiert ist.
 
 ### Geändert
 - **Flow umgekehrt: Ergebnisse sofort.** Notwendigkeit, Truth Table und Lösungen rechnen,
@@ -63,6 +89,11 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   geklärt (Minimierung über positive Minterme ∪ einfache Counterfactuals), die
   Klassifikationsregel nicht. Konservative und sparsame Lösung sind nicht betroffen.
   Analyse in [`VALIDATION.md`](VALIDATION.md).
+- **Robustness-Fit nach Oana & Schneider (RF_incl, RF_cov, RF_case):** nicht implementiert.
+  Voraussetzung ist ein externes Orakel (`SetMethods::robustness()`), das lokal nicht
+  installiert ist; ohne Kreuzvalidierung würden die Kennzahlen gegen die Regel oben
+  verstoßen.
+- **Fall-Diagnostik und Robustheitsraster** sind interne Snapshots, nicht extern validiert.
 
 ## [0.1.0] — 2026-07-16
 

@@ -8,11 +8,17 @@ import {
   parsimoniousSolution,
   intermediateSolution,
   necessityAnalysis,
+  necessarySupersets,
+  caseDiagnostics,
+  termMembership,
   runCombinedRobustnessGrid,
   type TruthTableResult,
   type Expectation,
   type RobustnessScenario,
   type CombinedRobustnessResult,
+  type NecessityExpressionEntry,
+  type QcaCase,
+  type SolutionModel,
 } from "@openqca/engine";
 import { DEMO, type RawDataset } from "@/lib/demo";
 import { parseCsv } from "@/lib/csv";
@@ -200,7 +206,11 @@ export default function Home() {
   const [calibView, setCalibView] = useState<CalibrationView>("quick");
   const [freqCut, setFreqCut] = useState(1);
   const [consCut, setConsCut] = useState(0.8);
-  const [xyCond, setXyCond] = useState("");
+  /**
+   * Auswahl der X-Achse im XY-Plot: `cond:<Name>` (Einzelbedingung),
+   * `path:<Term-Bits>` (Lösungspfad) oder `solution` (Gesamtlösung).
+   */
+  const [xySource, setXySource] = useState("");
   const [expectations, setExpectations] = useState<Record<string, Expectation>>({});
   // Geführte Beispiel-Tour: null = aus, sonst Index der aktiven Station.
   const [tourStep, setTourStep] = useState<number | null>(null);
@@ -575,6 +585,26 @@ export default function Home() {
     }
   }, [conditions, outcome, cases]);
 
+  /**
+   * Notwendige Kombinationen (SUIN-Disjunktionen und Konjunktionen). Die
+   * Schwellen entsprechen der gängigen Konvention (Konsistenz ≥ 0,9) plus einer
+   * Coverage-Untergrenze, die triviale Obermengen fernhält. Die Ordnung ist auf
+   * 3 begrenzt: darüber wird die Kombinatorik teuer und die Ausdrücke sind kaum
+   * noch interpretierbar.
+   */
+  const suin: NecessityExpressionEntry[] | null = useMemo(() => {
+    if (!(conditions.length > 0 && outcome && !conditions.includes(outcome))) return null;
+    try {
+      return necessarySupersets(conditions, outcome, cases, {
+        inclCut: 0.9,
+        covCut: 0.5,
+        depth: Math.min(conditions.length, 3),
+      });
+    } catch {
+      return null;
+    }
+  }, [conditions, outcome, cases]);
+
   const sol: SolBundle | null = useMemo(() => {
     if (!tt) return null;
     const exp: Record<string, Expectation> = Object.fromEntries(
@@ -872,7 +902,7 @@ export default function Home() {
       {/* Schritt 4 — Notwendigkeit */}
       <Step n={4} id={stepMeta[3].id} title={t(locale, stepMeta[3].titleKey)} status={s4} lockedReason={t(locale, lockedReasonKeys[3]!)} intro={t(locale, "step.intro.4")}>
         {showProvisionalMark && <ProvisionalMark />}
-        {necessity ? <NecessitySection necessity={necessity} /> : <p className="hint" style={hintStyle}>{t(locale, "step.pending")}</p>}
+        {necessity ? <NecessitySection necessity={necessity} suin={suin} /> : <p className="hint" style={hintStyle}>{t(locale, "step.pending")}</p>}
       </Step>
       {renderContinue(4)}
 
@@ -894,6 +924,7 @@ export default function Home() {
             expectations={expectations}
             setExpectations={setExpectations}
             conditions={conditions}
+            cases={cases}
           />
         )}
       </Step>
@@ -930,8 +961,47 @@ export default function Home() {
               <NegatedOutcomePanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
             </div>
             {conditions.length > 0 && outcome && (() => {
-              const xc = xyCond && conditions.includes(xyCond) ? xyCond : conditions[0];
-              const points = cases.map((c) => ({ label: c.label, x: c.values[xc], y: c.values[outcome] }));
+              /**
+               * Der in Aufsätzen abgebildete Suffizienz-Plot zeigt nicht eine
+               * Einzelbedingung, sondern den **Lösungsterm**: X ist die
+               * Zugehörigkeit zum Pfad (Minimum über seine Literale), die
+               * Gesamtlösung das Maximum über alle Pfade. Beides steht hier zur
+               * Wahl; gerechnet wird mit `termMembership` aus der Engine, damit
+               * es keine zweite, driftende Implementierung gibt.
+               */
+              const paths = sol.intermediate.models[0]?.paths ?? [];
+              const options: { value: string; label: string; group: "condition" | "path" | "solution" }[] = [
+                ...conditions.map((c) => ({ value: `cond:${c}`, label: c.replace(/^fs_/, ""), group: "condition" as const })),
+                ...paths.map((p) => ({
+                  value: `path:${p.term}`,
+                  label: p.expression.replace(/fs_/g, "").toUpperCase(),
+                  group: "path" as const,
+                })),
+                ...(paths.length > 1
+                  ? [{
+                      value: "solution",
+                      label: paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join(" + "),
+                      group: "solution" as const,
+                    }]
+                  : []),
+              ];
+              const selection = options.some((o) => o.value === xySource)
+                ? xySource
+                : `cond:${conditions[0]}`;
+              const selected = options.find((o) => o.value === selection)!;
+              const xOf = (c: QcaCase): number => {
+                if (selection === "solution") {
+                  return paths.length
+                    ? Math.max(...paths.map((p) => termMembership(p.term, conditions, c.values)))
+                    : 0;
+                }
+                if (selection.startsWith("path:")) {
+                  return termMembership(selection.slice(5), conditions, c.values);
+                }
+                return c.values[selection.slice(5)];
+              };
+              const points = cases.map((c) => ({ label: c.label, x: xOf(c), y: c.values[outcome] }));
+              const isTerm = !selection.startsWith("cond:");
               return (
                 <Card id="xyplot">
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
@@ -939,12 +1009,39 @@ export default function Home() {
                       <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{t(locale, "xy.title")}</h2>
                       <InfoHint title={t(locale, "info.xyPlot.title")} body={t(locale, "info.xyPlot.body")} />
                     </div>
-                    <select value={xc} onChange={(e) => setXyCond(e.target.value)} style={{ ...inputStyle, marginLeft: "auto" }}>
-                      {conditions.map((c) => (<option key={c} value={c}>{c}</option>))}
+                    <select
+                      value={selection}
+                      onChange={(e) => setXySource(e.target.value)}
+                      aria-label={t(locale, "xy.source.label")}
+                      data-testid="xy-source"
+                      style={{ ...inputStyle, marginLeft: "auto", maxWidth: "100%" }}
+                    >
+                      <optgroup label={t(locale, "xy.source.conditions")}>
+                        {options.filter((o) => o.group === "condition").map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </optgroup>
+                      {paths.length > 0 && (
+                        <optgroup label={t(locale, "xy.source.paths")}>
+                          {options.filter((o) => o.group === "path").map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {options.some((o) => o.group === "solution") && (
+                        <optgroup label={t(locale, "xy.source.solution")}>
+                          {options.filter((o) => o.group === "solution").map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
-                  <XyPlot xLabel={xc} yLabel={outcome} points={points} />
+                  <XyPlot xLabel={selected.label} yLabel={outcome} points={points} />
                   <p className="hint" style={hintStyle}>{t(locale, "xy.hint")}</p>
+                  {isTerm && (
+                    <p className="hint" style={hintStyle} data-testid="xy-path-hint">{t(locale, "xy.pathHint")}</p>
+                  )}
                 </Card>
               );
             })()}
@@ -1549,12 +1646,14 @@ function SolutionSection({
   expectations,
   setExpectations,
   conditions,
+  cases,
 }: {
   tt: TruthTableResult;
   sol: SolBundle;
   expectations: Record<string, Expectation>;
   setExpectations: (e: Record<string, Expectation>) => void;
   conditions: string[];
+  cases: QcaCase[];
 }) {
   const [locale] = useLocale();
   const outLabel = tt.outcome.replace(/^fs_/, "").toUpperCase();
@@ -1667,6 +1766,13 @@ function SolutionSection({
                       </tbody>
                     </table>
                   </div>
+                  <CaseDiagnosticsBlock
+                    model={m}
+                    conditions={tt.conditions}
+                    outcome={tt.outcome}
+                    cases={cases}
+                    testId={mi === 0 ? `case-diagnostics-${kind}` : undefined}
+                  />
                 </div>
               ))
             )}
@@ -1704,11 +1810,125 @@ function SolutionSection({
   );
 }
 
-/* ---------- Notwendigkeit ---------- */
+/* ---------- Fall-Diagnostik je Lösungspfad ---------- */
 
-function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessityAnalysis> }) {
+/** Eine Gruppe von Fallnamen; leere Gruppen bleiben sichtbar („keine"). */
+function DiagGroup({ label, names }: { label: string; names: string[] }) {
   const [locale] = useLocale();
   return (
+    <div style={{ display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
+      <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, flex: "none" }}>{label}</span>
+      <span style={{ fontSize: 13.5, color: names.length ? "var(--ink-2)" : "var(--muted)" }}>
+        {names.length ? names.join(", ") : t(locale, "diag.none")}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Kompakte Fall-Diagnostik (Schneider & Rohlfing) unter der Pfadtabelle.
+ * Bewusst keine zweite Tabelle: je Pfad ein Block mit gruppierten Fallnamen.
+ * Die individuell irrelevanten Fälle (X ≤ 0,5) werden nur gezählt — sie sind in
+ * der Regel die Mehrheit und tragen zur Interpretation des Pfads nichts bei.
+ */
+function CaseDiagnosticsBlock({
+  model,
+  conditions,
+  outcome,
+  cases,
+  testId,
+}: {
+  model: SolutionModel;
+  conditions: string[];
+  outcome: string;
+  cases: QcaCase[];
+  testId?: string;
+}) {
+  const [locale] = useLocale();
+  const diag = useMemo(
+    () => caseDiagnostics(model, conditions, outcome, cases),
+    [model, conditions, outcome, cases],
+  );
+  return (
+    <div
+      data-testid={testId}
+      style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--line-soft)" }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Label>{t(locale, "diag.title")}</Label>
+        <InfoHint
+          title={t(locale, "info.caseDiagnostics.title")}
+          body={t(locale, "info.caseDiagnostics.body")}
+        />
+      </div>
+      <p className="hint" style={{ ...hintStyle, marginTop: 2 }}>{t(locale, "diag.desc")}</p>
+      <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
+        {diag.paths.map((path) => (
+          <div
+            key={path.term}
+            style={{
+              border: "1px solid var(--line-soft)",
+              borderRadius: 8,
+              padding: "8px 10px",
+              display: "grid",
+              gap: 4,
+            }}
+          >
+            <div className="mono" style={{ fontSize: 13.5, fontWeight: 600 }}>
+              {path.expression.replace(/fs_/g, "").toUpperCase()}
+            </div>
+            <DiagGroup label={t(locale, "diag.typical")} names={path.typical.map((c) => c.label)} />
+            <DiagGroup
+              label={t(locale, "diag.deviantKind")}
+              names={path.deviantConsistencyKind.map((c) => c.label)}
+            />
+            <DiagGroup
+              label={t(locale, "diag.deviantDegree")}
+              names={path.deviantConsistencyDegree.map((c) => c.label)}
+            />
+            <DiagGroup
+              label={t(locale, "diag.irrelevant")}
+              names={
+                path.irrelevant.length
+                  ? [t(locale, "diag.irrelevantCount", { n: path.irrelevant.length })]
+                  : []
+              }
+            />
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        {diag.deviantCoverage.length ? (
+          <DiagGroup
+            label={t(locale, "diag.deviantCoverage")}
+            names={diag.deviantCoverage.map((c) => c.label)}
+          />
+        ) : (
+          <p className="hint" style={hintStyle}>{t(locale, "diag.deviantCoverage.none")}</p>
+        )}
+      </div>
+      {diag.atCrossover.length > 0 && (
+        <p className="hint" style={hintStyle}>
+          {t(locale, "diag.crossover", { cases: diag.atCrossover.join(", ") })}
+        </p>
+      )}
+      <p className="hint" style={hintStyle}>{t(locale, "diag.hint")}</p>
+    </div>
+  );
+}
+
+/* ---------- Notwendigkeit ---------- */
+
+function NecessitySection({
+  necessity,
+  suin,
+}: {
+  necessity: ReturnType<typeof necessityAnalysis>;
+  suin: NecessityExpressionEntry[] | null;
+}) {
+  const [locale] = useLocale();
+  return (
+    <>
     <Card>
       <H2>{t(locale, "nec.title")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: -6, marginBottom: 12, fontSize: 13.5 }}>
@@ -1731,6 +1951,12 @@ function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessit
                   <InfoHint title={t(locale, "info.necessityCoverage.title")} body={t(locale, "info.necessityCoverage.body")} formula={t(locale, "info.necessityCoverage.formula")} />
                 </span>
               </th>
+              <th style={thStyle()}>
+                <span style={thHintStyle}>
+                  {t(locale, "nec.col.relevance")}
+                  <InfoHint title={t(locale, "info.necessityRelevance.title")} body={t(locale, "info.necessityRelevance.body")} formula={t(locale, "info.necessityRelevance.formula")} />
+                </span>
+              </th>
               <th style={thStyle()}></th>
             </tr>
           </thead>
@@ -1740,6 +1966,7 @@ function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessit
                 <td style={tdStyle(false, false)} className="mono">{n.condition.replace(/^fs_/, "")}</td>
                 <td style={tdStyle(true, false)}>{fmt(n.consistency)}</td>
                 <td style={tdStyle(true, false)}>{fmt(n.coverage)}</td>
+                <td style={tdStyle(true, false)}>{fmt(n.relevance)}</td>
                 <td style={tdStyle(false, false)}>{n.isCandidate ? <span style={{ color: "var(--good-text)", fontWeight: 600 }}>{t(locale, "nec.candidate")}</span> : ""}</td>
               </tr>
             ))}
@@ -1747,6 +1974,64 @@ function NecessitySection({ necessity }: { necessity: ReturnType<typeof necessit
         </table>
       </div>
       <p className="hint" style={hintStyle}>{t(locale, "nec.hint")}</p>
+    </Card>
+    {suin && <SuinSection entries={suin} />}
+    </>
+  );
+}
+
+/* ---------- Notwendige Kombinationen (SUIN) ---------- */
+
+/**
+ * Zweite Ebene der Notwendigkeitsprüfung: Disjunktionen (SUIN) und
+ * Konjunktionen. Bewusst kompakt — die Tabelle ist ein Befund, keine
+ * Materialschlacht; Einzelbedingungen stehen bereits in der Tabelle darüber.
+ */
+function SuinSection({ entries }: { entries: NecessityExpressionEntry[] }) {
+  const [locale] = useLocale();
+  const rows = entries.filter((e) => e.literals.length > 1);
+  return (
+    <Card id="suin">
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{t(locale, "nec.suin.title")}</h2>
+        <InfoHint title={t(locale, "info.suin.title")} body={t(locale, "info.suin.body")} />
+      </div>
+      <p style={{ color: "var(--ink-2)", marginTop: -6, marginBottom: 12, fontSize: 13.5 }}>
+        {t(locale, "nec.suin.desc")}
+      </p>
+      {rows.length === 0 ? (
+        <p className="hint" style={hintStyle} data-testid="suin-empty">{t(locale, "nec.suin.none")}</p>
+      ) : (
+        <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }} data-testid="suin-table">
+            <thead>
+              <tr>
+                <th style={thStyle()}>{t(locale, "nec.suin.col.expression")}</th>
+                <th style={thStyle()}>{t(locale, "nec.suin.col.kind")}</th>
+                <th style={thStyle()}>{t(locale, "nec.col.consistency")}</th>
+                <th style={thStyle()}>{t(locale, "nec.col.coverage")}</th>
+                <th style={thStyle()}>{t(locale, "nec.col.relevance")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((entry) => (
+                <tr key={entry.expression}>
+                  <td style={tdStyle(false, false)} className="mono">
+                    {entry.expression.replace(/fs_/g, "").toUpperCase()}
+                  </td>
+                  <td style={tdStyle(false, false)}>
+                    {t(locale, entry.kind === "disjunction" ? "nec.suin.kind.disjunction" : "nec.suin.kind.conjunction")}
+                  </td>
+                  <td style={tdStyle(true, false)}>{fmt(entry.consistency)}</td>
+                  <td style={tdStyle(true, false)}>{fmt(entry.coverage)}</td>
+                  <td style={tdStyle(true, false)}>{fmt(entry.relevance)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="hint" style={hintStyle}>{t(locale, "nec.suin.hint")}</p>
     </Card>
   );
 }

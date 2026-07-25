@@ -306,6 +306,18 @@ function caseStability(
  * orchestration layer makes the research choices explicit and reports both
  * solution-term and case-oriented stability relative to the selected baseline
  * cell (or the first cell when no baseline is supplied).
+ *
+ * **What this is not.** This is a threshold/scenario *grid*, not the robustness
+ * test protocol of Oana & Schneider (2021/2024, doi 10.1177/00491241211036158).
+ * Their measures — RF_incl, RF_cov and RF_case, which relate an initial solution
+ * to a test solution via their intersection and union — are deliberately **not**
+ * implemented here, and no output of this function should be reported as such.
+ * What is reported is the share of grid cells that yield the same solution
+ * expression, plus the cases whose truth-table assignment or outcome side moves.
+ * That answers a related but different question. See `docs/ROADMAP.md`
+ * ("P1: Kombinierte Robustheit") for why the protocol measures remain open: they
+ * would need `SetMethods::robustness()` as an external oracle, and unvalidated
+ * numbers must not be shipped as validated.
  */
 export function runCombinedRobustnessGrid(
   options: CombinedRobustnessOptions,

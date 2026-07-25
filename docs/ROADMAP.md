@@ -6,7 +6,7 @@ Dieses Dokument beschreibt die priorisierten nächsten Schritte für openQCA. Es
 
 - Der kostenlose Analyse-Kern läuft local-first im Browser.
 - Die Engine ist intern regressionsgetestet. `node scripts/reference-check.mjs` prüft dokumentierte Ragin-Beispiele und interne Snapshots.
-- Die QCA-Lösungslogik ist in 19 Szenarien gegen das R-Paket `QCA` kreuzvalidiert: `node scripts/cross-validate.mjs` (17 PASS, zwei dokumentierte Abweichungen derselben ESA-Ursache — siehe `VALIDATION.md`).
+- Lösungslogik und Notwendigkeitsanalyse sind in 25 Szenarien gegen das R-Paket `QCA` kreuzvalidiert: `node scripts/cross-validate.mjs` (23 von 25 Szenarien PASS, zwei dokumentierte Abweichungen derselben ESA-Ursache — siehe `VALIDATION.md`). Davon prüfen sechs Szenarien die Notwendigkeit von Konjunktionen und Disjunktionen (SUIN) samt RoN gegen `superSubset`.
 - Crisp-, direkte Ragin- und lineare Fuzzy-Kalibrierung sind gegen `QCA` geprüft. Die direkte Methode nutzt Ragins ±3-Logit-Fixpunkte; `QCA` verwendet abweichende dokumentierte Zielwerte um 0,05/0,95. Die Restabweichung ist kein Beleg für substantielle Kalibrierungsgültigkeit.
 - `calibrateLinear` stimmt auf einem unabhängigen `QCA::calibrate(logistic = FALSE)`-Prüfgitter überein; `calibrateFourValue` bleibt im Rechenkern vorhanden, aber noch nicht extern validiert.
 - Die Web-App besitzt Rohdatenimport, Rollenwahl, Set-Spezifikationen, Evidenzfelder, Fallprüfung, Anker-Sensitivität und Protokoll-Export. Der erste Rohdaten-zu-Kalibrierungs-Vertikalschnitt ist für Crisp-, direkte und lineare Fuzzy-Sets implementiert; die lokale Implementierung ist durch Engine-, R-Oracle- und E2E-Prüfungen belegt. Die inhaltliche Gültigkeit konkreter Nutzeranker bleibt eine Forschungsentscheidung.
@@ -34,8 +34,28 @@ Abnahmekriterium ist der Rohdatensatz `datasets/rohwerte-demokratie.csv` mit min
 
 ## P1: Kombinierte Robustheit
 
-Nach dem ersten Meilenstein: methodisch begründete gemeinsame Varianten von Kalibrierungsankern sowie Frequency-, Consistency- und PRI-Entscheidungen. Berichtet werden sollen Sensitivitätsbereiche, stabile und instabile Lösungsterme, Fit-Änderungen sowie robuste, mögliche und fallbezogen wechselnde Klassifikationen. Grundlage ist das Robustness-Test-Protokoll von Oana und Schneider:
-https://doi.org/10.1177/00491241211036158
+Umgesetzt ist ein **Raster-Sweep** (`packages/engine/src/robustness.ts`,
+`runCombinedRobustnessGrid`): Über das Kreuzprodukt aus dokumentierten
+Kalibrierungsszenarien und Frequency-, Consistency- und PRI-Cutoffs wird je Zelle die
+komplexe, intermediäre und sparsame Lösung neu gerechnet. Berichtet werden der Anteil
+der Zellen mit identischem Lösungsausdruck (stabil/variabel) und die Fälle, deren
+Truth-Table-Zuordnung oder Outcome-Seite gegenüber der Basiszelle wechselt.
+
+**Ehrlichkeitshinweis (korrigiert am 2026-07-25).** An dieser Stelle stand zuvor,
+Grundlage sei das Robustness-Test-Protokoll von Oana & Schneider
+(https://doi.org/10.1177/00491241211036158). Das ist **zurückgenommen**: Die dort
+definierten Kennzahlen — **RF_incl**, **RF_cov** und **RF_case**, die
+Anfangs- und Testlösung über deren Schnitt und Vereinigung ins Verhältnis setzen —
+sind **nicht** implementiert. Das Raster beantwortet eine verwandte, aber andere
+Frage: *Wie oft bleibt derselbe Lösungsausdruck stehen, wenn ich Anker und Cutoffs
+variiere?* Es liefert Häufigkeitsanteile, keine Robustness-Fit-Maße, und ersetzt das
+Protokoll nicht.
+
+Offen bleibt damit: RF_incl/RF_cov/RF_case ergänzen. Voraussetzung dafür ist ein
+externes Orakel — das R-Paket `SetMethods` (`robustness()`) — das in dieser Umgebung
+**nicht installiert** ist. Ohne Kreuzvalidierung würden diese Kennzahlen gegen die
+Projektregel verstoßen, nichts als validiert auszuweisen, was es nicht ist. Siehe auch
+„Nicht abgedeckt gegenüber dem R-Paket QCA" weiter unten.
 
 ## P1: Lokale Projektdaten und Nachvollziehbarkeit
 
@@ -78,6 +98,25 @@ Browser-Hauptthread; Falltabellen werden vollständig gerendert. Der
 Panel-Identität. Ein Worker/virtuelle Tabellen und ein Panel-Datenmodell
 brauchen daher eigene Benchmarks und reproduzierbare Semantik; sie werden
 nicht stillschweigend in den lokalen Analysepfad eingeschoben.
+
+## Nicht abgedeckt gegenüber dem R-Paket `QCA`
+
+Diese Liste ist Teil der Positionierung: openQCA ist kein Ersatz für das R-Paket `QCA`
+(Dușa), sondern ein geführter, reproduzierbarer Weg durch den Standardfall. Wer eines
+der folgenden Verfahren braucht, rechnet in R weiter. Stand: 2026-07-25.
+
+| Lücke | Status in openQCA | R-Entsprechung |
+|---|---|---|
+| **mvQCA** (multi-value QCA) | nicht vorhanden. Truth Table und Minimierung sind auf binäre Zeilenbits festgelegt (`buildTruthTable`, `primeImplicants`); Vier-Werte-Kalibrierung existiert, ist aber nicht extern validiert und nicht in den Ablauf eingebunden | `truthTable(..., ...)` / `minimize()` mit mehrwertigen Bedingungen, `QCA::calibrate(type = "crisp")` mit mehreren Schwellen |
+| **Temporale/Panel-QCA (TQCA)** | nicht vorhanden. Der `RawDataset`-Vertrag kennt nur Fälle und Spalten, keine Zeit- oder Panel-Identität — siehe „Dokumentierte externe und semantische Blocker" | keine kanonische Funktion im Paket; erfordert eigenes Datenmodell (lagged conditions, Aggregation) |
+| **SUIN/Disjunktionen der Notwendigkeit** | **umgesetzt und R-kreuzvalidiert** (`necessarySupersets`, sechs `nec_*`-Szenarien). Deckungsgleich mit `superSubset` für Konjunktionen und minimale Disjunktionen inkl. RoN. Nicht abgedeckt: `relation = "sufficiency"`, `pri.cut`, mehrwertige Ausdrücke, `add`-Argument | `superSubset()` |
+| **RoN** | **umgesetzt und R-kreuzvalidiert** — je Einzelbedingung und je Kombination | `superSubset()`-Spalte `RoN`, `pof(..., relation = "necessity")` |
+| **XY-Plots für Lösungsterme** | **umgesetzt**: Der XY-Plot lässt Einzelbedingung, Lösungspfad und Gesamtlösung als X-Achse wählen (Term-Zugehörigkeit = Minimum über die Literale). Nicht abgedeckt: Notwendigkeits-Plots (X/Y vertauscht) und Plot-Export als Datensatz | `XYplot()` |
+| **Enhanced Standard Analysis, voller Umfang** | teilweise. Die intermediäre Lösung ist implementiert und in 17 der 19 Lösungsmodell-Szenarien deckungsgleich; **zwei dokumentierte Abweichungen** derselben Ursache bestehen (die Engine behält Literale, die R als *easy counterfactual* entfernt) — Analyse und Reichweite in [`VALIDATION.md`](../VALIDATION.md), Abschnitt „Bekannte Abweichungen". Nicht abgedeckt: explizite Behandlung von *untenable assumptions* aus notwendigen Bedingungen, getrennte Ausweisung von `$EC`/`$DC`, `minimize(..., sol.type)`-Varianten | `minimize(..., include = "?", dir.exp = ...)`, `$i.sol[[k]]$EC` / `$DC` |
+| **Robustness-Fit nach Oana & Schneider** (RF_incl, RF_cov, RF_case) | nicht vorhanden. openQCA rechnet ein Szenarien-/Cutoff-Raster und meldet Häufigkeitsanteile — siehe „P1: Kombinierte Robustheit" | `SetMethods::robustness()` (Paket in dieser Umgebung nicht installiert) |
+| **PRI extern validiert** | Kennzahl vorhanden und intern getestet, aber gegen **kein** externes Orakel gestellt | `pof()`-Spalte `PRI` |
+| **Vier-Werte-Kalibrierung extern validiert** | vorhanden, kein passendes Orakel — siehe Blocker unten | `QCA::calibrate()` liefert ordinale Codes, keine Mitgliedschaften |
+| **Weitere Paketfunktionen** | nicht vorhanden: `Xplot`, `venn`/Set-Diagramme, `modelFit`, Bootstrap-Konfidenzintervalle (`QCAfit`), `causalChain`/`cna`-Brücke | dito im R-Ökosystem |
 
 ## Dokumentierte externe und semantische Blocker
 

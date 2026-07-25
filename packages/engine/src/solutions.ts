@@ -4,6 +4,7 @@
  */
 
 import { termCovers, primeImplicants, minimalCovers, termToExpression } from "./minimize.ts";
+import { relevanceOfNecessity } from "./necessity.ts";
 import type { QcaCase, TruthTableResult } from "./truthTable.ts";
 
 export interface PathParams {
@@ -33,11 +34,25 @@ export interface NecessityEntry {
   condition: string;
   consistency: number; // Notwendigkeits-Konsistenz: Σ min(X,Y) / Σ Y
   coverage: number; // Relevanz: Σ min(X,Y) / Σ X
+  /**
+   * RoN (Relevance of Necessity, Schneider & Wagemann 2012, S. 236):
+   * Σ (1−X) / Σ (1−min(X,Y)). Coverage allein erkennt triviale Notwendigkeit
+   * nicht zuverlässig — eine nahezu allgegenwärtige Bedingung ist notwendig,
+   * aber nichtssagend. RoN geht dort gegen 0.
+   */
+  relevance: number;
   isCandidate: boolean; // Konsistenz ≥ 0,9
 }
 
-/** Zugehörigkeit eines Falls zu einem Term (Minimum über die literalen Bedingungen). */
-function termMembership(term: string, conditions: string[], values: Record<string, number>): number {
+/**
+ * Zugehörigkeit eines Falls zu einem Term (Minimum über die literalen Bedingungen).
+ *
+ * Exportiert, weil dieselbe Rechnung außerhalb der Lösungsermittlung gebraucht
+ * wird: Fall-Diagnostik je Pfad (`caseDiagnostics.ts`) und der XY-Plot eines
+ * Lösungsterms in der App. Zweitimplementierungen driften — deshalb hier nur
+ * einmal.
+ */
+export function termMembership(term: string, conditions: string[], values: Record<string, number>): number {
   let mem = 1;
   [...term].forEach((ch, i) => {
     if (ch === "1") mem = Math.min(mem, values[conditions[i]]);
@@ -286,6 +301,7 @@ export function necessityAnalysis(
         condition: label,
         consistency,
         coverage: sumX ? sumMin / sumX : NaN,
+        relevance: relevanceOfNecessity(X, Y),
         isCandidate: consistency >= 0.9,
       });
     }

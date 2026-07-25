@@ -48,9 +48,10 @@ openqca/
 
 ## Stand
 
-- **Engine** (43 Tests): Kalibrierung (direkt, linear, crisp, Vier-Werte), Konsistenz/Coverage/PRI,
+- **Engine** (57 Tests): Kalibrierung (direkt, linear, crisp, Vier-Werte), Konsistenz/Coverage/PRI,
   Truth Table, Quine-McCluskey-Minimierung, komplexe + **intermediäre** (Enhanced Standard Analysis
-  mit Richtungserwartungen) + sparsame Lösung, Notwendigkeitsanalyse, kombinierte Robustheitsraster.
+  mit Richtungserwartungen) + sparsame Lösung, Notwendigkeitsanalyse inklusive **Disjunktionen (SUIN)**
+  und **RoN**, **Fall-Diagnostik je Lösungspfad** (Schneider & Rohlfing), kombinierte Robustheitsraster.
 - **Validierung:** Lösungslogik und Notwendigkeitsanalyse sind in **23 von 25 Szenarien gegen das
   R-Paket `QCA`** kreuzvalidiert (Formeln und Fit-Kennzahlen, Toleranz `1e-6`; Notwendigkeit inkl.
   Disjunktionen/SUIN und RoN gegen `superSubset`); die zwei Abweichungen — beide aus
@@ -64,7 +65,7 @@ openqca/
   (Set-Definition, Methodenwahl, Anker, Evidenz, Fallprüfung, Anker-Sensitivität), Notwendigkeit,
   Truth Table mit allen drei Lösungstypen, Robustheit und Analyse des negierten Outcomes (~Y).
   Exporte: Protokoll (JSON), Markdown, äquivalentes **R-Skript**, druckfähiger Bericht. DE/EN.
-- **Qualitätssicherung:** 52 Playwright-E2E-Tests prüfen Flüsse, visuelle Integrität (Hell/Dunkel ×
+- **Qualitätssicherung:** 55 Playwright-E2E-Tests prüfen Flüsse, visuelle Integrität (Hell/Dunkel ×
   Desktop/Mobil) und Design-Konsistenz. Verbindliche Abnahmekriterien: [`docs/QUALITY-SPEC.md`](docs/QUALITY-SPEC.md).
 - **Cloud (optional, abschaltbar):** Konto (Supabase Magic Link), Projekt-Speicherung, KI-Assistenten
   (Anthropic) und Zahlungen (Stripe) — vollständig im Code, aktiviert allein über Env-Variablen.
@@ -74,6 +75,16 @@ openqca/
 Vier-Werte-Kalibrierung (kein passendes Orakel im R-Paket), Zeitreihen-/Panel-QCA (Datenmodell fehlt),
 Desktop-Build via Tauri (braucht Rust + Signierzertifikate), juristische Prüfung der `[PRÜFEN]`-Punkte
 unter `legal/`, eigene Domain, Zenodo-DOI und JOSS-Einreichung.
+
+## Was openQCA (noch) nicht kann
+
+openQCA ist kein Ersatz für das R-Paket `QCA` (Dușa), sondern ein geführter, reproduzierbarer Weg
+durch den Standardfall. Nicht abgedeckt sind unter anderem **mvQCA**, **temporale/Panel-QCA**, die
+Robustness-Fit-Kennzahlen von Oana & Schneider (RF_incl/RF_cov/RF_case) und der volle Umfang der
+Enhanced Standard Analysis — inklusive zweier dokumentierter ESA-Abweichungen gegenüber R. Die
+vollständige Gegenüberstellung mit Status und R-Entsprechung steht in
+[`docs/ROADMAP.md`](docs/ROADMAP.md), Abschnitt „Nicht abgedeckt gegenüber dem R-Paket `QCA`";
+die Abweichungen sind in [`VALIDATION.md`](VALIDATION.md) analysiert.
 
 ## Änderungen
 

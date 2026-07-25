@@ -55,9 +55,16 @@ Für die beiden bereits kalibrierten Datensätze `datasets/fuzzy-sets-beispiel.c
 - die Kennzahlen **inclS** und **covS** je Modell sowie **incl**, **cov** und
   **covU** je Pfad, verglichen mit Toleranz `1e-6`.
 
-Insgesamt 19 Szenarien: die beiden kalibrierten Beispieldatensaetze (je konservativ,
-sparsam und vier intermediaere Varianten), der konstruierte Ambiguitaetsfall (vier
-Szenarien) und der kanonische Lipset-Datensatz (drei Szenarien, nur lokal — siehe unten).
+19 Szenarien prüfen **Lösungsmodelle**: die beiden kalibrierten Beispieldatensaetze (je
+konservativ, sparsam und vier intermediaere Varianten), der konstruierte Ambiguitaetsfall
+(vier Szenarien) und der kanonische Lipset-Datensatz (drei Szenarien, nur lokal — siehe
+unten). Dazu kommen **sechs Notwendigkeits-Szenarien** gegen `superSubset` (siehe
+„Notwendigkeit: Disjunktionen (SUIN) und RoN"). Zusammen **25 Szenarien**.
+
+Die Notwendigkeits-Szenarien laufen über einen **eigenen Vergleichspfad**
+(`compareNecessity` in `scripts/cross-validate.mjs`), weil `superSubset` keine
+Lösungsmodelle mit Pfadkennzahlen liefert, sondern eine Ausdrucksliste mit
+inclN/RoN/covN. Die bestehende Modell-Vergleichslogik bleibt unverändert.
 
 ### Was ausdrücklich NICHT Teil dieser Szenarien ist
 
@@ -70,8 +77,12 @@ Damit keine Außendarstellung mehr behauptet, was hier nicht geprüft wird:
   bereits kalibriert in den Vergleich. Die Kalibrierung hat ihre eigene, weiter
   unten beschriebene Evidenzkette (`scripts/calibrate-cross-validate.mjs`) —
   mit einer dokumentierten Restabweichung ≤ 0,01 bei der direkten Methode.
-- **Notwendigkeitsanalyse** und die Kennzahlen der komplexen Lösungen in
-  `scripts/reference-check.mjs` bleiben interne Regressions-Snapshots.
+- Die **Snapshot-Werte** der Notwendigkeitsanalyse und der komplexen Lösungen in
+  `scripts/reference-check.mjs` bleiben interne Regressions-Snapshots. Das
+  *Verfahren* der Notwendigkeitsanalyse ist seit 2026-07-25 kreuzvalidiert —
+  siehe „Notwendigkeit: Disjunktionen (SUIN) und RoN".
+- **Fall-Diagnostik** und **Robustheitsraster** sind interne Snapshots, kein
+  externes Orakel — siehe die eigenen Abschnitte unten.
 
 ### Ausführen
 
@@ -92,9 +103,10 @@ Orakel, meldet das Skript dies und beendet mit Exit-Code 2.
 
 ### Status
 
-**17 von 19 Szenarien PASS** (Engine == R-Paket QCA, Formeln und Kennzahlen);
+**23 von 25 Szenarien PASS** (Engine == R-Paket QCA, Formeln und Kennzahlen);
 zwei Szenarien weichen dokumentiert ab — beide aus derselben ESA-Ursache, siehe
-„Bekannte Abweichungen" unten.
+„Bekannte Abweichungen" unten. Alle sechs Notwendigkeits-Szenarien stimmen exakt
+(Toleranz `1e-6`) mit `superSubset` überein.
 
 ### Erweiterung um Modell-Ambiguität (2026-07-25)
 
@@ -210,6 +222,95 @@ Form von einer Replikation mit dem R-Paket ab.
 **Konservative und sparsame Lösung sind nachweislich nicht betroffen**: Sie stimmen auf
 allen 16 Szenarien und auf Lipset exakt mit R überein.
 
+## Notwendigkeit: Disjunktionen (SUIN) und RoN
+
+**Neu am 2026-07-25 und R-kreuzvalidiert.** Bis dahin prüfte die Engine ausschließlich
+einzelne Bedingungen und ihre Negation. `necessarySupersets`
+(`packages/engine/src/necessity.ts`) prüft zusätzlich **Konjunktionen** und
+**Disjunktionen** bis zu einer wählbaren Ordnung und weist neben inclN und covN auch
+**RoN** (Relevance of Necessity, Schneider & Wagemann 2012, S. 236) aus:
+
+```
+inclN = Σ min(X,Y) / Σ Y
+covN  = Σ min(X,Y) / Σ X
+RoN   = Σ (1−X)    / Σ (1−min(X,Y))
+```
+
+RoN ist ergänzt worden, weil Coverage allein triviale Notwendigkeit nicht zuverlässig
+erkennt. Die Kennzahl steht auch je Einzelbedingung in `necessityAnalysis`.
+
+### Referenz und Semantik
+
+Referenz ist `superSubset(data, outcome, conditions, relation = "necessity",
+incl.cut, cov.cut, depth, use.tilde = TRUE)`. Dessen Auswahlregeln wurden empirisch
+nachgebildet und sind in `necessity.ts` dokumentiert:
+
+- Zulässig ist ein Ausdruck bei `inclN ≥ incl.cut` **und** `covN ≥ cov.cut`
+  (danach `RoN ≥ ron.cut`); die Cutoffs werden wie in R um `sqrt(eps)` aufgeweicht.
+- **Konjunktionen** werden vollständig ausgewiesen (jede ist eine kleinere Obermenge
+  des Outcomes und damit ein eigener Befund).
+- **Disjunktionen** nur, wenn sie *minimal* sind: Sobald eine echte Teil-Disjunktion —
+  bis hin zum einzelnen Literal — bereits zulässig ist, entfällt die größere.
+  Einzelne Literale erscheinen ausschließlich in der Konjunktionsliste, genau wie in R.
+- Kein Ausdruck kombiniert eine Bedingung mit ihrer eigenen Negation.
+
+### Szenarien und Status
+
+Sechs Szenarien, verglichen werden die **Ausdrucksmenge** sowie **inclN, RoN und covN**
+je Ausdruck mit Toleranz `1e-6`:
+
+| Szenario | Datensatz | incl.cut | cov.cut | depth | Status |
+|---|---|---|---|---|---|
+| `nec_fuzzy_incl90_cov60` | fuzzy-sets-beispiel | 0,90 | 0,60 | 3 | **PASS** |
+| `nec_fuzzy_incl80_cov50` | fuzzy-sets-beispiel | 0,80 | 0,50 | 3 | **PASS** |
+| `nec_crisp_incl90_cov50` | crisp-sets-beispiel | 0,90 | 0,50 | 4 | **PASS** |
+| `nec_ambig_incl90_cov50` | modell-ambiguitaet | 0,90 | 0,50 | 4 | **PASS** |
+| `nec_lipset_incl90_cov50` | Lipset (lokal) | 0,90 | 0,50 | 5 | **PASS** |
+| `nec_lipset_incl75_depth3` | Lipset (lokal) | 0,75 | 0,00 | 3 | **PASS** |
+
+Die Szenarien decken bewusst unterschiedliche Konstellationen ab: reine Disjunktionen
+ohne notwendige Einzelbedingung (fuzzy, crisp), eine notwendige Einzelbedingung, die
+größere Disjunktionen sperrt (`ambig`: `C`), sowie gemischte Konjunktions- und
+Disjunktionsbefunde auf dem kanonischen Lipset-Datensatz. Der Crisp-Fall trifft
+zusätzlich die Cutoff-Kante exakt (`~MARKT + ~KONKURRENZ` mit covN = 0,5000).
+
+### Was hier NICHT validiert ist
+
+- `superSubset(relation = "sufficiency")`, `pri.cut` und das `add`-Argument sind nicht
+  nachgebildet und werden nicht behauptet.
+- Der Standardwert `depth` weicht bewusst von R ab (openQCA: `min(k, 3)`, R: `k`). Für
+  die Kreuzvalidierung wird `depth` immer explizit gesetzt.
+
+## Robustheit: was das Raster leistet — und was nicht
+
+`runCombinedRobustnessGrid` rechnet ein Kreuzprodukt aus Kalibrierungsszenarien und
+Frequency-/Consistency-/PRI-Cutoffs und meldet, welcher Anteil der Zellen denselben
+Lösungsausdruck liefert und welche Fälle ihre Klassifikation wechseln.
+
+Das ist **nicht** das Robustness-Test-Protokoll von Oana & Schneider
+(doi 10.1177/00491241211036158). Dessen Kennzahlen **RF_incl**, **RF_cov** und
+**RF_case** sind nicht implementiert. Die frühere Berufung darauf in `docs/ROADMAP.md`
+wurde am 2026-07-25 zurückgenommen; der Verweis steht dort jetzt als Hintergrund mit
+ausdrücklicher Abgrenzung. Eine Ergänzung setzt ein externes Orakel voraus
+(`SetMethods::robustness()`), das in dieser Umgebung nicht installiert ist — ohne
+Kreuzvalidierung würden die Kennzahlen gegen die Regel verstoßen, nichts als validiert
+auszuweisen, was es nicht ist. Der Sweep selbst ist **interner Regressions-Snapshot**,
+kein extern validiertes Verfahren.
+
+## Fall-Diagnostik: interner Snapshot, kein externes Orakel
+
+`caseDiagnostics` (`packages/engine/src/caseDiagnostics.ts`) klassifiziert Fälle je
+Lösungspfad nach Schneider & Rohlfing (2013, 2016): typisch, *deviant consistency in
+kind*, *deviant consistency in degree*, individuell irrelevant (IIR) sowie auf
+Lösungsebene *deviant coverage*.
+
+Die Typologie ist **rein definitorisch** (Schwellenvergleiche im XY-Raum) und wird
+durch Unit-Tests in `packages/engine/test/caseDiagnostics.test.ts` abgesichert —
+darunter die Erschöpfungs- und Disjunktheitseigenschaft der vier Typen. Sie ist
+**nicht** gegen ein externes Orakel gestellt: Das R-Paket `QCA` kennt keine
+entsprechende Funktion (`SetMethods` böte sie, ist aber nicht installiert). Damit bleibt
+sie ein **interner Regressions-Snapshot** im Sinne der Aussagegrenze weiter unten.
+
 ### Kanonik-Hinweis: Semantik von „either"/fehlender Erwartung
 
 Die Cross-Validierung hat die kanonische ESA-Regel bestätigt und präzisiert: Ein
@@ -251,11 +352,17 @@ Forschungsurteile bzw. Sensitivitätsanalysen — keine reine Implementierungsfr
 
 ## Aussagegrenze
 
-Die Kalibrierungs- und Notwendigkeits-Kennzahlen sowie die Kennzahlen der
-komplexen Lösungen in `scripts/reference-check.mjs` sind weiterhin **interne
-Regressions-Snapshots** (nicht extern validiert). Die **intermediäre Lösung**
-sowie konservative/sparsame Lösungsformeln und deren Fit-Parameter sind dagegen
-über `scripts/cross-validate.mjs` gegen das R-Paket QCA extern kreuzvalidiert.
+**Extern kreuzvalidiert** (gegen das R-Paket QCA, `scripts/cross-validate.mjs`):
+konservative, sparsame und intermediäre Lösungsformeln samt Fit-Parametern sowie —
+seit 2026-07-25 — die **Notwendigkeit von Konjunktionen und Disjunktionen (SUIN)
+inklusive inclN, covN und RoN** gegen `superSubset`.
+
+**Interne Regressions-Snapshots** (nicht extern validiert): die Kalibrierungs-Snapshots
+und die Kennzahlen der komplexen Lösungen in `scripts/reference-check.mjs`, **PRI**,
+die **Fall-Diagnostik** (`caseDiagnostics`) und das **Robustheitsraster**
+(`runCombinedRobustnessGrid`). Die frühere pauschale Formulierung „Notwendigkeits-
+Kennzahlen sind interne Snapshots" gilt damit nur noch für die Snapshot-Werte in
+`reference-check.mjs`, nicht mehr für das Verfahren selbst.
 Eine Erweiterung auf weitere Datensätze und auf fsQCA 4.1 als zweites Orakel
 bleibt möglich.
 

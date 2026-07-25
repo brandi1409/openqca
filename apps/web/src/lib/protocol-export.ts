@@ -70,8 +70,13 @@ export const METHODOLOGY_REFERENCES: readonly MethodologyReference[] = [
     citation: "Ioana-Elena Oana and Carsten Q. Schneider (online 2021; print 2024), A Robustness Test Protocol for Applied QCA: Theory and R Software Application, Sociological Methods & Research, 53(1), 57–88",
     doi: "10.1177/00491241211036158",
     url: "https://doi.org/10.1177/00491241211036158",
+    // Bewusst eng gefasst: openQCA rechnet ein Raster aus Kalibrierungsszenarien
+    // und Cutoffs und meldet Häufigkeitsanteile stabiler Ausdrücke. Die
+    // Kennzahlen des Protokolls (RF_incl, RF_cov, RF_case) sind NICHT
+    // implementiert — der Verweis ist Hintergrund, keine Umsetzungsbehauptung.
     pages: "57–88",
-    scope: "Sensitivity ranges and fit-oriented and case-oriented robustness",
+    scope:
+      "Background on robustness testing in QCA; openQCA implements a scenario/cutoff grid, not the protocol's RF_incl/RF_cov/RF_case measures",
   },
   {
     id: "qca-manual-3-25",

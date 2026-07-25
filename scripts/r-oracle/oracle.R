@@ -211,9 +211,66 @@ if (file.exists(LIPSET_FUZZY)) {
   cat("Lipset-Daten fehlen (", LIPSET_FUZZY, ") - Szenarien uebersprungen.\n", sep = "")
 }
 
+# --- Notwendigkeit: superSubset als Referenz ---------------------------------
+# Eigener Orakel-Pfad, bewusst getrennt von den Loesungsmodellen oben. Referenz
+# ist superSubset(..., relation = "necessity"): Es liefert die zulaessigen
+# notwendigen Konjunktionen (Teilmengen) UND die minimalen notwendigen
+# Disjunktionen (SUIN-Kandidaten), je mit inclN, RoN und covN.
+necScenarios <- list()
+add_necessity <- function(name, data, outcome, conditions, incl.cut, cov.cut, depth) {
+  ss <- tryCatch(
+    superSubset(data, outcome = outcome, conditions = conditions,
+                relation = "necessity", incl.cut = incl.cut, cov.cut = cov.cut,
+                depth = depth, use.tilde = TRUE, msg = FALSE),
+    error = function(e) NULL
+  )
+  ic <- if (is.null(ss)) NULL else ss$incl.cov
+  rows <- list()
+  if (!is.null(ic) && nrow(ic) > 0) {
+    rn <- rownames(ic)
+    for (i in seq_len(nrow(ic))) {
+      rows[[length(rows) + 1]] <- list(
+        expression = rn[i], inclN = ic[i, "inclN"], RoN = ic[i, "RoN"], covN = ic[i, "covN"]
+      )
+    }
+  }
+  necScenarios[[length(necScenarios) + 1]] <<- list(name = name, expressions = rows)
+}
+
+necessity_json <- function(name, rows) {
+  exprJsons <- vapply(rows, function(r) {
+    paste0(
+      "{",
+      "\"expression\":", jstr(r$expression), ",",
+      "\"inclN\":", jnum(r$inclN), ",",
+      "\"RoN\":", jnum(r$RoN), ",",
+      "\"covN\":", jnum(r$covN),
+      "}"
+    )
+  }, "")
+  paste0(
+    "{",
+    "\"name\":", jstr(name), ",",
+    "\"expressions\":[", paste(exprJsons, collapse = ","), "]",
+    "}"
+  )
+}
+
+add_necessity("nec_fuzzy_incl90_cov60", fuzzy, FUZZY_OUT, FUZZY_CONDS, 0.9, 0.6, 3)
+add_necessity("nec_fuzzy_incl80_cov50", fuzzy, FUZZY_OUT, FUZZY_CONDS, 0.8, 0.5, 3)
+add_necessity("nec_crisp_incl90_cov50", crisp, CRISP_OUT, CRISP_CONDS, 0.9, 0.5, 4)
+add_necessity("nec_ambig_incl90_cov50", ambig, AMBIG_OUT, AMBIG_CONDS, 0.9, 0.5, 4)
+if (file.exists(LIPSET_FUZZY)) {
+  add_necessity("nec_lipset_incl90_cov50", lipset, LIPSET_OUT, LIPSET_CONDS, 0.9, 0.5, 5)
+  add_necessity("nec_lipset_incl75_depth3", lipset, LIPSET_OUT, LIPSET_CONDS, 0.75, 0, 3)
+}
+
 # --- JSON schreiben ----------------------------------------------------------
 scenarioJsons <- vapply(scenarios, function(s) {
   scenario_json(s$name, s$models, s$data, s$outcome)
+}, "")
+necScenarioJsons <- vapply(necScenarios, function(s) {
+  necessity_json(s$name, s$expressions)
 }, "")
 
 json <- paste0(
@@ -221,6 +278,9 @@ json <- paste0(
   "  \"generatedBy\": \"scripts/r-oracle/oracle.R (R-Paket QCA)\",\n",
   "  \"scenarios\": [\n    ",
   paste(scenarioJsons, collapse = ",\n    "),
+  "\n  ],\n",
+  "  \"necessity\": [\n    ",
+  paste(necScenarioJsons, collapse = ",\n    "),
   "\n  ]\n}\n"
 )
 

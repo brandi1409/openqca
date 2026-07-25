@@ -14,9 +14,9 @@ Stand: 2026-07-25 · Ausführung: lokale Implementierung, deterministische Prüf
 ### A1 — Korrektheit (bereits abgedeckt, bleibt Pflicht)
 | # | Kriterium | Prüfung |
 |---|---|---|
-| A1.1 | Engine-Unit-Tests grün | `node --test` in `packages/engine` (43) |
+| A1.1 | Engine-Unit-Tests grün | `node --test` in `packages/engine` (57) |
 | A1.2 | Referenz-Suite grün | `node scripts/reference-check.mjs` |
-| A1.3 | **R-Kreuzvalidierung exakt** (konservativ/intermediär/sparsam, fuzzy+crisp+Modell-Ambiguität) | `node scripts/cross-validate.mjs` (15/16 PASS, 1 in VALIDATION.md dokumentierte Abweichung) — die Zahl auf der Landing (`landing.rigor.r1`, `landing.h.proof`) muss diesem Stand entsprechen |
+| A1.3 | **R-Kreuzvalidierung exakt** — Lösungsmodelle (konservativ/intermediär/sparsam, fuzzy+crisp+Modell-Ambiguität+Lipset) **und** Notwendigkeit inkl. Disjunktionen/SUIN und RoN gegen `superSubset` | `node scripts/cross-validate.mjs` (23/25 PASS, 2 in VALIDATION.md dokumentierte Abweichungen derselben ESA-Ursache) — die Zahl auf der Landing (`landing.rigor.r1`, `landing.h.proof`) muss diesem Stand entsprechen; das Skript erzwingt das selbst |
 | A1.4 | Produktions-Build fehlerfrei | `npm run build --workspace web` |
 | A1.5 | **Kalibrierungs-Kreuzvalidierung** (crisp/piecewise-linear exakt; direkt-logistisch mit dokumentierter Restabweichung) | `node scripts/calibrate-cross-validate.mjs` — Engine nutzt Ragins ±3-Logit-Fixpunkte (≈0,0474/0,9526), R QCA zielt auf ≈0,05/0,95; Restabweichung ≤ 0,01 wird akzeptiert und dokumentiert |
 
@@ -58,6 +58,8 @@ unverändert scharf, nur eben nach `openDocumentationView()` (Helper in `e2e/hel
 | A2.19 | **Dokumentation schaltet Export frei**: nach vollständiger Dokumentation aller Sets meldet das Meter „4 von 4", alle vier Export-Buttons sind bedienbar, der Sperrgrund verschwindet und der Bericht trägt **kein** Banner mehr | `flows.spec` (im A2.12-Durchlauf geprüft — der vollständige Dokumentationslauf ist dort bereits vorhanden; ein eigener Test wäre reine Wiederholung) |
 | A2.20 | **Landing = App**: Lösungsformel und die beiden Kennzahlen im Hero-Beweisstreifen auf `/` sind identisch mit der intermediären Lösung auf `/app?demo=1` (Text normalisiert). Geprüft wird die **Identität**, kein eingefrorener Zahlenwert — Datensatz und Engine dürfen sich ändern, aber nie unterschiedlich auf beiden Seiten | `flows.spec` |
 | A2.21 | **Anker-Herkunft und Vorläufig-Marke**: Nach dem Import ist ausgewiesen, dass die Anker aus Perzentilen stammen; der Hinweis verschwindet, sobald ein Anker angefasst wird. Die Ergebniskarten (Schritte 4–6) tragen die „vorläufig"-Marke, solange die Kalibrierung nicht dokumentiert ist | `flows.spec` |
+| A2.22 | **Methodenkanon sichtbar** (Fuzzy-Beispiel): Notwendigkeitstabelle weist **RoN** aus · Karte „Notwendige Kombinationen (SUIN)" zeigt `BILDUNG + STAATSKAPAZITAET` mit 0,965 / 0,904 / 0,857 (inclN/covN/RoN — Werte aus der R-kreuzvalidierten Engine) · **Fall-Diagnostik** an der intermediären Lösungskarte nennt `Fall_11` (abweichend der Art nach) und `Fall_13` (dem Grad nach) und meldet keine deviant coverage · **XY-Plot** lässt Lösungspfad und Gesamtlösung als X-Achse wählen, blendet den Pfad-Hinweis ein und beschriftet die Achse mit dem Lösungsterm | `flows.spec` |
+| A2.23 | **390px mit geladener Analyse**: kein horizontaler Seiten-Overflow, und kein Element der SUIN-Karte, der Fall-Diagnostik oder der XY-Karte reicht näher als **10px** an den rechten Rand (breite Tabellen dürfen in ihrem `overflow-x: auto`-Container liegen) | `flows.spec` |
 
 **Rollen-Vorbelegung (verbindlich):** Beim Laden eines Datensatzes ist die **letzte** numerische
 Spalte das Outcome und **jede** weitere numerische Spalte eine Bedingung. Es gibt kein stilles

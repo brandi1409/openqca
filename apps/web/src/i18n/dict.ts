@@ -46,7 +46,7 @@ const de = {
   "landing.h.ctaDemo": "Beispiel-Analyse öffnen",
   "landing.h.ctaOwn": "Mit eigenen Daten starten",
   "landing.h.proof":
-    "Lösungen kreuzvalidiert gegen das R-Paket QCA — 17 von 19 Szenarien identisch, die eine Abweichung ist analysiert und dokumentiert · Kalibrierung separat gegengeprüft, Abweichung ≤ 0,01 · MIT-Lizenz",
+    "Lösungen und Notwendigkeit kreuzvalidiert gegen das R-Paket QCA — 23 von 25 Szenarien identisch, die zwei Abweichungen sind analysiert und dokumentiert · Kalibrierung separat gegengeprüft, Abweichung ≤ 0,01 · MIT-Lizenz",
   "landing.h.stripAria": "Ablauf einer QCA: Rohdaten, Kalibrierung, Truth Table, Lösungsformel",
   "landing.h.stripCaption":
     "Keine Illustration: Diese Zahlen rechnet die openQCA-Engine beim Laden der Seite live aus dem Demo-Datensatz (synthetisch, angelehnt an Lipset 1959) — mit denselben Formeln wie in der App.",
@@ -73,7 +73,7 @@ const de = {
 
   "landing.rigor.title": "Methodenstrenge, nachprüfbar.",
   "landing.rigor.r1":
-    "Lösungs-Szenarien identisch mit dem R-Paket QCA — Formeln und Fit-Kennzahlen (inclS, covS sowie incl/cov/covU je Pfad) für konservativ, sparsam und intermediär/ESA. Die eine Abweichung (ESA mit gemischten Richtungserwartungen bei Modell-Ambiguität) ist analysiert und offen dokumentiert. Die Kalibrierung ist separat gegengeprüft; bei der direkten Methode bleibt eine Abweichung ≤ 0,01.",
+    "Szenarien identisch mit dem R-Paket QCA — Formeln und Fit-Kennzahlen (inclS, covS sowie incl/cov/covU je Pfad) für konservativ, sparsam und intermediär/ESA, dazu Notwendigkeit inklusive Disjunktionen (SUIN) und RoN gegen `superSubset`. Die zwei Abweichungen (ESA, dieselbe Ursache) sind analysiert und offen dokumentiert. Die Kalibrierung ist separat gegengeprüft; bei der direkten Methode bleibt eine Abweichung ≤ 0,01.",
   "landing.rigor.r2":
     "Kreuzungspunkt exakt 0,500; die Anker liegen bei ≈0,047 und ≈0,953 (Log-Odds ±3 nach Ragins Verfahren). Das R-Paket zielt auf gerundete 0,05 / 0,95 — die Abweichung ist dokumentiert und bleibt ≤ 0,01.",
   "landing.rigor.r3":
@@ -688,9 +688,21 @@ const de = {
   "nec.col.condition": "Bedingung",
   "nec.col.consistency": "Konsistenz",
   "nec.col.coverage": "Coverage",
+  "nec.col.relevance": "RoN",
   "nec.candidate": "≥ 0,9 — Kandidat",
   "nec.hint":
-    "Konvention: Konsistenz ≥ 0,9 als Hinweis auf Notwendigkeit — mit Coverage und Fallkenntnis interpretieren.",
+    "Konvention: Konsistenz ≥ 0,9 als Hinweis auf Notwendigkeit — mit Coverage, RoN und Fallkenntnis interpretieren.",
+  "nec.suin.title": "Notwendige Kombinationen (SUIN)",
+  "nec.suin.desc":
+    "Geprüft werden auch Disjunktionen (X + Z) und Konjunktionen (X·Z) bis zur Ordnung 3 — Referenz ist superSubset aus dem R-Paket QCA. Ist die Disjunktion notwendig, ohne dass ein einzelner Teil es ist, spricht man von SUIN-Bedingungen.",
+  "nec.suin.col.expression": "Ausdruck",
+  "nec.suin.col.kind": "Form",
+  "nec.suin.kind.disjunction": "Disjunktion (SUIN)",
+  "nec.suin.kind.conjunction": "Konjunktion",
+  "nec.suin.none":
+    "Keine Kombination erreicht bei Konsistenz ≥ 0,9 zugleich eine Coverage ≥ 0,5.",
+  "nec.suin.hint":
+    "Ein hoher RoN-Wert spricht gegen Trivialität. Notwendigkeit allein ist kein Befund — die Kombination muss substantiell begründbar sein.",
 
   // -- Robustheit -------------------------------------------------------------
   "robustness.title": "Robustheit — Konsistenz-Cutoff-Sweep",
@@ -759,6 +771,28 @@ const de = {
   "xy.consistentZone": "konsistent: X ≤ Y",
   "xy.legend.consistent": "konsistent (X ≤ Y)",
   "xy.legend.inconsistent": "widerspricht (X > Y)",
+  "xy.source.label": "X-Achse",
+  "xy.source.conditions": "Einzelbedingungen",
+  "xy.source.paths": "Lösungspfade (intermediär)",
+  "xy.source.solution": "Gesamtlösung (intermediär)",
+  "xy.pathHint":
+    "Für einen Lösungspfad ist X die Zugehörigkeit zum Term (Minimum über seine Literale) — das ist der in Aufsätzen abgebildete Suffizienz-Plot.",
+
+  // -- Fall-Diagnostik (Schneider & Rohlfing) ----------------------------------
+  "diag.title": "Fall-Diagnostik je Pfad",
+  "diag.desc":
+    "Welche Fälle stehen hinter jedem Pfad, welche widersprechen ihm? Grundlage für fallorientierte Vertiefung (Schneider & Rohlfing 2013, 2016).",
+  "diag.typical": "Typisch",
+  "diag.deviantKind": "Abweichend (Art)",
+  "diag.deviantDegree": "Abweichend (Grad)",
+  "diag.irrelevant": "Irrelevant (IIR)",
+  "diag.irrelevantCount": "{n} Fälle",
+  "diag.deviantCoverage": "Vom Modell nicht gedeckt (deviant coverage)",
+  "diag.deviantCoverage.none": "Alle Outcome-Fälle sind von mindestens einem Pfad gedeckt.",
+  "diag.none": "keine",
+  "diag.crossover": "Grenzfälle mit Zugehörigkeit genau 0,5: {cases}",
+  "diag.hint":
+    "Typisch = X > 0,5, Y > 0,5, X ≤ Y · Abweichend (Art) = X > 0,5, Y ≤ 0,5 (widerspricht der Hinreichendheit) · Abweichend (Grad) = X > Y, beide > 0,5 · Irrelevant = X ≤ 0,5, der Pfad sagt über den Fall nichts aus.",
 
   // -- Protokoll --------------------------------------------------------------
   "proto.title": "Analyseprotokoll",
@@ -1004,6 +1038,19 @@ const de = {
     "Zeigt, wie relevant eine notwendige Bedingung ist: Ist X trivial (z. B. fast immer vorhanden), kann die Konsistenz hoch sein, ohne dass X inhaltlich etwas erklärt. Niedrige Coverage bei hoher Konsistenz ist daher ein Warnsignal für eine triviale Bedingung.",
   "info.necessityCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ",
 
+  "info.necessityRelevance.title": "RoN — Relevance of Necessity",
+  "info.necessityRelevance.body":
+    "Coverage allein erkennt triviale Notwendigkeit nicht zuverlässig. RoN (Schneider & Wagemann 2012) misst, wie viel Nicht-Mitgliedschaft in X überhaupt noch möglich ist: Ist X bei fast allen Fällen nahezu vollständig vorhanden, geht RoN gegen 0 — die Bedingung ist zwar notwendig, aber nichtssagend. Werte nahe 1 sprechen für einen substantiellen Befund.",
+  "info.necessityRelevance.formula": "Σ (1−Xᵢ) / Σ (1−min(Xᵢ,Yᵢ))",
+
+  "info.suin.title": "SUIN-Bedingungen",
+  "info.suin.body":
+    "Eine Disjunktion X + Z kann notwendig sein, obwohl weder X noch Z es einzeln ist — die Teile sind dann „hinreichend, aber nicht notwendig für einen Faktor, der unzureichend, aber notwendig ist“ (SUIN, Mahoney/Kimball/Koivu 2009). Referenz für Auswahl und Kennzahlen ist superSubset aus dem R-Paket QCA; die Kreuzvalidierung ist in VALIDATION.md dokumentiert.",
+
+  "info.caseDiagnostics.title": "Fall-Diagnostik",
+  "info.caseDiagnostics.body":
+    "Ordnet jeden Fall je Lösungspfad nach seiner Lage im XY-Plot ein (Schneider & Rohlfing 2013, 2016). Typische Fälle eignen sich für Prozessanalysen, „abweichend (Art)“ widerspricht der Hinreichendheit, und „nicht gedeckt“ zeigt, wo die Lösung unvollständig ist. Die 0,5-Grenze wird streng gelesen: Mitgliedschaft heißt > 0,5.",
+
   "info.freqCutoff.title": "Frequenz-Cutoff (n)",
   "info.freqCutoff.body":
     "Die Mindestzahl an Fällen, die eine Konfiguration in der Truth Table aufweisen muss, damit sie als beobachtet gilt. Konfigurationen mit weniger Fällen werden wie Remainder behandelt, unabhängig von ihrer Konsistenz.",
@@ -1086,7 +1133,7 @@ const en: Record<DictKey, string> = {
   "landing.h.ctaDemo": "Open the example analysis",
   "landing.h.ctaOwn": "Start with your own data",
   "landing.h.proof":
-    "Solutions cross-validated against the R package QCA — 17 of 19 scenarios identical, the single divergence is analysed and documented · calibration cross-checked separately, deviation ≤ 0.01 · MIT license",
+    "Solutions and necessity cross-validated against the R package QCA — 23 of 25 scenarios identical, the two divergences are analysed and documented · calibration cross-checked separately, deviation ≤ 0.01 · MIT license",
   "landing.h.stripAria": "A QCA workflow: raw data, calibration, truth table, solution formula",
   "landing.h.stripCaption":
     "Not an illustration: the openQCA engine computes these numbers live from the demo dataset (synthetic, inspired by Lipset 1959) when this page loads — using the same formulas as the app.",
@@ -1113,7 +1160,7 @@ const en: Record<DictKey, string> = {
 
   "landing.rigor.title": "Methodological rigor, verifiable.",
   "landing.rigor.r1":
-    "Solution scenarios identical with the R package QCA — formulas and fit measures (inclS, covS as well as incl/cov/covU per path) for conservative, parsimonious and intermediate/ESA. The single divergence (ESA with mixed directional expectations under model ambiguity) is analysed and openly documented. Calibration is cross-checked separately; for the direct method a deviation of ≤ 0.01 remains.",
+    "Scenarios identical with the R package QCA — formulas and fit measures (inclS, covS as well as incl/cov/covU per path) for conservative, parsimonious and intermediate/ESA, plus necessity including disjunctions (SUIN) and RoN against `superSubset`. The two divergences (ESA, same root cause) are analysed and openly documented. Calibration is cross-checked separately; for the direct method a deviation of ≤ 0.01 remains.",
   "landing.rigor.r2":
     "Crossover exactly 0.500; the anchors land at ≈0.047 and ≈0.953 (log-odds ±3, following Ragin's procedure). The R package targets rounded 0.05 / 0.95 — the deviation is documented and stays ≤ 0.01.",
   "landing.rigor.r3":
@@ -1725,9 +1772,21 @@ const en: Record<DictKey, string> = {
   "nec.col.condition": "Condition",
   "nec.col.consistency": "Consistency",
   "nec.col.coverage": "Coverage",
+  "nec.col.relevance": "RoN",
   "nec.candidate": "≥ 0.9 — candidate",
   "nec.hint":
-    "Convention: consistency ≥ 0.9 as an indication of necessity — interpret together with coverage and case knowledge.",
+    "Convention: consistency ≥ 0.9 as an indication of necessity — interpret together with coverage, RoN and case knowledge.",
+  "nec.suin.title": "Necessary combinations (SUIN)",
+  "nec.suin.desc":
+    "Disjunctions (X + Z) and conjunctions (X·Z) up to order 3 are tested as well — the reference is superSubset from the R package QCA. If the disjunction is necessary while no single part is, these are SUIN conditions.",
+  "nec.suin.col.expression": "Expression",
+  "nec.suin.col.kind": "Form",
+  "nec.suin.kind.disjunction": "Disjunction (SUIN)",
+  "nec.suin.kind.conjunction": "Conjunction",
+  "nec.suin.none":
+    "No combination reaches consistency ≥ 0.9 together with coverage ≥ 0.5.",
+  "nec.suin.hint":
+    "A high RoN speaks against triviality. Necessity alone is not a finding — the combination has to make substantive sense.",
 
   // -- Robustness -------------------------------------------------------------
   "robustness.title": "Robustness — consistency cutoff sweep",
@@ -1796,6 +1855,28 @@ const en: Record<DictKey, string> = {
   "xy.consistentZone": "consistent: X ≤ Y",
   "xy.legend.consistent": "consistent (X ≤ Y)",
   "xy.legend.inconsistent": "contradicts (X > Y)",
+  "xy.source.label": "X axis",
+  "xy.source.conditions": "Single conditions",
+  "xy.source.paths": "Solution paths (intermediate)",
+  "xy.source.solution": "Whole solution (intermediate)",
+  "xy.pathHint":
+    "For a solution path, X is membership in the term (the minimum across its literals) — this is the sufficiency plot reported in journal articles.",
+
+  // -- Case diagnostics (Schneider & Rohlfing) ---------------------------------
+  "diag.title": "Case diagnostics per path",
+  "diag.desc":
+    "Which cases stand behind each path, and which contradict it? The basis for case-oriented follow-up (Schneider & Rohlfing 2013, 2016).",
+  "diag.typical": "Typical",
+  "diag.deviantKind": "Deviant (kind)",
+  "diag.deviantDegree": "Deviant (degree)",
+  "diag.irrelevant": "Irrelevant (IIR)",
+  "diag.irrelevantCount": "{n} cases",
+  "diag.deviantCoverage": "Not covered by the model (deviant coverage)",
+  "diag.deviantCoverage.none": "Every outcome case is covered by at least one path.",
+  "diag.none": "none",
+  "diag.crossover": "Borderline cases with membership exactly 0.5: {cases}",
+  "diag.hint":
+    "Typical = X > 0.5, Y > 0.5, X ≤ Y · Deviant (kind) = X > 0.5, Y ≤ 0.5 (contradicts sufficiency) · Deviant (degree) = X > Y, both > 0.5 · Irrelevant = X ≤ 0.5, the path says nothing about the case.",
 
   // -- Protocol ---------------------------------------------------------------
   "proto.title": "Analysis protocol",
@@ -2038,6 +2119,19 @@ const en: Record<DictKey, string> = {
   "info.necessityCoverage.body":
     "Shows how relevant a necessary condition is: if X is trivial (e.g. present almost always), consistency can be high without X explaining anything substantive. Low coverage alongside high consistency is therefore a warning sign of a trivial condition.",
   "info.necessityCoverage.formula": "Σ min(Xᵢ,Yᵢ) / Σ Xᵢ",
+
+  "info.necessityRelevance.title": "RoN — relevance of necessity",
+  "info.necessityRelevance.body":
+    "Coverage alone does not reliably detect trivial necessity. RoN (Schneider & Wagemann 2012) measures how much non-membership in X is still possible: if X is almost fully present in nearly every case, RoN approaches 0 — the condition is necessary but uninformative. Values close to 1 point to a substantive finding.",
+  "info.necessityRelevance.formula": "Σ (1−Xᵢ) / Σ (1−min(Xᵢ,Yᵢ))",
+
+  "info.suin.title": "SUIN conditions",
+  "info.suin.body":
+    "A disjunction X + Z can be necessary even though neither X nor Z is necessary on its own — the parts are then “sufficient but unnecessary for a factor that is insufficient but necessary” (SUIN, Mahoney/Kimball/Koivu 2009). The reference for selection and measures is superSubset from the R package QCA; the cross-validation is documented in VALIDATION.md.",
+
+  "info.caseDiagnostics.title": "Case diagnostics",
+  "info.caseDiagnostics.body":
+    "Classifies every case per solution path by its position in the XY plot (Schneider & Rohlfing 2013, 2016). Typical cases are candidates for process tracing, “deviant (kind)” contradicts sufficiency, and “not covered” shows where the solution is incomplete. The 0.5 threshold is read strictly: membership means > 0.5.",
 
   "info.freqCutoff.title": "Frequency cutoff (n)",
   "info.freqCutoff.body":

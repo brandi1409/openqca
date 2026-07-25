@@ -533,7 +533,10 @@ test("A2.17 Schnellpfad — Rohwerte rechnen ohne Dokumentation, Export bleibt g
 
   // Ergebnisse sind da — ohne eine einzige Eingabe.
   await expect(page.locator("#notwendigkeit")).not.toContainText("gesperrt");
-  await expect(page.locator("#notwendigkeit table")).toBeVisible();
+  // `.first()` seit A2.22: Der Notwendigkeits-Schritt enthält jetzt zwei Tabellen
+  // (Einzelbedingungen und notwendige Kombinationen/SUIN). Geprüft bleibt
+  // unverändert, dass die Notwendigkeitsanalyse ohne Dokumentation rechnet.
+  await expect(page.locator("#notwendigkeit table").first()).toBeVisible();
   await expect(page.locator("#truthtable")).not.toContainText("gesperrt");
   await expect(page.locator("#truthtable table").first()).toBeVisible();
   await expect(page.locator("#loesungen")).toContainText(/→ DEMOKRATIE_INDEX/);
@@ -655,4 +658,128 @@ test("A2.21 Anker-Herkunft und Vorläufig-Marke am Ergebnis", async ({ page }) =
 
   // Die Vorläufig-Marke bleibt: Anker gesetzt ≠ Kalibrierung dokumentiert.
   await expect(page.getByTestId("provisional-result-mark").first()).toBeVisible();
+});
+
+/**
+ * A2.22 — Die drei Methodenlücken, die eine publikationsfähige Analyse blockierten,
+ * sind an der Oberfläche angekommen:
+ *
+ *  1. **Notwendigkeit von Disjunktionen (SUIN) + RoN** — die Einzelbedingungs-Tabelle
+ *     allein übersieht Fälle, in denen erst `X + Z` notwendig ist. Die Werte stammen
+ *     aus der R-kreuzvalidierten Engine (`nec_fuzzy_*`-Szenarien, VALIDATION.md).
+ *  2. **Fall-Diagnostik je Lösungspfad** (Schneider & Rohlfing) — ohne sie ist eine
+ *     Lösung nur halb interpretierbar.
+ *  3. **XY-Plot für Lösungsterme** — der in Aufsätzen abgebildete Suffizienz-Plot
+ *     zeigt den Pfad, nicht eine Einzelbedingung.
+ *
+ * Der Fuzzy-Beispieldatensatz ist bereits kalibriert und liefert deshalb feste,
+ * prüfbare Werte: `BILDUNG + STAATSKAPAZITAET` ist notwendig (Konsistenz 0,965),
+ * die intermediäre Lösung lautet `STAATSKAPAZITAET + BILDUNG`, und `Fall_11`
+ * widerspricht dem Pfad `BILDUNG` der Art nach (X > 0,5, Y ≤ 0,5).
+ */
+test("A2.22 SUIN/RoN, Fall-Diagnostik und Pfad-XY-Plot", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await loadExample(page, /Fuzzy-Sets Beispiel/);
+
+  // 1a. Die Einzelbedingungs-Tabelle weist RoN aus.
+  await expect(page.getByRole("columnheader", { name: "RoN" }).first()).toBeVisible();
+
+  // 1b. Notwendige Disjunktion mit ihren drei Kennzahlen.
+  const suin = page.locator("#suin");
+  await expect(suin).toBeVisible({ timeout: 15_000 });
+  const suinTable = page.getByTestId("suin-table");
+  await expect(suinTable).toBeVisible();
+  const row = suinTable.locator("tr", { hasText: "BILDUNG + STAATSKAPAZITAET" }).first();
+  await expect(row).toContainText("Disjunktion");
+  await expect(row).toContainText("0,965"); // inclN
+  await expect(row).toContainText("0,904"); // covN
+  await expect(row).toContainText("0,857"); // RoN
+
+  // 2. Fall-Diagnostik an der intermediären Lösungskarte: Fall_11 widerspricht
+  //    dem Pfad BILDUNG der Art nach, Fall_13 nur dem Grad nach.
+  const diagnostics = page.getByTestId("case-diagnostics-intermediate");
+  await expect(diagnostics).toBeVisible();
+  await expect(diagnostics).toContainText("Typisch");
+  await expect(diagnostics).toContainText("Fall_11");
+  await expect(diagnostics).toContainText("Fall_13");
+  // Kein Fall mit Outcome > 0,5 bleibt ungedeckt.
+  await expect(diagnostics).toContainText(/Alle Outcome-Fälle sind von mindestens einem Pfad gedeckt/);
+
+  // 3. XY-Plot: Umschalten von Einzelbedingung auf Lösungspfad.
+  const source = page.getByTestId("xy-source");
+  await expect(source).toBeVisible();
+  await expect(page.getByTestId("xy-path-hint")).toHaveCount(0);
+  const pathOption = source.locator("optgroup[label='Lösungspfade (intermediär)'] option").first();
+  const pathValue = await pathOption.getAttribute("value");
+  expect(pathValue, "Der XY-Plot muss Lösungspfade zur Wahl stellen").toBeTruthy();
+  await source.selectOption(pathValue!);
+  await expect(page.getByTestId("xy-path-hint")).toBeVisible();
+
+  // Die Gesamtlösung ist ebenfalls wählbar — dort trägt die X-Achse sichtbar den
+  // ganzen Lösungsterm statt einer Einzelbedingung.
+  await source.selectOption("solution");
+  await expect(page.locator("#xyplot svg[role='img']").first()).toHaveAttribute(
+    "aria-label",
+    /STAATSKAPAZITAET \+ BILDUNG \(X\)/,
+  );
+
+  expect(pageErrors, `Pageerrors: ${pageErrors.join(" | ")}`).toEqual([]);
+});
+
+/**
+ * A2.23 — Die neuen Flächen (SUIN-Tabelle, Fall-Diagnostik, XY-Auswahl) dürfen die
+ * Seite auf 390px nicht sprengen. A3.2 prüft die Routen im leeren Zustand; hier wird
+ * mit geladenem Datensatz gemessen, und zwar mit Reserve statt auf Kante.
+ */
+test.describe("A2.23 mobile @390", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("A2.23 kein horizontaler Overflow mit geladener Analyse", async ({ page }) => {
+    await loadExample(page, /Fuzzy-Sets Beispiel/);
+    await expect(page.locator("#suin")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("case-diagnostics-intermediate")).toBeVisible();
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, "Horizontaler Seiten-Overflow bei 390px").toBeLessThanOrEqual(0);
+
+    // Reserve: kein sichtbares Element ragt über die Viewport-Breite − 10px hinaus.
+    // Ausgenommen sind bewusst scrollbare Container (overflow-x: auto), in denen
+    // breite Tabellen zulässig sind.
+    // Reserve, gemessen an den NEUEN Flächen: kein Element der SUIN-Karte, der
+    // Fall-Diagnostik oder der XY-Karte reicht näher als 10px an den rechten
+    // Viewport-Rand. Breite Tabellen dürfen dabei in ihrem eigenen
+    // Scroll-Container liegen (overflow-x: auto) — genau dafür ist er da.
+    const offenders = await page.evaluate(() => {
+      const limit = document.documentElement.clientWidth - 10;
+      const insideScroller = (node: HTMLElement, root: HTMLElement): boolean => {
+        for (let el: HTMLElement | null = node; el && el !== root.parentElement; el = el.parentElement) {
+          const ox = getComputedStyle(el).overflowX;
+          if (ox === "auto" || ox === "scroll") return true;
+        }
+        return false;
+      };
+      const roots = [
+        document.querySelector<HTMLElement>("#suin"),
+        document.querySelector<HTMLElement>("[data-testid='case-diagnostics-intermediate']"),
+        document.querySelector<HTMLElement>("#xyplot"),
+      ].filter((el): el is HTMLElement => !!el);
+      const worst: { tag: string; right: number }[] = [];
+      for (const root of roots) {
+        for (const el of [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))]) {
+          const style = getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden") continue;
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) continue;
+          if (rect.right <= limit) continue;
+          if (insideScroller(el, root)) continue;
+          worst.push({ tag: `${el.tagName}.${el.className || "-"}`.slice(0, 80), right: rect.right });
+        }
+      }
+      return worst.slice(0, 5);
+    });
+    expect(offenders, `Elemente über der 10px-Reserve: ${JSON.stringify(offenders)}`).toEqual([]);
+  });
 });
