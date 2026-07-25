@@ -188,6 +188,29 @@ add_scenario("ambig_intermediate_all_present",
 add_scenario("ambig_intermediate_mixed",
              minimize(ttA, include = "?", dir.exp = c(1, 0, 1, 0), use.tilde = TRUE), ambig, AMBIG_OUT)
 
+# ----- Lipset (kanonischer Lehrfall), incl.cut = 0.8, n.cut = 1 --------------
+# Nur wenn die lokalen Referenzdaten vorliegen (siehe lipset-export.R). Die
+# Daten stammen aus dem GPL-lizenzierten R-Paket QCA und werden deshalb NICHT
+# mit diesem MIT-Repository ausgeliefert.
+LIPSET_FUZZY <- "datasets/local/lipset-fuzzy.csv"
+if (file.exists(LIPSET_FUZZY)) {
+  lipset <- read.csv(LIPSET_FUZZY, row.names = 1)
+  LIPSET_CONDS <- "DEV,URB,LIT,IND,STB"
+  LIPSET_OUT <- "SURV"
+  ttL <- truthTable(lipset, outcome = LIPSET_OUT, conditions = LIPSET_CONDS,
+                    incl.cut = 0.8, n.cut = 1)
+  add_scenario("lipset_conservative",
+               minimize(ttL, include = "", use.tilde = TRUE), lipset, LIPSET_OUT)
+  add_scenario("lipset_parsimonious",
+               minimize(ttL, include = "?", use.tilde = TRUE), lipset, LIPSET_OUT)
+  add_scenario("lipset_intermediate_all_present",
+               minimize(ttL, include = "?", dir.exp = c(1, 1, 1, 1, 1), use.tilde = TRUE),
+               lipset, LIPSET_OUT)
+  cat("Lipset-Szenarien aufgenommen.\n")
+} else {
+  cat("Lipset-Daten fehlen (", LIPSET_FUZZY, ") - Szenarien uebersprungen.\n", sep = "")
+}
+
 # --- JSON schreiben ----------------------------------------------------------
 scenarioJsons <- vapply(scenarios, function(s) {
   scenario_json(s$name, s$models, s$data, s$outcome)

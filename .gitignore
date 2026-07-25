@@ -16,3 +16,7 @@ src-tauri/target/
 # Playwright-E2E-Artefakte
 apps/web/test-results/
 apps/web/playwright-report/
+
+# Lokal erzeugte Referenzdaten aus dem GPL-lizenzierten R-Paket QCA
+# (siehe scripts/r-oracle/lipset-export.R) — bewusst NICHT versioniert.
+datasets/local/

@@ -429,7 +429,7 @@ function Rigor() {
     // (ESA mit gemischten Richtungserwartungen bei Modell-Ambiguität). Wer ein
     // Szenario hinzufügt oder eine Abweichung behebt, zieht diesen Wert und
     // `landing.h.proof` nach.
-    ["15/16", "landing.rigor.r1"],
+    ["17/19", "landing.rigor.r1"],
     ["m(c) = 0,500", "landing.rigor.r2"],
     ["3", "landing.rigor.r3"],
     ["MIT", "landing.rigor.r4"],

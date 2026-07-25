@@ -6,7 +6,7 @@ Dieses Dokument beschreibt die priorisierten nächsten Schritte für openQCA. Es
 
 - Der kostenlose Analyse-Kern läuft local-first im Browser.
 - Die Engine ist intern regressionsgetestet. `node scripts/reference-check.mjs` prüft dokumentierte Ragin-Beispiele und interne Snapshots.
-- Die QCA-Lösungslogik ist in 16 Szenarien gegen das R-Paket `QCA` kreuzvalidiert: `node scripts/cross-validate.mjs` (15 PASS, eine dokumentierte Abweichung — siehe `VALIDATION.md`).
+- Die QCA-Lösungslogik ist in 19 Szenarien gegen das R-Paket `QCA` kreuzvalidiert: `node scripts/cross-validate.mjs` (17 PASS, zwei dokumentierte Abweichungen derselben ESA-Ursache — siehe `VALIDATION.md`).
 - Crisp-, direkte Ragin- und lineare Fuzzy-Kalibrierung sind gegen `QCA` geprüft. Die direkte Methode nutzt Ragins ±3-Logit-Fixpunkte; `QCA` verwendet abweichende dokumentierte Zielwerte um 0,05/0,95. Die Restabweichung ist kein Beleg für substantielle Kalibrierungsgültigkeit.
 - `calibrateLinear` stimmt auf einem unabhängigen `QCA::calibrate(logistic = FALSE)`-Prüfgitter überein; `calibrateFourValue` bleibt im Rechenkern vorhanden, aber noch nicht extern validiert.
 - Die Web-App besitzt Rohdatenimport, Rollenwahl, Set-Spezifikationen, Evidenzfelder, Fallprüfung, Anker-Sensitivität und Protokoll-Export. Der erste Rohdaten-zu-Kalibrierungs-Vertikalschnitt ist für Crisp-, direkte und lineare Fuzzy-Sets implementiert; die lokale Implementierung ist durch Engine-, R-Oracle- und E2E-Prüfungen belegt. Die inhaltliche Gültigkeit konkreter Nutzeranker bleibt eine Forschungsentscheidung.

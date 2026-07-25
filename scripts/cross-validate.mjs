@@ -110,6 +110,19 @@ const DATASETS = {
     consCut: 1,
     freqCut: 1,
   },
+  // Lipset — der kanonische QCA-Lehrfall (Ragins eigenes Beispiel). Die Daten
+  // stammen aus dem GPL-lizenzierten R-Paket QCA und werden deshalb NICHT mit
+  // diesem MIT-Repository ausgeliefert; sie werden lokal erzeugt
+  // (Rscript scripts/r-oracle/lipset-export.R). Fehlen sie, werden die
+  // Szenarien sauber uebersprungen statt zu scheitern.
+  lipset: {
+    filename: "local/lipset-fuzzy.csv",
+    conditions: ["DEV", "URB", "LIT", "IND", "STB"],
+    outcome: "SURV",
+    consCut: 0.8,
+    freqCut: 1,
+    optional: true,
+  },
   // Konstruierter Ambiguitätsfall: mehrere sparsame Modelle, ein konservativer
   // Primimplikant von mehreren sparsamen subsumiert. Prüft die kanonische
   // ESA-Modellbildung — der Fall fehlte in den ersten zwölf Szenarien.
@@ -145,6 +158,9 @@ const SCENARIOS = [
   { name: "ambig_parsimonious", ds: "ambig", kind: "parsimonious" },
   { name: "ambig_intermediate_all_present", ds: "ambig", kind: "intermediate", dirExp: [1, 1, 1, 1] },
   { name: "ambig_intermediate_mixed", ds: "ambig", kind: "intermediate", dirExp: [1, 0, 1, 0] },
+  { name: "lipset_conservative", ds: "lipset", kind: "conservative" },
+  { name: "lipset_parsimonious", ds: "lipset", kind: "parsimonious" },
+  { name: "lipset_intermediate_all_present", ds: "lipset", kind: "intermediate", dirExp: [1, 1, 1, 1, 1] },
 ];
 
 /**
@@ -157,7 +173,12 @@ const SCENARIOS = [
 const KNOWN_DIVERGENCES = {
   ambig_intermediate_mixed:
     "ESA mit gemischten Richtungserwartungen: R liefert C*D + A*B*C, die Engine " +
-    "C*D + A*B*C*~D — das Literal ~D wird nicht als easy counterfactual entfernt. " +
+    "C*D + A*B*C*~D — ein Literal wird nicht als easy counterfactual entfernt. " +
+    "Siehe VALIDATION.md, Abschnitt 'Bekannte Abweichungen'.",
+  lipset_intermediate_all_present:
+    "Dieselbe ESA-Ursache auf dem kanonischen Lipset-Datensatz: R liefert " +
+    "DEV*URB*LIT*STB + DEV*LIT*~IND*STB, die Engine behaelt zusaetzlich IND. " +
+    "Konservative und sparsame Loesung stimmen dort exakt ueberein. " +
     "Siehe VALIDATION.md, Abschnitt 'Bekannte Abweichungen'.",
 };
 
@@ -280,7 +301,17 @@ async function main() {
 
   let failed = 0;
   let knownFailed = 0;
+  let skipped = 0;
   for (const scenario of SCENARIOS) {
+    // Optionale Datensaetze (z. B. Lipset aus dem GPL-Paket QCA) liegen nicht im
+    // Repository. Fehlen sie, wird das Szenario sichtbar uebersprungen — nicht
+    // als Fehlschlag gewertet und auch nicht stillschweigend verschwiegen.
+    const ds = DATASETS[scenario.ds];
+    if (ds.optional && !existsSync(`${datasetsDir}${ds.filename}`)) {
+      skipped += 1;
+      console.log(`– ${scenario.name}: uebersprungen (Daten lokal nicht vorhanden)`);
+      continue;
+    }
     const exp = expByName.get(scenario.name);
     if (!exp) {
       console.error(`✗ ${scenario.name}: kein Orakel-Eintrag in expected.json`);
@@ -319,14 +350,28 @@ async function main() {
     }
   }
 
-  const passed = SCENARIOS.length - failed - knownFailed;
-  console.log(`\n${passed}/${SCENARIOS.length} Szenarien PASS` +
-    (knownFailed ? ` · ${knownFailed} bekannte, dokumentierte Abweichung(en)` : ""));
+  const considered = SCENARIOS.length - skipped;
+  const passed = considered - failed - knownFailed;
+  console.log(`\n${passed}/${considered} Szenarien PASS` +
+    (knownFailed ? ` · ${knownFailed} bekannte, dokumentierte Abweichung(en)` : "") +
+    (skipped ? ` · ${skipped} uebersprungen (optionale Daten fehlen)` : ""));
   if (failed > 0) {
     console.error(`${failed} Szenario(en) FAIL — Kreuzvalidierung fehlgeschlagen.`);
     process.exit(1);
   }
-  await checkPublicClaims(passed, SCENARIOS.length);
+  // Die oeffentliche Behauptung bezieht sich auf den VOLLEN Umfang der
+  // Kreuzvalidierung, nicht auf die Teilmenge, die in dieser Umgebung lief.
+  // Wurden optionale Szenarien uebersprungen (z. B. Lipset ohne lokale Daten),
+  // waere ein Vergleich gegen die Teilmenge irrefuehrend — dann wird die
+  // Pruefung bewusst ausgesetzt und das sichtbar gemeldet.
+  if (skipped === 0) {
+    await checkPublicClaims(passed, considered);
+  } else {
+    console.log(
+      `Hinweis: Behauptungs-Pruefung ausgesetzt, weil ${skipped} optionale Szenario(s) ` +
+        `uebersprungen wurden. Vollstaendig pruefen mit: Rscript scripts/r-oracle/lipset-export.R`,
+    );
+  }
   console.log("Kreuzvalidierung gegen R (QCA-Paket) bestanden.");
   if (knownFailed) {
     console.log("Hinweis: dokumentierte Abweichungen siehe VALIDATION.md, Abschnitt Bekannte Abweichungen.");

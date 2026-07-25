@@ -51,9 +51,10 @@ openqca/
 - **Engine** (43 Tests): Kalibrierung (direkt, linear, crisp, Vier-Werte), Konsistenz/Coverage/PRI,
   Truth Table, Quine-McCluskey-Minimierung, komplexe + **intermediäre** (Enhanced Standard Analysis
   mit Richtungserwartungen) + sparsame Lösung, Notwendigkeitsanalyse, kombinierte Robustheitsraster.
-- **Validierung:** Die Lösungslogik ist in **15 von 16 Szenarien gegen das R-Paket `QCA`**
-  kreuzvalidiert (Formeln und Fit-Kennzahlen, Toleranz `1e-6`); die eine Abweichung — ESA mit
-  gemischten Richtungserwartungen — ist analysiert und offen dokumentiert.
+- **Validierung:** Die Lösungslogik ist in **17 von 19 Szenarien gegen das R-Paket `QCA`**
+  kreuzvalidiert (Formeln und Fit-Kennzahlen, Toleranz `1e-6`); die zwei Abweichungen — beide aus
+  derselben ESA-Ursache, eine davon auf dem kanonischen Lipset-Datensatz — sind analysiert
+  und offen dokumentiert.
   Crisp- und lineare Fuzzy-Kalibrierung stimmen
   ebenfalls mit `QCA` überein; die direkte Methode folgt Ragins ±3-Logit-Fixpunkten und weicht
   dokumentiert um < 0,01 von den R-Zielwerten ab. **Welche Zahl extern validiert und welche eine
@@ -62,7 +63,7 @@ openqca/
   (Set-Definition, Methodenwahl, Anker, Evidenz, Fallprüfung, Anker-Sensitivität), Notwendigkeit,
   Truth Table mit allen drei Lösungstypen, Robustheit und Analyse des negierten Outcomes (~Y).
   Exporte: Protokoll (JSON), Markdown, äquivalentes **R-Skript**, druckfähiger Bericht. DE/EN.
-- **Qualitätssicherung:** 48 Playwright-E2E-Tests prüfen Flüsse, visuelle Integrität (Hell/Dunkel ×
+- **Qualitätssicherung:** 52 Playwright-E2E-Tests prüfen Flüsse, visuelle Integrität (Hell/Dunkel ×
   Desktop/Mobil) und Design-Konsistenz. Verbindliche Abnahmekriterien: [`docs/QUALITY-SPEC.md`](docs/QUALITY-SPEC.md).
 - **Cloud (optional, abschaltbar):** Konto (Supabase Magic Link), Projekt-Speicherung, KI-Assistenten
   (Anthropic) und Zahlungen (Stripe) — vollständig im Code, aktiviert allein über Env-Variablen.

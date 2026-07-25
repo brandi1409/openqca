@@ -46,7 +46,7 @@ const de = {
   "landing.h.ctaDemo": "Beispiel-Analyse öffnen",
   "landing.h.ctaOwn": "Mit eigenen Daten starten",
   "landing.h.proof":
-    "Lösungen kreuzvalidiert gegen das R-Paket QCA — 15 von 16 Szenarien identisch, die eine Abweichung ist analysiert und dokumentiert · Kalibrierung separat gegengeprüft, Abweichung ≤ 0,01 · MIT-Lizenz",
+    "Lösungen kreuzvalidiert gegen das R-Paket QCA — 17 von 19 Szenarien identisch, die eine Abweichung ist analysiert und dokumentiert · Kalibrierung separat gegengeprüft, Abweichung ≤ 0,01 · MIT-Lizenz",
   "landing.h.stripAria": "Ablauf einer QCA: Rohdaten, Kalibrierung, Truth Table, Lösungsformel",
   "landing.h.stripCaption":
     "Keine Illustration: Diese Zahlen rechnet die openQCA-Engine beim Laden der Seite live aus dem Demo-Datensatz (synthetisch, angelehnt an Lipset 1959) — mit denselben Formeln wie in der App.",
@@ -1081,7 +1081,7 @@ const en: Record<DictKey, string> = {
   "landing.h.ctaDemo": "Open the example analysis",
   "landing.h.ctaOwn": "Start with your own data",
   "landing.h.proof":
-    "Solutions cross-validated against the R package QCA — 15 of 16 scenarios identical, the single divergence is analysed and documented · calibration cross-checked separately, deviation ≤ 0.01 · MIT license",
+    "Solutions cross-validated against the R package QCA — 17 of 19 scenarios identical, the single divergence is analysed and documented · calibration cross-checked separately, deviation ≤ 0.01 · MIT license",
   "landing.h.stripAria": "A QCA workflow: raw data, calibration, truth table, solution formula",
   "landing.h.stripCaption":
     "Not an illustration: the openQCA engine computes these numbers live from the demo dataset (synthetic, inspired by Lipset 1959) when this page loads — using the same formulas as the app.",

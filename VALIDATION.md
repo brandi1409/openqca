@@ -55,17 +55,18 @@ Für die beiden bereits kalibrierten Datensätze `datasets/fuzzy-sets-beispiel.c
 - die Kennzahlen **inclS** und **covS** je Modell sowie **incl**, **cov** und
   **covU** je Pfad, verglichen mit Toleranz `1e-6`.
 
-Insgesamt 12 Szenarien (2 Datensätze × {konservativ, sparsam, 4 intermediäre
-Varianten}).
+Insgesamt 19 Szenarien: die beiden kalibrierten Beispieldatensaetze (je konservativ,
+sparsam und vier intermediaere Varianten), der konstruierte Ambiguitaetsfall (vier
+Szenarien) und der kanonische Lipset-Datensatz (drei Szenarien, nur lokal — siehe unten).
 
-### Was ausdrücklich NICHT Teil dieser 12 Szenarien ist
+### Was ausdrücklich NICHT Teil dieser Szenarien ist
 
 Damit keine Außendarstellung mehr behauptet, was hier nicht geprüft wird:
 
 - **PRI** wird nirgends extern validiert. Die Kennzahl wird in Truth Table und
   Bericht ausgewiesen und ist durch interne Tests abgedeckt, aber nicht gegen
   ein externes Orakel gestellt.
-- **Kalibrierung** ist nicht Teil dieser 12 Szenarien. Beide Datensätze gehen
+- **Kalibrierung** ist nicht Teil dieser Szenarien. Beide Datensätze gehen
   bereits kalibriert in den Vergleich. Die Kalibrierung hat ihre eigene, weiter
   unten beschriebene Evidenzkette (`scripts/calibrate-cross-validate.mjs`) —
   mit einer dokumentierten Restabweichung ≤ 0,01 bei der direkten Methode.
@@ -91,8 +92,9 @@ Orakel, meldet das Skript dies und beendet mit Exit-Code 2.
 
 ### Status
 
-**15 von 16 Szenarien PASS** (Engine == R-Paket QCA, Formeln und Kennzahlen);
-ein Szenario weicht dokumentiert ab, siehe „Bekannte Abweichungen" unten.
+**17 von 19 Szenarien PASS** (Engine == R-Paket QCA, Formeln und Kennzahlen);
+zwei Szenarien weichen dokumentiert ab — beide aus derselben ESA-Ursache, siehe
+„Bekannte Abweichungen" unten.
 
 ### Erweiterung um Modell-Ambiguität (2026-07-25)
 
@@ -256,3 +258,32 @@ sowie konservative/sparsame Lösungsformeln und deren Fit-Parameter sind dagegen
 über `scripts/cross-validate.mjs` gegen das R-Paket QCA extern kreuzvalidiert.
 Eine Erweiterung auf weitere Datensätze und auf fsQCA 4.1 als zweites Orakel
 bleibt möglich.
+
+## Lipset — der kanonische Referenzfall (lokal, nicht mitgeliefert)
+
+Der stärkste verfügbare Korrektheitsbeleg ist der Datensatz, den das Fach am besten
+kennt: Lipsets 18 europäische Staaten der Zwischenkriegszeit, in der von Ragin für QCA
+aufbereiteten Form. Er liegt im R-Paket `QCA` als `LR` (Rohwerte) und `LF` (kalibriert).
+
+**Warum er nicht im Repository liegt.** Das R-Paket steht unter GPL (≥ 3), openQCA unter
+MIT. Eine Weitergabe der Paketdaten in diesem Repository wäre ein Lizenzkonflikt. Die
+Daten werden deshalb lokal aus der installierten R-Bibliothek erzeugt:
+
+```sh
+Rscript scripts/r-oracle/lipset-export.R   # schreibt datasets/local/ (gitignored)
+Rscript scripts/r-oracle/oracle.R          # nimmt die Lipset-Szenarien mit auf
+node scripts/cross-validate.mjs
+```
+
+Fehlen die Daten, werden die drei Lipset-Szenarien **sichtbar übersprungen** und nicht
+als Fehlschlag gewertet — die übrigen Szenarien laufen unverändert.
+
+**Befund.** `lipset_conservative` und `lipset_parsimonious` stimmen **exakt** mit R
+überein. `lipset_intermediate_all_present` weicht ab — dieselbe ESA-Ursache wie
+`ambig_intermediate_mixed` (siehe „Bekannte Abweichungen"). Damit ist belegt: Truth
+Table, Primimplikanten, Minimierung und die Fit-Kennzahlen treffen den kanonischen Fall;
+die offene Frage betrifft ausschließlich die Auswahl der einfachen Counterfactuals.
+
+Quelle der Daten: Lipset, S. M. (1959): Some Social Requisites of Democracy. *American
+Political Science Review* 53(1), 69–105 — in der von Ragin aufbereiteten, im R-Paket
+`QCA` (Dușa) ausgelieferten Form.
