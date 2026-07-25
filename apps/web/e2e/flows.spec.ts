@@ -703,8 +703,11 @@ test("A2.22 SUIN/RoN, Fall-Diagnostik und Pfad-XY-Plot", async ({ page }) => {
   await expect(diagnostics).toContainText("Typisch");
   await expect(diagnostics).toContainText("Fall_11");
   await expect(diagnostics).toContainText("Fall_13");
-  // Kein Fall mit Outcome > 0,5 bleibt ungedeckt.
-  await expect(diagnostics).toContainText(/Alle Outcome-Fälle sind von mindestens einem Pfad gedeckt/);
+  // Kein Fall mit Outcome > 0,5 bleibt ungedeckt: die deviant-coverage-Zeile wird
+  // nur ausgegeben, wenn es solche Fälle gibt — hier darf sie also fehlen.
+  // (Dass die Zeile bei ungedeckten Fällen tatsächlich erscheint, prüft der
+  //  Engine-Test „caseDiagnostics: deviant coverage nur für ungedeckte Outcome-Fälle".)
+  await expect(diagnostics).not.toContainText("deviant coverage");
 
   // 3. XY-Plot: Umschalten von Einzelbedingung auf Lösungspfad.
   const source = page.getByTestId("xy-source");

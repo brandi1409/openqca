@@ -79,6 +79,10 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   ≈0,047/≈0,953 rechnet — in Bericht und Oberfläche korrigiert.
 - Lehrbeispiel und Import-Platzhalter waren fest auf Englisch verdrahtet und erschienen so
   in der deutschen Oberfläche.
+- Fall-Diagnostik: Legende, Erklärtext und Grenzfall-Hinweis erschienen bis zu sechsmal
+  untereinander, weil sie je Lösungsmodell gerendert wurden und die sparsame Lösung
+  mehrdeutig sein kann. Sie stehen jetzt einmal je Schritt; gleichwertige Modelle sind
+  einklappbar, das erste ist offen.
 - Kopfzeile der App lief auf schmalen Viewports über (nur auf Linux-Schriftmetrik sichtbar).
 - MIT-Lizenz ohne eingetragenen Rechteinhaber; Platzhalter-Kontakte in `SECURITY.md` und
   `CODE_OF_CONDUCT.md`.

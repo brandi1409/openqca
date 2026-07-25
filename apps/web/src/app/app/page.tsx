@@ -1657,8 +1657,15 @@ function SolutionSection({
 }) {
   const [locale] = useLocale();
   const outLabel = tt.outcome.replace(/^fs_/, "").toUpperCase();
+  // Grenzfälle bei exakt 0,5 sind eine Eigenschaft des Datensatzes, nicht des
+  // Modells — einmal je Schritt, nicht unter jedem Lösungsmodell.
+  const atCrossover = tt.rows.flatMap((r) => r.atCrossover ?? []);
   return (
     <div id="loesungen" style={{ scrollMarginTop: 56 }}>
+      <p className="hint" style={{ ...hintStyle, marginTop: 0, marginBottom: 12 }}>
+        {t(locale, "diag.desc")}
+        {atCrossover.length > 0 && ` ${t(locale, "diag.crossover", { cases: [...new Set(atCrossover)].join(", ") })}`}
+      </p>
       {(["complex", "intermediate", "parsimonious"] as const).map((kind) => {
         const s = sol[kind];
         const title =
@@ -1691,7 +1698,24 @@ function SolutionSection({
               <p className="hint" style={hintStyle}>{t(locale, "sol.none")}</p>
             ) : (
               s.models.map((m, mi) => (
-                <div key={mi}>
+                // Mehrdeutigkeit ist ein methodischer Befund, kein Anzeigeproblem:
+                // Bei mehreren gleichwertigen Modellen wird das benannt und nur
+                // das erste ausgeklappt — sonst stapeln sich hier fuenf volle
+                // Bloecke samt Diagnostik untereinander.
+                <details key={mi} open={mi === 0} style={{ marginTop: mi ? 10 : 0 }}>
+                  <summary
+                    style={{
+                      cursor: s.models.length > 1 ? "pointer" : "default",
+                      listStyle: s.models.length > 1 ? undefined : "none",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--muted)",
+                      marginBottom: 6,
+                      display: s.models.length > 1 ? "list-item" : "none",
+                    }}
+                  >
+                    {t(locale, "sol.model.n", { i: mi + 1, total: s.models.length })}
+                  </summary>
                   <div
                     className="oq-formula"
                     data-testid={mi === 0 ? `solution-formula-${kind}` : undefined}
@@ -1773,7 +1797,7 @@ function SolutionSection({
                     cases={cases}
                     testId={mi === 0 ? `case-diagnostics-${kind}` : undefined}
                   />
-                </div>
+                </details>
               ))
             )}
             {kind === "intermediate" && (
@@ -1854,14 +1878,17 @@ function CaseDiagnosticsBlock({
       data-testid={testId}
       style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid var(--line-soft)" }}
     >
+      {/* Erklärtext, Legende und die datensatzweite Grenzfall-Zeile stehen NICHT
+          hier: Dieser Block wird je Lösungsmodell gerendert, bei Modell-
+          Ambiguität also vielfach. Sie erschienen dadurch sechsmal auf einem
+          Bildschirm. Sie stehen jetzt einmal am Anfang des Lösungs-Schritts. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Label>{t(locale, "diag.title")}</Label>
         <InfoHint
           title={t(locale, "info.caseDiagnostics.title")}
-          body={t(locale, "info.caseDiagnostics.body")}
+          body={`${t(locale, "info.caseDiagnostics.body")} ${t(locale, "diag.hint")}`}
         />
       </div>
-      <p className="hint" style={{ ...hintStyle, marginTop: 2 }}>{t(locale, "diag.desc")}</p>
       <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
         {diag.paths.map((path) => (
           <div
@@ -1897,22 +1924,17 @@ function CaseDiagnosticsBlock({
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 8 }}>
-        {diag.deviantCoverage.length ? (
+      {/* Nur melden, wenn es etwas zu melden gibt — die Leermeldung stand sonst
+          unter jedem Modell. Grenzfälle (0,5) sind datensatzweit identisch und
+          stehen einmal oben im Schritt. */}
+      {diag.deviantCoverage.length > 0 && (
+        <div style={{ marginTop: 8 }}>
           <DiagGroup
             label={t(locale, "diag.deviantCoverage")}
             names={diag.deviantCoverage.map((c) => c.label)}
           />
-        ) : (
-          <p className="hint" style={hintStyle}>{t(locale, "diag.deviantCoverage.none")}</p>
-        )}
-      </div>
-      {diag.atCrossover.length > 0 && (
-        <p className="hint" style={hintStyle}>
-          {t(locale, "diag.crossover", { cases: diag.atCrossover.join(", ") })}
-        </p>
+        </div>
       )}
-      <p className="hint" style={hintStyle}>{t(locale, "diag.hint")}</p>
     </div>
   );
 }

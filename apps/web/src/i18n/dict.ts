@@ -668,6 +668,7 @@ const de = {
   "sol.complex.title": "Komplexe (konservative) Lösung",
   "sol.intermediate.title": "Intermediäre Lösung",
   "sol.parsimonious.title": "Sparsame (parsimonious) Lösung",
+  "sol.model.n": "Modell {i} von {total} (gleichwertig — die Lösung ist mehrdeutig)",
   "sol.none": "Keine Konfiguration erfüllt die Cutoffs — keine Lösung.",
   "sol.kpi.consistency": "Lösungs-Konsistenz",
   "sol.kpi.coverage": "Lösungs-Coverage",
@@ -788,11 +789,10 @@ const de = {
   "diag.irrelevant": "Irrelevant (IIR)",
   "diag.irrelevantCount": "{n} Fälle",
   "diag.deviantCoverage": "Vom Modell nicht gedeckt (deviant coverage)",
-  "diag.deviantCoverage.none": "Alle Outcome-Fälle sind von mindestens einem Pfad gedeckt.",
   "diag.none": "keine",
   "diag.crossover": "Grenzfälle mit Zugehörigkeit genau 0,5: {cases}",
   "diag.hint":
-    "Typisch = X > 0,5, Y > 0,5, X ≤ Y · Abweichend (Art) = X > 0,5, Y ≤ 0,5 (widerspricht der Hinreichendheit) · Abweichend (Grad) = X > Y, beide > 0,5 · Irrelevant = X ≤ 0,5, der Pfad sagt über den Fall nichts aus.",
+    "Typisch = X > 0,5, Y > 0,5, X ≤ Y · Abweichend (Art) = X > 0,5, Y ≤ 0,5 (widerspricht der Hinreichendheit) · Abweichend (Grad) = X > Y, beide > 0,5 · Irrelevant = X ≤ 0,5, der Pfad sagt über den Fall nichts aus. „Vom Modell nicht gedeckt (deviant coverage)“ erscheint nur, wenn es solche Fälle gibt — fehlt die Zeile, ist jeder Outcome-Fall von mindestens einem Pfad gedeckt.",
 
   // -- Protokoll --------------------------------------------------------------
   "proto.title": "Analyseprotokoll",
@@ -1752,6 +1752,7 @@ const en: Record<DictKey, string> = {
   "sol.complex.title": "Complex (conservative) solution",
   "sol.intermediate.title": "Intermediate solution",
   "sol.parsimonious.title": "Parsimonious solution",
+  "sol.model.n": "Model {i} of {total} (equivalent — the solution is ambiguous)",
   "sol.none": "No configuration meets the cutoffs — no solution.",
   "sol.kpi.consistency": "Solution consistency",
   "sol.kpi.coverage": "Solution coverage",
@@ -1872,11 +1873,10 @@ const en: Record<DictKey, string> = {
   "diag.irrelevant": "Irrelevant (IIR)",
   "diag.irrelevantCount": "{n} cases",
   "diag.deviantCoverage": "Not covered by the model (deviant coverage)",
-  "diag.deviantCoverage.none": "Every outcome case is covered by at least one path.",
   "diag.none": "none",
   "diag.crossover": "Borderline cases with membership exactly 0.5: {cases}",
   "diag.hint":
-    "Typical = X > 0.5, Y > 0.5, X ≤ Y · Deviant (kind) = X > 0.5, Y ≤ 0.5 (contradicts sufficiency) · Deviant (degree) = X > Y, both > 0.5 · Irrelevant = X ≤ 0.5, the path says nothing about the case.",
+    "Typical = X > 0.5, Y > 0.5, X ≤ Y · Deviant (kind) = X > 0.5, Y ≤ 0.5 (contradicts sufficiency) · Deviant (degree) = X > Y, both > 0.5 · Irrelevant = X ≤ 0.5, the path says nothing about the case. “Not covered by the model (deviant coverage)” only appears when such cases exist — if the line is absent, every outcome case is covered by at least one path.",
 
   // -- Protocol ---------------------------------------------------------------
   "proto.title": "Analysis protocol",
