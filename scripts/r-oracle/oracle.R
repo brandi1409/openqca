@@ -26,10 +26,13 @@ suppressMessages(library(QCA))
 # --- Datensaetze -------------------------------------------------------------
 fuzzy <- read.csv("datasets/fuzzy-sets-beispiel.csv", row.names = 1)
 crisp <- read.csv("datasets/crisp-sets-beispiel.csv", row.names = 1)
+ambig <- read.csv("datasets/modell-ambiguitaet.csv", row.names = 1)
 
 FUZZY_CONDS <- "WOHLSTAND,BILDUNG,STAATSKAPAZITAET"
 FUZZY_OUT <- "DEMOKRATIE"
 CRISP_CONDS <- "FOERDERUNG,TEAM,MARKT,KONKURRENZ"
+AMBIG_CONDS <- "A,B,C,D"
+AMBIG_OUT <- "ERGEBNIS"
 CRISP_OUT <- "ERFOLG"
 
 # --- Hilfsfunktionen ---------------------------------------------------------
@@ -167,6 +170,23 @@ add_scenario("crisp_intermediate_mixed",
              minimize(ttC, include = "?", dir.exp = c(1, 1, 0, 0), use.tilde = TRUE), crisp, CRISP_OUT)
 add_scenario("crisp_intermediate_dash",
              minimize(ttC, include = "?", dir.exp = c(1, 1, "-", 0), use.tilde = TRUE), crisp, CRISP_OUT)
+
+# ----- Modell-Ambiguität, incl.cut = 1, n.cut = 1 ----------------------------
+# Konstruierter Fall (Y = A*B + C*D mit Lücken): Die sparsame Lösung hat MEHRERE
+# Modelle, und ein konservativer Primimplikant wird von mehreren sparsamen
+# subsumiert. Genau diesen Fall deckten die ersten zwölf Szenarien nicht ab —
+# er prüft, ob die Engine die kanonische ESA-Modellbildung (i.sol je (C,P)-Paar,
+# danach kanonische Deduplizierung) trifft und nicht nur den Einzelmodell-Fall.
+ttA <- truthTable(ambig, outcome = AMBIG_OUT, conditions = AMBIG_CONDS,
+                  incl.cut = 1, n.cut = 1)
+add_scenario("ambig_conservative",
+             minimize(ttA, include = "", use.tilde = TRUE), ambig, AMBIG_OUT)
+add_scenario("ambig_parsimonious",
+             minimize(ttA, include = "?", use.tilde = TRUE), ambig, AMBIG_OUT)
+add_scenario("ambig_intermediate_all_present",
+             minimize(ttA, include = "?", dir.exp = c(1, 1, 1, 1), use.tilde = TRUE), ambig, AMBIG_OUT)
+add_scenario("ambig_intermediate_mixed",
+             minimize(ttA, include = "?", dir.exp = c(1, 0, 1, 0), use.tilde = TRUE), ambig, AMBIG_OUT)
 
 # --- JSON schreiben ----------------------------------------------------------
 scenarioJsons <- vapply(scenarios, function(s) {

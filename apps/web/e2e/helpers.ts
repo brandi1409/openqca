@@ -39,15 +39,29 @@ export async function dismissConsent(page: Page): Promise<void> {
 }
 
 /**
+ * Die komplexe/intermediäre Lösung des Demo-Datensatzes im Startzustand
+ * (alle numerischen Nicht-Outcome-Spalten sind Bedingungen, freqCut 1,
+ * consCut 0,8, Erwartungen „present"). Steht hier einmal, weil mehrere Tests
+ * darauf warten.
+ *
+ * Vorher lautete der Wert `WOHLSTAND*URBAN*BILDUNG` — das war das Ergebnis der
+ * stillen Rollen-Heuristik, die nur die ersten DREI Bedingungen zuließ und
+ * `stabil` lautlos verwarf. Seit die Heuristik entfernt ist, rechnet die App mit
+ * vier Bedingungen; der Wert stammt aus einem echten Lauf gegen den
+ * Produktions-Build (siehe A2.20, das ihn zusätzlich gegen die Landing prüft).
+ */
+export const DEMO_SOLUTION = /WOHLSTAND\*BILDUNG\*STABIL/;
+
+/**
  * Demo-Datensatz auf /app laden und auf die vollständig berechnete Analyse
- * warten (komplexe Lösung enthält WOHLSTAND*URBAN*BILDUNG, vgl. A2.2). Danach
+ * warten (komplexe Lösung enthält WOHLSTAND*BILDUNG*STABIL, vgl. A2.2). Danach
  * sind Kalibrierkurve, Truth Table, Lösungen und XY-Plot im DOM.
  */
 export async function loadDemo(page: Page): Promise<void> {
   await page.goto("/app");
   await dismissConsent(page);
   await page.getByRole("button", { name: "Demo-Datensatz laden" }).click();
-  await expect(page.getByText(/WOHLSTAND\*URBAN\*BILDUNG/).first()).toBeVisible({
+  await expect(page.getByText(DEMO_SOLUTION).first()).toBeVisible({
     timeout: 15_000,
   });
 }

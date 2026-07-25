@@ -110,6 +110,16 @@ const DATASETS = {
     consCut: 1,
     freqCut: 1,
   },
+  // Konstruierter Ambiguitätsfall: mehrere sparsame Modelle, ein konservativer
+  // Primimplikant von mehreren sparsamen subsumiert. Prüft die kanonische
+  // ESA-Modellbildung — der Fall fehlte in den ersten zwölf Szenarien.
+  ambig: {
+    filename: "modell-ambiguitaet.csv",
+    conditions: ["A", "B", "C", "D"],
+    outcome: "ERGEBNIS",
+    consCut: 1,
+    freqCut: 1,
+  },
 };
 
 // dir.exp-Werte → Expectation-Record (1→present, 0→absent, "-"→either).
@@ -131,7 +141,71 @@ const SCENARIOS = [
   { name: "crisp_intermediate_all_absent", ds: "crisp", kind: "intermediate", dirExp: [0, 0, 0, 0] },
   { name: "crisp_intermediate_mixed", ds: "crisp", kind: "intermediate", dirExp: [1, 1, 0, 0] },
   { name: "crisp_intermediate_dash", ds: "crisp", kind: "intermediate", dirExp: [1, 1, "-", 0] },
+  { name: "ambig_conservative", ds: "ambig", kind: "conservative" },
+  { name: "ambig_parsimonious", ds: "ambig", kind: "parsimonious" },
+  { name: "ambig_intermediate_all_present", ds: "ambig", kind: "intermediate", dirExp: [1, 1, 1, 1] },
+  { name: "ambig_intermediate_mixed", ds: "ambig", kind: "intermediate", dirExp: [1, 0, 1, 0] },
 ];
+
+/**
+ * Dokumentierte, noch nicht verstandene Abweichungen von der Referenz.
+ * Sie werden NICHT versteckt: Das Skript meldet sie sichtbar als Warnung und
+ * schlägt fehl, sobald eine davon VERSCHWINDET (dann ist der Eintrag zu
+ * entfernen). Niemals einen Eintrag hinzufügen, um eine Prüfung grün zu
+ * bekommen — nur für Abweichungen, die in VALIDATION.md analysiert sind.
+ */
+const KNOWN_DIVERGENCES = {
+  ambig_intermediate_mixed:
+    "ESA mit gemischten Richtungserwartungen: R liefert C*D + A*B*C, die Engine " +
+    "C*D + A*B*C*~D — das Literal ~D wird nicht als easy counterfactual entfernt. " +
+    "Siehe VALIDATION.md, Abschnitt 'Bekannte Abweichungen'.",
+};
+
+
+/**
+ * Bindet die oeffentliche Behauptung an das tatsaechliche Ergebnis.
+ *
+ * Die Landing nennt die Zahl der uebereinstimmenden Szenarien. Genau solche
+ * handgepflegten Zahlen driften — das war bereits einmal der Fall (die Seite
+ * warb mit Werten, die die App nicht lieferte). Deshalb prueft dieses Skript
+ * bei jedem Lauf, dass die Zahlen in dict.ts/Landing.tsx dem echten Stand
+ * entsprechen, und schlaegt sonst fehl. Nie die Zahl hier anpassen, um gruen
+ * zu werden — immer die Behauptung korrigieren.
+ */
+async function checkPublicClaims(passed, total) {
+  const files = [
+    fileURLToPath(new URL("apps/web/src/i18n/dict.ts", rootUrl)),
+    fileURLToPath(new URL("apps/web/src/components/Landing.tsx", rootUrl)),
+  ];
+  const problems = [];
+  for (const file of files) {
+    let text;
+    try {
+      text = await readFile(file, "utf8");
+    } catch {
+      continue; // Datei fehlt (z. B. Engine-only-Checkout) — nicht Aufgabe dieses Skripts.
+    }
+    // Muster wie "15 von 16", "15/16", "12 von 12" einsammeln.
+    const patterns = [/(\d+)\s*von\s*(\d+)\s*Szenarien/g, /"(\d+)\/(\d+)"/g];
+    for (const re of patterns) {
+      for (const m of text.matchAll(re)) {
+        const claimed = Number(m[1]);
+        const claimedTotal = Number(m[2]);
+        if (claimed !== passed || claimedTotal !== total) {
+          problems.push(
+            `${file.split("/").slice(-1)[0]}: behauptet ${claimed}/${claimedTotal}, tatsaechlich ${passed}/${total} — "${m[0]}"`,
+          );
+        }
+      }
+    }
+  }
+  if (problems.length) {
+    console.error("\nOeffentliche Behauptung stimmt nicht mit dem Ergebnis ueberein:");
+    problems.forEach((p) => console.error(`    - ${p}`));
+    console.error("Behauptung korrigieren, nicht diese Pruefung.");
+    process.exit(1);
+  }
+}
 
 async function computeScenario(scenario) {
   const dataset = DATASETS[scenario.ds];
@@ -200,6 +274,7 @@ async function main() {
   const expByName = new Map(expected.scenarios.map((s) => [s.name, s]));
 
   let failed = 0;
+  let knownFailed = 0;
   for (const scenario of SCENARIOS) {
     const exp = expByName.get(scenario.name);
     if (!exp) {
@@ -216,8 +291,22 @@ async function main() {
       continue;
     }
     const problems = compareModels(ourModels, exp.models);
+    const known = KNOWN_DIVERGENCES[scenario.name];
     if (problems.length === 0) {
-      console.log(`✓ ${scenario.name}: PASS`);
+      if (known) {
+        // Eine dokumentierte Abweichung, die plötzlich verschwindet, ist ebenso
+        // meldepflichtig wie eine neue: Entweder wurde sie behoben (dann gehört
+        // der Eintrag entfernt) oder das Orakel wurde verändert.
+        failed += 1;
+        console.error(`✗ ${scenario.name}: ERWARTETE ABWEICHUNG IST WEG`);
+        console.error(`    Eintrag in KNOWN_DIVERGENCES entfernen und VALIDATION.md aktualisieren.`);
+      } else {
+        console.log(`✓ ${scenario.name}: PASS`);
+      }
+    } else if (known) {
+      knownFailed += 1;
+      console.warn(`⚠ ${scenario.name}: BEKANNTE ABWEICHUNG — ${known}`);
+      problems.forEach((p) => console.warn(`    - ${p}`));
     } else {
       failed += 1;
       console.error(`✗ ${scenario.name}: FAIL`);
@@ -225,12 +314,18 @@ async function main() {
     }
   }
 
-  console.log(`\n${SCENARIOS.length - failed}/${SCENARIOS.length} Szenarien PASS`);
+  const passed = SCENARIOS.length - failed - knownFailed;
+  console.log(`\n${passed}/${SCENARIOS.length} Szenarien PASS` +
+    (knownFailed ? ` · ${knownFailed} bekannte, dokumentierte Abweichung(en)` : ""));
   if (failed > 0) {
     console.error(`${failed} Szenario(en) FAIL — Kreuzvalidierung fehlgeschlagen.`);
     process.exit(1);
   }
+  await checkPublicClaims(passed, SCENARIOS.length);
   console.log("Kreuzvalidierung gegen R (QCA-Paket) bestanden.");
+  if (knownFailed) {
+    console.log("Hinweis: dokumentierte Abweichungen siehe VALIDATION.md, Abschnitt Bekannte Abweichungen.");
+  }
 }
 
 main().catch((error) => {

@@ -71,9 +71,12 @@ function formatDateAT(d: Date, locale: "de" | "en"): string {
 
 const REPORT_COPY = {
   de: {
-    fullOut: "voll draußen (0,05)",
-    crossover: "Kreuzung (0,50)",
-    fullIn: "voll drinnen (0,95)",
+    // Die Engine bildet die Anker nach Ragins Verfahren über Log-Odds ±3 ab —
+    // das ergibt 1/(1+e^±3) ≈ 0,047 / 0,953, NICHT die gerundeten 0,05 / 0,95.
+    // Der Bericht beschriftet, was gerechnet wurde (Befund E).
+    fullOut: "voll draußen (≈0,047)",
+    crossover: "Kreuzung (0,500)",
+    fullIn: "voll drinnen (≈0,953)",
     variable: "Variable",
     status: "Status",
     method: "Methode",
@@ -137,9 +140,9 @@ const REPORT_COPY = {
       "Die Berechnungen sind exakt, aber die inhaltliche Begründung der Kalibrierung (Set-Definitionen, Evidenz, Fallprüfung) ist noch unvollständig. Für eine publikationsreife Fassung die Dokumentation in der Kalibrier-Werkbank vervollständigen — sie schaltet auch Protokoll- und R-Export frei.",
   },
   en: {
-    fullOut: "full non-membership (0.05)",
-    crossover: "crossover (0.50)",
-    fullIn: "full membership (0.95)",
+    fullOut: "full non-membership (≈0.047)",
+    crossover: "crossover (0.500)",
+    fullIn: "full membership (≈0.953)",
     variable: "Variable",
     status: "Status",
     method: "Method",

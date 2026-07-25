@@ -14,8 +14,18 @@ import { LanguageToggle } from "@/components/LanguageToggle";
  * Designidee: Die Seite beweist statt zu behaupten. Der Hero zeigt die echte
  * Ableitung Rohdaten → Kalibrierung → Truth Table → Lösungsformel — und zwar
  * nicht als Dekoration, sondern LIVE mit der Engine gerechnet (Modul-Scope,
- * Demo-Datensatz). Die Zahlen auf der Landing können damit nie von der App
- * abweichen. Typografie: Serif-Display (Journal-Anmutung, reiner System-Stack)
+ * Demo-Datensatz).
+ *
+ * Übereinstimmung mit der App ist eine geprüfte Zusage, keine Behauptung: Der
+ * Streifen rechnet mit demselben Modell wie der Startzustand von „/app?demo=1"
+ * (alle numerischen Nicht-Outcome-Spalten als Bedingungen, freqCut 1,
+ * consCut 0,8, Erwartungen „present", intermediäre Lösung) und schreibt die
+ * Formel in derselben Notation. E2E-Test A2.20 vergleicht beide Strings bei
+ * jedem Lauf — genau diese Zusage war schon einmal gebrochen (die Landing
+ * rechnete mit vier, die App wegen einer stillen Rollen-Heuristik mit drei
+ * Bedingungen).
+ *
+ * Typografie: Serif-Display (Journal-Anmutung, reiner System-Stack)
  * + Mono für Formeln/Zahlen; Farben bleiben die Tokens aus globals.css.
  *
  * Die Landing unterliegt bewusst NICHT der strengen A4-Skala (QUALITY-SPEC:
@@ -65,17 +75,17 @@ function computeHeroData() {
 
 const HERO = computeHeroData();
 
-/** Bits eines Terms („1-11") → Literale in Anzeigeform (WOHLSTAND, ~URBAN …). */
-function termToText(bits: string): string {
-  const parts: string[] = [];
-  bits.split("").forEach((b, i) => {
-    if (b === "1") parts.push(HERO_CONDS[i].toUpperCase());
-    else if (b === "0") parts.push("~" + HERO_CONDS[i].toUpperCase());
-  });
-  return parts.join("·");
-}
-
-const HERO_FORMULA = HERO.model ? HERO.model.terms.map(termToText).join(" + ") + " → DEMOKRATIE" : "";
+/**
+ * Lösungsformel in exakt der Notation der App (`SolutionSection`):
+ * Pfad-Ausdrücke der Engine, Großschreibung, „  +  " zwischen den Pfaden,
+ * „→ OUTCOME" am Ende. Keine eigene Übersetzung der Term-Bits mehr — die wäre
+ * eine zweite Wahrheit neben der App.
+ */
+const HERO_FORMULA = HERO.model
+  ? HERO.model.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ") +
+    " → " +
+    HERO_OUTCOME.replace(/^fs_/, "").toUpperCase()
+  : "";
 
 /** Zahl im deutschen Format mit 3 Dezimalen (0,972). */
 function fmt3(x: number): string {
@@ -239,11 +249,14 @@ function ProofStrip() {
         <StripArrow />
         <StripPanel label={t(locale, "landing.h.s4")} grow>
           <div className="oq-anim-late" style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: "100%", gap: 8 }}>
-            <div style={{ fontFamily: MONO_FONT, fontSize: "clamp(14px, 1.8vw, 17px)", fontWeight: 600, color: "var(--ink)", lineHeight: 1.5, overflowWrap: "anywhere" }}>
+            <div
+              data-testid="landing-hero-formula"
+              style={{ fontFamily: MONO_FONT, fontSize: "clamp(14px, 1.8vw, 17px)", fontWeight: 600, color: "var(--ink)", lineHeight: 1.5, overflowWrap: "anywhere" }}
+            >
               {HERO_FORMULA}
             </div>
             {HERO.model && (
-              <div style={{ fontFamily: MONO_FONT, fontSize: 12, color: "var(--muted)" }}>
+              <div data-testid="landing-hero-kpis" style={{ fontFamily: MONO_FONT, fontSize: 12, color: "var(--muted)" }}>
                 {t(locale, "landing.h.consistency")} {fmt3(HERO.model.solutionConsistency)} · {t(locale, "landing.h.coverage")} {fmt3(HERO.model.solutionCoverage)}
               </div>
             )}
@@ -410,7 +423,13 @@ function Deliverables() {
 function Rigor() {
   const [locale] = useLocale();
   const rows: [string, DictKey][] = [
-    ["12/12", "landing.rigor.r1"],
+    // ACHTUNG: Diese Zahl ist eine Behauptung über `scripts/cross-validate.mjs`.
+    // Sie MUSS mit dem Status in VALIDATION.md übereinstimmen — Stand: 16
+    // Szenarien, 15 PASS, eine analysierte und dort dokumentierte Abweichung
+    // (ESA mit gemischten Richtungserwartungen bei Modell-Ambiguität). Wer ein
+    // Szenario hinzufügt oder eine Abweichung behebt, zieht diesen Wert und
+    // `landing.h.proof` nach.
+    ["15/16", "landing.rigor.r1"],
     ["m(c) = 0,500", "landing.rigor.r2"],
     ["3", "landing.rigor.r3"],
     ["MIT", "landing.rigor.r4"],

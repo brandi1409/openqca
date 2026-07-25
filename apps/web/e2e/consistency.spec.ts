@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { dismissConsent } from "./helpers";
+import { DEMO_SOLUTION, dismissConsent } from "./helpers";
 
 /**
  * A4 — Konsistenz des Design-Systems, geprüft in 4 Matrizen: Light/Dark ×
@@ -17,7 +17,7 @@ const VIEWPORTS = [
 /** /app mit Demo befüllen, damit ALLE Buttons/Flächen (Kalibrierung, Lösungen, Export) im DOM sind. */
 async function primeApp(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Demo-Datensatz laden" }).click();
-  await expect(page.getByText(/WOHLSTAND\*URBAN\*BILDUNG/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(DEMO_SOLUTION).first()).toBeVisible({ timeout: 15_000 });
 }
 
 const A4_ROUTES = ["/app", "/preise", "/download", "/konto"] as const;

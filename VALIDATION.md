@@ -57,6 +57,20 @@ Für die beiden bereits kalibrierten Datensätze `datasets/fuzzy-sets-beispiel.c
 Insgesamt 12 Szenarien (2 Datensätze × {konservativ, sparsam, 4 intermediäre
 Varianten}).
 
+### Was ausdrücklich NICHT Teil dieser 12 Szenarien ist
+
+Damit keine Außendarstellung mehr behauptet, was hier nicht geprüft wird:
+
+- **PRI** wird nirgends extern validiert. Die Kennzahl wird in Truth Table und
+  Bericht ausgewiesen und ist durch interne Tests abgedeckt, aber nicht gegen
+  ein externes Orakel gestellt.
+- **Kalibrierung** ist nicht Teil dieser 12 Szenarien. Beide Datensätze gehen
+  bereits kalibriert in den Vergleich. Die Kalibrierung hat ihre eigene, weiter
+  unten beschriebene Evidenzkette (`scripts/calibrate-cross-validate.mjs`) —
+  mit einer dokumentierten Restabweichung ≤ 0,01 bei der direkten Methode.
+- **Notwendigkeitsanalyse** und die Kennzahlen der komplexen Lösungen in
+  `scripts/reference-check.mjs` bleiben interne Regressions-Snapshots.
+
 ### Ausführen
 
 ```sh
@@ -76,7 +90,55 @@ Orakel, meldet das Skript dies und beendet mit Exit-Code 2.
 
 ### Status
 
-**Alle 12 Szenarien PASS** (Engine == R-Paket QCA, Formeln und Kennzahlen).
+**15 von 16 Szenarien PASS** (Engine == R-Paket QCA, Formeln und Kennzahlen);
+ein Szenario weicht dokumentiert ab, siehe „Bekannte Abweichungen" unten.
+
+### Erweiterung um Modell-Ambiguität (2026-07-25)
+
+Ein externes Code-Audit wies darauf hin, dass die ursprünglichen zwölf Szenarien
+ausschließlich Fälle mit **einem** Lösungsmodell abdeckten. Die intermediäre Lösung ist
+aber gerade dort heikel, wo ein konservativer Primimplikant von **mehreren** sparsamen
+Primimplikanten subsumiert wird (Modell-Ambiguität). Dafür wurde
+`datasets/modell-ambiguitaet.csv` konstruiert (9 Fälle, vier crisp Bedingungen,
+Y = A·B + C·D mit Lücken): Die sparsame Lösung hat dort zwei Modelle
+(`A*B + C*D` und `B*C + C*D`), R meldet zwei `i.sol`-Einträge (C1P1, C1P2).
+
+Ergebnis der vier neuen Szenarien:
+
+- `ambig_conservative`, `ambig_parsimonious`, `ambig_intermediate_all_present`: **PASS**.
+  Insbesondere trifft die Engine die kanonische Modellbildung: Beide `i.sol`-Einträge
+  liefern in R dieselbe intermediäre Lösung `C*D + A*B*C`; nach kanonischer
+  Deduplizierung bleibt genau ein Modell — exakt die Ausgabe der Engine. Die
+  ursprünglich vermutete „Verschmelzung mehrerer Subsumer zu einem falschen Modell"
+  ist damit **widerlegt**.
+- `ambig_intermediate_mixed`: **dokumentierte Abweichung**, siehe unten.
+
+### Bekannte Abweichungen
+
+**`ambig_intermediate_mixed` — ESA mit gemischten Richtungserwartungen.**
+Mit `dir.exp = (A=1, B=0, C=1, D=0)` liefert R `C*D + A*B*C`, die Engine dagegen
+`C*D + A*B*C*~D`. Der konservative Primimplikant ist `A*B*C*~D`; die Engine behält das
+Literal `~D`, weil ihre Regel ein Literal nur bei **strikter Gegenpolarität** der
+Erwartung entfernt (hier stimmen Literal `~D` und Erwartung „absent" überein). R stuft
+den zugehörigen Remainder (`A*B*C*D`, Zeile 16) hingegen als *easy counterfactual* ein
+und entfernt `~D`.
+
+Die Regel der Engine ist an den zwölf ursprünglichen Szenarien R-validiert und dort
+korrekt; sie ist in diesem Randfall unvollständig. Die Ursache ist noch nicht
+abschließend geklärt — insbesondere, wie R die Einstufung easy/difficult für Literale
+bildet, deren Polarität mit der Erwartung übereinstimmt, deren Remainder aber die
+Gegenrichtung darstellt.
+
+Bis zur Klärung gilt: Der Fall ist als Szenario **eingecheckt und sichtbar**.
+`scripts/cross-validate.mjs` führt ihn in `KNOWN_DIVERGENCES`, meldet ihn bei jedem Lauf
+als Warnung und **schlägt fehl, sobald die Abweichung verschwindet** (dann ist der
+Eintrag zu entfernen und dieser Abschnitt zu aktualisieren). Die Abweichung wurde nicht
+durch Anpassen von Erwartungswerten, Toleranzen oder des Orakels „grün gemacht".
+
+Praktische Reichweite: Betroffen sind ausschließlich intermediäre Lösungen mit
+**gemischten** Richtungserwartungen in Konstellationen mit Modell-Ambiguität. Die
+konservative und die sparsame Lösung sind nicht betroffen, ebenso wenig intermediäre
+Lösungen mit durchgängig gleichen Erwartungen.
 
 ### Kanonik-Hinweis: Semantik von „either"/fehlender Erwartung
 

@@ -32,7 +32,15 @@ export type MethodologyReference = {
   scope: string;
 };
 
-const TOOL_VERSION = "0.0.0";
+/**
+ * Werkzeug-Version für die Reproduzierbarkeits-Metadaten jedes Exports.
+ * Quelle ist `NEXT_PUBLIC_APP_VERSION` (aus `apps/web/package.json`, optional mit
+ * Commit-Kennung — siehe `apps/web/next.config.ts`). Fällt die Variable aus
+ * (Test-Harness, Storybook, Tarball-Build), steht dort ehrlich „dev" statt einer
+ * erfundenen Release-Nummer. Vorher stand hier hartkodiert „0.0.0" — ein
+ * Protokoll, das auf keinen Stand zeigt.
+ */
+const TOOL_VERSION = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "dev";
 export const RAW_DATA_FILENAME = "openqca-raw-data.csv";
 export const METHODOLOGY_REFERENCES: readonly MethodologyReference[] = [
   {

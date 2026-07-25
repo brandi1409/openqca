@@ -144,23 +144,25 @@ function isColUsable(
   return true;
 }
 
-/** Auto-Ableitung des Variablen-Metamodells: Datenart erkennen, Rollen heuristisch vorbelegen. */
+/**
+ * Auto-Ableitung des Variablen-Metamodells: Datenart erkennen, Rollen vorbelegen.
+ *
+ * Regel ohne Ausnahme: die LETZTE numerische Spalte ist das Outcome, JEDE andere
+ * numerische Spalte ist eine Bedingung. Früher hat hier ein stilles Budget von
+ * drei Bedingungen alle weiteren Spalten auf „ignore" gesetzt — Variablen
+ * verschwanden ohne Hinweis aus Analyse und Dokumentations-Meter, und die
+ * Landing rechnete deshalb mit anderen Bedingungen als die App. Wer weniger
+ * Bedingungen will, wählt sie im Schritt „Variablen & Rollen" bewusst ab; auf
+ * das methodische Risiko vieler Bedingungen weist `limited diversity` dort
+ * sichtbar hin.
+ */
 function deriveVarMeta(ds: RawDataset): Record<string, VarMeta> {
   const cols = numericColumns(ds);
   const meta: Record<string, VarMeta> = {};
   const outcomeCol = cols.length ? cols[cols.length - 1] : "";
-  let conditionBudget = 3;
   cols.forEach((col) => {
     const type = detectVarType(numericValues(ds, col));
-    let role: VarRole;
-    if (col === outcomeCol) {
-      role = "outcome";
-    } else if (conditionBudget > 0) {
-      role = "condition";
-      conditionBudget--;
-    } else {
-      role = "ignore";
-    }
+    const role: VarRole = col === outcomeCol ? "outcome" : "condition";
     meta[col] = { type, role };
   });
   return meta;
@@ -757,7 +759,16 @@ export default function Home() {
 
       {/* Schritt 2 — Variablen & Rollen */}
       <Step n={2} id={stepMeta[1].id} title={t(locale, stepMeta[1].titleKey)} status={s2} lockedReason={t(locale, lockedReasonKeys[1]!)} intro={t(locale, "step.intro.2")}>
-        {ds && <VariablesSection ds={ds} varMeta={varMeta} setVarMeta={setVarMeta} calibSpecs={calibSpecs} />}
+        {ds && (
+          <VariablesSection
+            ds={ds}
+            varMeta={varMeta}
+            setVarMeta={setVarMeta}
+            calibSpecs={calibSpecs}
+            conditionCount={conditions.length}
+            caseCount={cases.length}
+          />
+        )}
       </Step>
       <Step n={3} id={stepMeta[2].id} title={t(locale, stepMeta[2].titleKey)} status={s3} lockedReason={t(locale, lockedReasonKeys[2]!)} intro={t(locale, "step.intro.3")}>
         {ds && (
@@ -1215,14 +1226,29 @@ function VariablesSection({
   varMeta,
   setVarMeta,
   calibSpecs,
+  conditionCount,
+  caseCount,
 }: {
   ds: RawDataset;
   varMeta: Record<string, VarMeta>;
   setVarMeta: (m: Record<string, VarMeta>) => void;
   calibSpecs: CalibSpecs;
+  /** Bedingungen, mit denen tatsächlich gerechnet wird (nutzbare Set-Spalten). */
+  conditionCount: number;
+  /** Fälle, die tatsächlich in die Analyse eingehen (Missing bereits abgezogen). */
+  caseCount: number;
 }) {
   const [locale] = useLocale();
   const cols = numericColumns(ds);
+  /**
+   * Limited diversity, sichtbar statt still: 2^k Konfigurationen bei n Fällen —
+   * übersteigt 2^k die Fallzahl, bleiben zwangsläufig Zeilen unbeobachtet
+   * (Remainders). Das ist kein Fehler, aber eine methodische Entscheidung, die
+   * die Nutzerin kennen muss. Ersetzt die frühere stille Deckelung auf drei
+   * Bedingungen.
+   */
+  const configurations = conditionCount > 0 && conditionCount <= 30 ? 2 ** conditionCount : 0;
+  const limitedDiversity = caseCount > 0 && configurations > caseCount;
 
   function setType(col: string, type: VarType) {
     setVarMeta({ ...varMeta, [col]: { ...varMeta[col], type } });
@@ -1259,6 +1285,17 @@ function VariablesSection({
       >
         {t(locale, "vars.role.help")}
       </p>
+      {limitedDiversity && (
+        <div data-testid="variables-limited-diversity" style={{ margin: "0 0 14px" }}>
+          <Diag kind="warn">
+            {t(locale, "vars.limitedDiversity", {
+              k: String(conditionCount),
+              configurations: String(configurations),
+              n: String(caseCount),
+            })}
+          </Diag>
+        </div>
+      )}
       <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
           <thead>
@@ -1544,10 +1581,16 @@ function SolutionSection({
             ) : (
               s.models.map((m, mi) => (
                 <div key={mi}>
-                  <div className="oq-formula">
+                  <div
+                    className="oq-formula"
+                    data-testid={mi === 0 ? `solution-formula-${kind}` : undefined}
+                  >
                     {m.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → {outLabel}
                   </div>
-                  <div style={{ display: "flex", gap: 26, margin: "12px 0" }}>
+                  <div
+                    data-testid={mi === 0 ? `solution-kpis-${kind}` : undefined}
+                    style={{ display: "flex", gap: 26, margin: "12px 0" }}
+                  >
                     <Kpi
                       v={fmt(m.solutionConsistency)}
                       l={

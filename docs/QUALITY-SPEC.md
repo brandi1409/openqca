@@ -16,7 +16,7 @@ Stand: 2026-07-25 · Ausführung: lokale Implementierung, deterministische Prüf
 |---|---|---|
 | A1.1 | Engine-Unit-Tests grün | `node --test` in `packages/engine` (43) |
 | A1.2 | Referenz-Suite grün | `node scripts/reference-check.mjs` |
-| A1.3 | **R-Kreuzvalidierung exakt** (konservativ/intermediär/sparsam, fuzzy+crisp) | `node scripts/cross-validate.mjs` (12/12) |
+| A1.3 | **R-Kreuzvalidierung exakt** (konservativ/intermediär/sparsam, fuzzy+crisp+Modell-Ambiguität) | `node scripts/cross-validate.mjs` (15/16 PASS, 1 in VALIDATION.md dokumentierte Abweichung) — die Zahl auf der Landing (`landing.rigor.r1`, `landing.h.proof`) muss diesem Stand entsprechen |
 | A1.4 | Produktions-Build fehlerfrei | `npm run build --workspace web` |
 | A1.5 | **Kalibrierungs-Kreuzvalidierung** (crisp/piecewise-linear exakt; direkt-logistisch mit dokumentierter Restabweichung) | `node scripts/calibrate-cross-validate.mjs` — Engine nutzt Ragins ±3-Logit-Fixpunkte (≈0,0474/0,9526), R QCA zielt auf ≈0,05/0,95; Restabweichung ≤ 0,01 wird akzeptiert und dokumentiert |
 
@@ -38,7 +38,7 @@ unverändert scharf, nur eben nach `openDocumentationView()` (Helper in `e2e/hel
 | # | Kriterium | Test |
 |---|---|---|
 | A2.1 | Alle Routen liefern 200 und **null Konsolen-Fehler/Pageerrors**: `/`, `/app`, `/methodik`, `/preise`, `/download`, `/konto`, `/rechtliches/{impressum,datenschutz,agb}` | `smoke.spec` |
-| A2.2 | **Demo-Datensatz**: laden → Schritte 1–3 ✓ → komplexe Lösung enthält `WOHLSTAND*URBAN*BILDUNG` | `flows.spec` |
+| A2.2 | **Demo-Datensatz**: laden → Schritte 1–3 ✓ → alle vier numerischen Nicht-Outcome-Spalten sind Bedingungen (`STABIL` steht in der Truth Table) → komplexe Lösung enthält `WOHLSTAND*BILDUNG*STABIL` | `flows.spec` |
 | A2.3 | **Crisp-Beispiel**: laden ohne Fehler; Deskriptivstatistik zeigt Min/Max exakt `0`/`1`; **beide** Kalibrier-Ansichten zeigen „bereits kalibriert" (Schnell-Karte und Kontextband der Werkbank) | `flows.spec` |
 | A2.4 | **Fuzzy-Beispiel**: laden ohne Fehler; WOHLSTAND Min/Max exakt `0,100`/`0,900` (keine Re-Kalibrierung) | `flows.spec` |
 | A2.5 | **Beispiel-Tour**: startet, alle 7 Stationen per „Weiter", endet sauber | `tour.spec` |
@@ -53,9 +53,16 @@ unverändert scharf, nur eben nach `openDocumentationView()` (Helper in `e2e/hel
 | A2.14 | **Lokale Projekt-Persistenz**: „Projekt lokal speichern" → Reload lädt den Datensatz automatisch zurück | `flows.spec` |
 | A2.15 | **Kalibrier-Provenienz & Missing-Policy** überstehen Reload (Set-Bezeichnung, Policy, Evidenzzeile) | `flows.spec` |
 | A2.16 | **Demo-Bericht**: erzeugbar, trägt im Dokument selbst das Banner „Synthetische Lehrdaten — nicht zitierfähig"; Rechenweg vollständig; Protokoll-/R-Export bleibt gesperrt | `flows.spec` |
-| A2.17 | **Schnellpfad**: eigene Rohwerte laden, **nichts** ausfüllen → Schnell-Ansicht ist Startzustand, Notwendigkeit/Truth Table/Lösungen rechnen sofort, Bericht-Button frei, Meter zeigt „0 von 4 Sets dokumentiert", alle vier Export-Buttons gesperrt, null Pageerrors | `flows.spec` |
+| A2.17 | **Schnellpfad**: eigene Rohwerte laden, **nichts** ausfüllen → Schnell-Ansicht ist Startzustand, Notwendigkeit/Truth Table/Lösungen rechnen sofort, Bericht-Button frei, Meter zeigt „0 von 5 Sets dokumentiert" (vier Bedingungen + Outcome — keine stille Deckelung), alle vier Export-Buttons gesperrt, null Pageerrors | `flows.spec` |
 | A2.18 | **„Vorläufig"-Banner**: Bericht aus dem Schnellpfad trägt `Vorläufig — Kalibrierung noch nicht vollständig dokumentiert`, **kein** Demo-Banner, und enthält den vollständigen Rechenweg | `flows.spec` |
 | A2.19 | **Dokumentation schaltet Export frei**: nach vollständiger Dokumentation aller Sets meldet das Meter „4 von 4", alle vier Export-Buttons sind bedienbar, der Sperrgrund verschwindet und der Bericht trägt **kein** Banner mehr | `flows.spec` (im A2.12-Durchlauf geprüft — der vollständige Dokumentationslauf ist dort bereits vorhanden; ein eigener Test wäre reine Wiederholung) |
+| A2.20 | **Landing = App**: Lösungsformel und die beiden Kennzahlen im Hero-Beweisstreifen auf `/` sind identisch mit der intermediären Lösung auf `/app?demo=1` (Text normalisiert). Geprüft wird die **Identität**, kein eingefrorener Zahlenwert — Datensatz und Engine dürfen sich ändern, aber nie unterschiedlich auf beiden Seiten | `flows.spec` |
+
+**Rollen-Vorbelegung (verbindlich):** Beim Laden eines Datensatzes ist die **letzte** numerische
+Spalte das Outcome und **jede** weitere numerische Spalte eine Bedingung. Es gibt kein stilles
+Budget mehr, das überzählige Spalten auf „ignorieren" setzt. Wird `2^k` größer als die Fallzahl,
+weist Schritt 2 sichtbar auf *limited diversity* hin (`[data-testid="variables-limited-diversity"]`),
+ohne die Analyse zu blockieren.
 
 ### A3 — Visuelle Integrität (E2E, generisch — findet auch künftige Fälle)
 Geprüft in **4 Matrizen**: Light/Dark × Desktop (1280) / Mobile (390).

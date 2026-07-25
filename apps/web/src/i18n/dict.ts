@@ -42,11 +42,11 @@ const de = {
   "landing.h.eyebrow": "Qualitative Comparative Analysis · Open Source",
   "landing.h.title": "Von den Fällen zur Formel.",
   "landing.h.sub":
-    "openQCA führt Sie von Rohdaten über Kalibrierung und Truth Table zur belastbaren Lösungsformel — für Masterarbeit, Dissertation und Paper. Mit exakt den Formeln aus Ragin (2008) und einer Engine, die gegen das R-Paket QCA kreuzvalidiert ist. Kostenlos, quelloffen, Ihre Daten bleiben im Browser.",
+    "openQCA führt Sie von Rohdaten über Kalibrierung und Truth Table zur belastbaren Lösungsformel — für Masterarbeit, Dissertation und Paper. Mit den Formeln aus Ragin (2008) und einer Engine, deren Lösungen gegen das R-Paket QCA kreuzvalidiert sind. Kostenlos, quelloffen, Ihre Daten bleiben im Browser.",
   "landing.h.ctaDemo": "Beispiel-Analyse öffnen",
   "landing.h.ctaOwn": "Mit eigenen Daten starten",
   "landing.h.proof":
-    "Kreuzvalidiert gegen das R-Paket QCA — 12/12 Szenarien identisch · Kalibrierung & Kennzahlen exakt nach Ragin (2008) · MIT-Lizenz",
+    "Lösungen kreuzvalidiert gegen das R-Paket QCA — 15 von 16 Szenarien identisch, die eine Abweichung ist analysiert und dokumentiert · Kalibrierung separat gegengeprüft, Abweichung ≤ 0,01 · MIT-Lizenz",
   "landing.h.stripAria": "Ablauf einer QCA: Rohdaten, Kalibrierung, Truth Table, Lösungsformel",
   "landing.h.stripCaption":
     "Keine Illustration: Diese Zahlen rechnet die openQCA-Engine beim Laden der Seite live aus dem Demo-Datensatz (synthetisch, angelehnt an Lipset 1959) — mit denselben Formeln wie in der App.",
@@ -73,9 +73,9 @@ const de = {
 
   "landing.rigor.title": "Methodenstrenge, nachprüfbar.",
   "landing.rigor.r1":
-    "Szenarien identisch mit dem R-Paket QCA — Kalibrierung, Konsistenz, PRI, Coverage und alle drei Lösungstypen kreuzvalidiert.",
+    "Lösungs-Szenarien identisch mit dem R-Paket QCA — Formeln und Fit-Kennzahlen (inclS, covS sowie incl/cov/covU je Pfad) für konservativ, sparsam und intermediär/ESA. Die eine Abweichung (ESA mit gemischten Richtungserwartungen bei Modell-Ambiguität) ist analysiert und offen dokumentiert. Die Kalibrierung ist separat gegengeprüft; bei der direkten Methode bleibt eine Abweichung ≤ 0,01.",
   "landing.rigor.r2":
-    "Fixpunkte der direkten Kalibrierung exakt (m(i) ≈ 0,953 · m(e) ≈ 0,047), nach Ragin (2008) — nicht genähert.",
+    "Kreuzungspunkt exakt 0,500; die Anker liegen bei ≈0,047 und ≈0,953 (Log-Odds ±3 nach Ragins Verfahren). Das R-Paket zielt auf gerundete 0,05 / 0,95 — die Abweichung ist dokumentiert und bleibt ≤ 0,01.",
   "landing.rigor.r3":
     "Lösungstypen, sauber getrennt: komplex, intermediär mit Richtungserwartungen (ESA nach Schneider & Wagemann 2012), sparsam.",
   "landing.rigor.r4":
@@ -91,7 +91,7 @@ const de = {
   "landing.compare.install.c": "R + Paketinstallation",
   "landing.compare.coach": "Geführter Ablauf mit Fehler-Coach",
   "landing.compare.calib": "Direkte Kalibrierung (Ragin 2008)",
-  "landing.compare.calib.a": "✓ R-validiert",
+  "landing.compare.calib.a": "✓ R-gegengeprüft (Δ ≤ 0,01)",
   "landing.compare.calib.c": "✓ Referenz",
   "landing.compare.esa": "Intermediäre Lösung (ESA)",
   "landing.compare.export": "Protokoll + R-Skript-Export",
@@ -106,7 +106,7 @@ const de = {
   "landing.fl.i1": "Geführte Kalibrierung mit Coach für Schiefe, 0,5-Problem und Grenzfälle",
   "landing.fl.i2": "Crisp- und Fuzzy-Sets — automatisch erkannt, nie doppelt kalibriert",
   "landing.fl.i3": "Notwendigkeitsanalyse vor der Truth Table (Schneider & Wagemann)",
-  "landing.fl.i4": "Truth Table mit Konsistenz-, PRI- und Häufigkeits-Cutoffs",
+  "landing.fl.i4": "Truth Table mit Konsistenz- und Häufigkeits-Cutoff, PRI je Zeile ausgewiesen",
   "landing.fl.i5": "Robustheitsprüfung: Konsistenz-Cutoff-Sweep",
   "landing.fl.i6": "Separate Analyse des negierten Outcomes (~Y)",
   "landing.fl.i7": "Import aus CSV und Excel (XLSX), Diagramm-Export als SVG/PNG",
@@ -327,9 +327,9 @@ const de = {
   "calib.title": "Kalibrierung, die mitdenkt",
   "calib.desc":
     "Rohwerte werden zu Fuzzy-Set-Zugehörigkeit. Der Coach prüft jede Entscheidung live gegen deine Fälle.",
-  "calib.anchorOut": "Voll draußen → 0,05",
-  "calib.anchorCross": "Kreuzung → 0,50",
-  "calib.anchorIn": "Voll drinnen → 0,95",
+  "calib.anchorOut": "Voll draußen → ≈0,047",
+  "calib.anchorCross": "Kreuzung → 0,500",
+  "calib.anchorIn": "Voll drinnen → ≈0,953",
 "calib.badOrder": "Anker müssen in Richtung der Zugehörigkeit geordnet sein: voll draußen < Kreuzung < voll drinnen (bei invertierter Skala mit absteigenden Rohwerten).",
   "calib.atHalf.count": "{n} Fall/Fälle liegen genau bei 0,5",
   "calib.atHalf.rest":
@@ -597,6 +597,8 @@ const de = {
   "calib.sens.truncated": "{n} weitere Änderungen werden nicht angezeigt.",
   "calib.sens.noCaseChanges": "Keine Fallklassifikationswechsel.",
   "vars.role.help": "Ein Outcome ist das zu erklärende Set. Bedingungen werden unabhängig kalibriert und gemeinsam zur Erklärung kombiniert. Ignorierte Spalten gehen nicht in die Analyse ein.",
+  "vars.limitedDiversity":
+    "{k} Bedingungen ergeben {configurations} mögliche Konfigurationen bei {n} Fällen — viele Zeilen der Truth Table bleiben zwangsläufig unbeobachtet (limited diversity). Weniger Bedingungen oder eine theoretische Vorauswahl erwägen; die Analyse rechnet weiter, die Remainder-Behandlung wird aber wichtiger.",
   "vars.type.help.raw": "Rohwerte werden im nächsten Schritt kalibriert. Die numerische Verteilung ersetzt keine Set-Begründung.",
   "vars.type.help.fuzzy": "Bereits kalibrierte Fuzzy-Mitgliedschaften. Herkunft, Semantik und Richtung dokumentieren.",
   "vars.type.help.crisp": "Bereits kalibrierte Crisp-Mitgliedschaften. Herkunft, Inklusionsregel und Richtung dokumentieren.",
@@ -1075,11 +1077,11 @@ const en: Record<DictKey, string> = {
   "landing.h.eyebrow": "Qualitative Comparative Analysis · Open Source",
   "landing.h.title": "From cases to formula.",
   "landing.h.sub":
-    "openQCA takes you from raw data through calibration and truth table to a defensible solution formula — for your Master's thesis, dissertation or paper. With the exact formulas from Ragin (2008) and an engine cross-validated against the R package QCA. Free, open source, and your data stays in the browser.",
+    "openQCA takes you from raw data through calibration and truth table to a defensible solution formula — for your Master's thesis, dissertation or paper. With the formulas from Ragin (2008) and an engine whose solutions are cross-validated against the R package QCA. Free, open source, and your data stays in the browser.",
   "landing.h.ctaDemo": "Open the example analysis",
   "landing.h.ctaOwn": "Start with your own data",
   "landing.h.proof":
-    "Cross-validated against the R package QCA — 12/12 scenarios identical · Calibration & measures exactly per Ragin (2008) · MIT license",
+    "Solutions cross-validated against the R package QCA — 15 of 16 scenarios identical, the single divergence is analysed and documented · calibration cross-checked separately, deviation ≤ 0.01 · MIT license",
   "landing.h.stripAria": "A QCA workflow: raw data, calibration, truth table, solution formula",
   "landing.h.stripCaption":
     "Not an illustration: the openQCA engine computes these numbers live from the demo dataset (synthetic, inspired by Lipset 1959) when this page loads — using the same formulas as the app.",
@@ -1106,9 +1108,9 @@ const en: Record<DictKey, string> = {
 
   "landing.rigor.title": "Methodological rigor, verifiable.",
   "landing.rigor.r1":
-    "Scenarios identical with the R package QCA — calibration, consistency, PRI, coverage and all three solution types cross-validated.",
+    "Solution scenarios identical with the R package QCA — formulas and fit measures (inclS, covS as well as incl/cov/covU per path) for conservative, parsimonious and intermediate/ESA. The single divergence (ESA with mixed directional expectations under model ambiguity) is analysed and openly documented. Calibration is cross-checked separately; for the direct method a deviation of ≤ 0.01 remains.",
   "landing.rigor.r2":
-    "Fixed points of direct calibration exact (m(i) ≈ 0.953 · m(e) ≈ 0.047), per Ragin (2008) — not approximated.",
+    "Crossover exactly 0.500; the anchors land at ≈0.047 and ≈0.953 (log-odds ±3, following Ragin's procedure). The R package targets rounded 0.05 / 0.95 — the deviation is documented and stays ≤ 0.01.",
   "landing.rigor.r3":
     "Solution types, cleanly separated: complex, intermediate with directional expectations (ESA per Schneider & Wagemann 2012), parsimonious.",
   "landing.rigor.r4":
@@ -1124,7 +1126,7 @@ const en: Record<DictKey, string> = {
   "landing.compare.install.c": "R + package installation",
   "landing.compare.coach": "Guided workflow with mistake coach",
   "landing.compare.calib": "Direct calibration (Ragin 2008)",
-  "landing.compare.calib.a": "✓ R-validated",
+  "landing.compare.calib.a": "✓ R-cross-checked (Δ ≤ 0.01)",
   "landing.compare.calib.c": "✓ reference",
   "landing.compare.esa": "Intermediate solution (ESA)",
   "landing.compare.export": "Protocol + R-script export",
@@ -1139,7 +1141,7 @@ const en: Record<DictKey, string> = {
   "landing.fl.i1": "Guided calibration with a coach for skew, the 0.5 problem and borderline cases",
   "landing.fl.i2": "Crisp and fuzzy sets — auto-detected, never calibrated twice",
   "landing.fl.i3": "Necessity analysis before the truth table (Schneider & Wagemann)",
-  "landing.fl.i4": "Truth table with consistency, PRI and frequency cutoffs",
+  "landing.fl.i4": "Truth table with consistency and frequency cutoffs, PRI reported per row",
   "landing.fl.i5": "Robustness check: consistency cutoff sweep",
   "landing.fl.i6": "Separate analysis of the negated outcome (~Y)",
   "landing.fl.i7": "Import from CSV and Excel (XLSX), chart export as SVG/PNG",
@@ -1360,9 +1362,9 @@ const en: Record<DictKey, string> = {
   "calib.title": "Calibration that thinks along",
   "calib.desc":
     "Raw values become fuzzy-set membership. The coach checks every decision live against your cases.",
-  "calib.anchorOut": "Fully out → 0.05",
-  "calib.anchorCross": "Crossover → 0.50",
-  "calib.anchorIn": "Fully in → 0.95",
+  "calib.anchorOut": "Fully out → ≈0.047",
+  "calib.anchorCross": "Crossover → 0.500",
+  "calib.anchorIn": "Fully in → ≈0.953",
 "calib.badOrder": "Anchors must follow membership direction: fully out < crossover < fully in (descending raw values for an inverted scale).",
   "calib.atHalf.count": "{n} case(s) lie exactly at 0.5",
   "calib.atHalf.rest":
@@ -1627,6 +1629,8 @@ const en: Record<DictKey, string> = {
   "calib.sens.truncated": "{n} more changes are not shown.",
   "calib.sens.noCaseChanges": "No case classification changes.",
   "vars.role.help": "An outcome is the set being explained. Conditions are calibrated independently and combined to explain it. Ignored columns are excluded from the analysis.",
+  "vars.limitedDiversity":
+    "{k} conditions yield {configurations} possible configurations for {n} cases — many truth-table rows necessarily stay unobserved (limited diversity). Consider fewer conditions or a theory-driven pre-selection; the analysis still runs, but how remainders are treated matters more.",
   "vars.type.help.raw": "Raw values will be calibrated next. The observed distribution does not replace a set rationale.",
   "vars.type.help.fuzzy": "Already calibrated fuzzy memberships. Document provenance, meaning, and direction.",
   "vars.type.help.crisp": "Already calibrated crisp memberships. Document provenance, inclusion rule, and direction.",

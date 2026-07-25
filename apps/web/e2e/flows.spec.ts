@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import {
+  DEMO_SOLUTION,
+  dismissConsent,
   expectExportGateClosed,
   expectExportGateOpen,
   loadDemo,
@@ -14,13 +16,18 @@ import {
  * Rollen-Wechsel.
  */
 
-test("A2.2 Demo — komplexe Lösung enthält WOHLSTAND*URBAN*BILDUNG", async ({ page }) => {
+test("A2.2 Demo — komplexe Lösung enthält WOHLSTAND*BILDUNG*STABIL", async ({ page }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(e.message));
 
   await loadDemo(page);
 
-  await expect(page.getByText(/WOHLSTAND\*URBAN\*BILDUNG/).first()).toBeVisible();
+  // Alle fünf numerischen Spalten haben eine Rolle: vier Bedingungen, ein
+  // Outcome. Die frühere Erwartung WOHLSTAND*URBAN*BILDUNG war das Ergebnis der
+  // stillen Drei-Bedingungen-Deckelung und ist mit deren Entfernung ungültig.
+  // Spaltenkopf steht klein im DOM und wird per text-transform großgesetzt.
+  await expect(page.locator("#truthtable table thead th").nth(3)).toHaveText(/^stabil$/i);
+  await expect(page.getByText(DEMO_SOLUTION).first()).toBeVisible();
   // Replikationsartefakte bleiben für synthetische Daten gesperrt — sie würden
   // eine Provenienz behaupten, die es nicht gibt.
   await expect(
@@ -513,8 +520,14 @@ test("A2.17 Schnellpfad — Rohwerte rechnen ohne Dokumentation, Export bleibt g
   await expect(page.getByTestId("calibration-view-quick")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("calibration-quick")).toBeVisible();
   await expect(page.getByTestId("calibration-active-context")).toHaveCount(0);
+  // FÜNF Sets: rohwerte-demokratie.csv hat vier numerische Bedingungsspalten und
+  // ein Outcome. Vorher stand hier „0 von 4" — die vierte Bedingung
+  // (INDUSTRIEANTEIL) fiel der stillen Drei-Bedingungen-Deckelung zum Opfer und
+  // war weder im Meter noch in der Analyse. A2.11/A2.12 prüfen weiterhin
+  // „0 von 4" bzw. „4 von 4", weil der Lehr-Seed URBANISIERUNG dort BEWUSST auf
+  // „ignorieren" setzt — eine dokumentierte Entscheidung statt einer Heuristik.
   await expect(page.getByTestId("calibration-doc-meter-title")).toContainText(
-    /^Publikationsreife: 0 von 4 Sets dokumentiert$/,
+    /^Publikationsreife: 0 von 5 Sets dokumentiert$/,
   );
   await expect(page.locator('[data-testid^="calibration-doc-chip-"][data-documented="true"]')).toHaveCount(0);
 
@@ -566,4 +579,47 @@ test("A2.18 Vorläufig-Banner — Bericht aus dem Schnellpfad kennzeichnet sich 
   await expect(report.locator("body")).toContainText("DEMOKRATIE_INDEX");
   await expect(report.locator("body")).toContainText("openQCA — Analysebericht");
   await report.close();
+});
+
+/**
+ * A2.20 — Die Landing verspricht: „Keine Illustration … mit denselben Formeln
+ * wie in der App." Genau diese Zusage war gebrochen: Der Hero rechnete mit vier
+ * Bedingungen (`WOHLSTAND*BILDUNG*STABIL`, 0,972 / 0,860), die App zeigte wegen
+ * einer stillen Rollen-Heuristik nur drei (`WOHLSTAND*URBAN*BILDUNG`,
+ * 0,809 / 0,581). Ein Werkzeug, das auf der Startseite andere Zahlen behauptet
+ * als es liefert, verliert genau die Glaubwürdigkeit, für die es geschrieben
+ * ist — deshalb ist die Übereinstimmung ab jetzt eine geprüfte Zusage.
+ *
+ * Geprüft wird die Identität, nicht ein eingefrorener Zahlenwert: Ändert sich
+ * der Demo-Datensatz oder die Engine, dürfen sich BEIDE Seiten ändern — aber nie
+ * unterschiedlich.
+ */
+test("A2.20 Landing-Hero und App-Demo zeigen dieselbe Lösungsformel", async ({ page }) => {
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+  /** Alle Kennzahlen im deutschen Format (0,972) in Lesereihenfolge. */
+  const numbers = (s: string) => s.match(/\d+,\d+/g) ?? [];
+
+  await page.goto("/");
+  await dismissConsent(page);
+  const heroFormula = norm(await page.getByTestId("landing-hero-formula").innerText());
+  const heroNumbers = numbers(await page.getByTestId("landing-hero-kpis").innerText());
+  // Der Streifen behauptet eine echte Ableitung — eine leere Formel wäre ein
+  // stiller Fehlschlag und würde den Vergleich unten trivial grün machen.
+  expect(heroFormula, "Hero-Formel ist leer — der Beweis-Streifen rechnet nicht").toMatch(
+    /\S+\s+→\s+\S+/,
+  );
+  expect(heroNumbers, "Hero-Kennzahlen fehlen").toHaveLength(2);
+
+  await page.goto("/app?demo=1");
+  await dismissConsent(page);
+  const appFormula = page.getByTestId("solution-formula-intermediate");
+  await expect(appFormula).toBeVisible({ timeout: 15_000 });
+
+  // Formel: identisch, Zeichen für Zeichen (nur Leerraum normalisiert).
+  expect(norm(await appFormula.innerText())).toBe(heroFormula);
+  // Und die beiden Kennzahlen daneben ebenso — die Abweichung 0,972/0,860 gegen
+  // 0,809/0,581 war der eigentliche Schaden.
+  expect(numbers(await page.getByTestId("solution-kpis-intermediate").innerText())).toEqual(
+    heroNumbers,
+  );
 });
