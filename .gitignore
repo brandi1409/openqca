@@ -24,3 +24,4 @@ datasets/local/
 # Build-Ausgabe des Engine-Pakets (wird per prepare-Skript erzeugt)
 packages/engine/dist/
 *.tgz
+scripts/r-oracle/esa-corpus.json

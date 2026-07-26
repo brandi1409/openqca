@@ -186,18 +186,55 @@ eingestuft, abhängig von den **übrigen** positiven Konfigurationen:
   `011` (Wechsel von `111`, Bedingung in den erwarteten Zustand) ist **einfach**.
 - `fuzzy_intermediate_all_absent`, Erwartungen alle „absent", positive Ecken
   `001, 110, 111`: Derselbe Remainder `011`, erreichbar aus derselben Ecke `111` durch
-  denselben Wechsel, ist **schwierig** (R führt ihn unter `$DC`).
+  denselben Wechsel, ist **schwierig**.
 
-Der Unterschied liegt allein in den zusätzlichen positiven Ecken. R's Einstufung hängt
-also **nicht** nur an der paarweisen Erreichbarkeit aus *irgendeiner* positiven Ecke,
-sondern an der Gesamtkonstellation. Genau hier muss der nächste Anlauf ansetzen —
-sinnvollerweise mit einem Skript, das R's `$EC`/`$DC` über viele generierte Datensätze
-einsammelt und Regelkandidaten dagegen prüft, statt sie einzeln zu erraten.
+Der Unterschied liegt allein in den zusätzlichen positiven Ecken.
 
-Der Umbau wurde **bewusst zurückgenommen**: Kandidat A hätte R-geprüfte Engine-Tests
-gebrochen, Kandidat B die Gesamtübereinstimmung verschlechtert. Solange die Regel nicht
-vollständig verstanden ist, bleibt die bestehende Implementierung stehen — mit dieser
-offenen Dokumentation.
+### Dritter Anlauf (2026-07-26): Korpus statt Raten
+
+Die früheren Anläufe haben Regeln geraten und an einzelnen Szenarien gemessen. Dieser
+Anlauf hat stattdessen R systematisch befragt. Zwei Werkzeuge sind dabei entstanden und
+bleiben im Repository:
+
+- **`scripts/r-oracle/esa-corpus.R`** erzeugt einen Korpus: Für jede Aufteilung der acht
+  Ecken eines Drei-Bedingungen-Würfels in positive, negative und Remainder und für jede
+  Kombination von Richtungserwartungen ruft es `minimize()` und hält konservative,
+  sparsame und intermediäre Lösung sowie R's Listen `$EC`, `$DC` und `$SA` fest.
+- **`scripts/esa-solution-check.mjs`** stellt die intermediäre Lösung der Engine über den
+  ganzen Korpus gegen R.
+
+**Vier belastbare Befunde:**
+
+1. **`$EC` ist eine Ausgabe, keine Klassifikation.** R führt dort die einfachen
+   Counterfactuals auf, die die **fertige Lösung tatsächlich nutzt** — nicht die
+   Einstufung aller Vereinfachungsannahmen. Nachweis: Im Ambiguitätsfall listet
+   `$SA` für das sparsame Modell `B*C + C*D` die Annahmen `0110` und `1111`, `$EC`
+   dagegen nur `1111` — genau den Remainder, den die Lösung `C*D + A*B*C` überdeckt.
+   Eine Regel gegen `$EC` zu fitten, misst also das falsche Ziel. Das war der Denkfehler
+   der ersten beiden Anläufe.
+2. **Die Konstruktion ist bestätigt.** Ersetzt man die paarweise Literal-Justierung durch
+   erneute Minimierung über (positive Minterme ∪ zugelassene Remainder), liefert die
+   Engine auf **Ragins Lipset-Datensatz exakt R's intermediäre Lösung** — die Abweichung
+   verschwindet ohne jede Anpassung von Erwartungswerten oder Toleranzen.
+3. **Eine Regel deckt fast alles ab, aber nicht alles.** Der Kandidat „ein Remainder ist
+   einfach, wenn er aus einer beobachteten positiven Konfiguration hervorgeht, indem
+   Bedingungen in ihren theoriekonformen Zustand wechseln" reproduziert R auf
+   **1.792 von 1.792** Konstellationen des Korpus mit einer positiven Ecke, auf allen 57
+   Engine-Tests und auf Lipset. Er scheitert an `fuzzy_intermediate_all_absent`
+   (mehrere positive Ecken) und erzeugt im Ambiguitätsfall ein zusätzliches Modell.
+4. **Der Umbau wurde erneut zurückgenommen — aus einem inhaltlichen Grund.** Wo der
+   Kandidat scheitert, liefert er eine **zu sparsame** Lösung: Er trifft eine
+   Vereinfachungsannahme, die R nicht trifft. Das ist die methodisch gefährliche
+   Richtung — die bestehende Implementierung irrt in die andere (zu spezifisch, keine
+   Annahme, die R nicht auch trifft). Zwei Abweichungen gegen zwei Abweichungen zu
+   tauschen und dabei die Fehlerrichtung zu verschlechtern, wäre kein Fortschritt.
+
+**Was der nächste Anlauf zuerst tun sollte:** den Korpus auf mehrere positive Ecken
+erweitern (`Rscript scripts/r-oracle/esa-corpus.R 3`) und Kandidaten mit
+`scripts/esa-solution-check.mjs` gegen die **Lösung** prüfen, nicht gegen `$EC`. Die
+Signatur des offenen Falls ist scharf: Ein Remainder, der aus einer positiven Ecke durch
+einen einzigen theoriekonformen Wechsel hervorgeht, ist bei einer positiven Ecke einfach
+und bei mehreren manchmal schwierig. Was ihn dann blockiert, ist die offene Frage.
 
 Bis zur Klärung gilt: Der Fall ist als Szenario **eingecheckt und sichtbar**.
 `scripts/cross-validate.mjs` führt ihn in `KNOWN_DIVERGENCES`, meldet ihn bei jedem Lauf

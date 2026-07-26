@@ -9,6 +9,21 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+- **ESA-Korpus als Untersuchungswerkzeug** (`scripts/r-oracle/esa-corpus.R`,
+  `scripts/esa-solution-check.mjs`, `scripts/esa-rule-check.mjs`): Statt Regeln zu raten
+  und an Einzelszenarien zu messen, wird R systematisch befragt — jede Aufteilung der
+  Ecken eines Drei-Bedingungen-Würfels in positive, negative und Remainder, jede
+  Kombination von Richtungserwartungen.
+
+### Korrigiert
+- **Ein Denkfehler in der ESA-Analyse ist ausgeräumt.** R's `$EC` ist eine *Ausgabe* —
+  die einfachen Counterfactuals, die die fertige Lösung nutzt —, nicht die Einstufung
+  aller Vereinfachungsannahmen. Regelkandidaten dagegen zu prüfen misst das falsche
+  Ziel; das war der Fehler der beiden früheren Anläufe. Belastbarer Maßstab ist die
+  Lösung selbst. Einzelheiten in [`VALIDATION.md`](VALIDATION.md).
+
+
 ## [0.2.0] — 2026-07-26
 
 ### Hinzugefügt

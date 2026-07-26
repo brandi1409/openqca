@@ -1,6 +1,6 @@
 # scripts/ — Prüf- und Validierungsskripte
 
-Fünf Skripte, jedes mit einem eigenen Zweck. Alle laufen aus dem
+Sieben Skripte, jedes mit einem eigenen Zweck. Alle laufen aus dem
 **Repository-Wurzelverzeichnis** mit **Node ≥ 22.18** (ab dieser Version führt Node
 TypeScript ohne Zusatz-Flag aus; die Skripte importieren die Engine-Quellen direkt,
 ohne Build-Schritt).
@@ -16,6 +16,8 @@ und installiert.
 | `calibrate-cross-validate.mjs` | **Externe** Kreuzvalidierung der Kalibrierung gegen `QCA::calibrate()` | nein (liest eingechecktes Orakel) |
 | `performance-benchmark.mjs` | Laufzeitmessung des Truth-Table-Pfads über wachsende Bedingungs-/Fallzahlen | nein |
 | `check-engine-package.mjs` | Packt `@openqca/engine`, installiert das Tarball in ein leeres Projekt und ruft die Funktionen auf — ein durchlaufendes `npm pack` beweist nicht, dass ein Paket benutzbar ist | nein |
+| `esa-solution-check.mjs` | Stellt die intermediäre Lösung der Engine über den ESA-Korpus gegen R — Untersuchungswerkzeug für [Issue #1](https://github.com/brandi1409/openqca/issues/1), nicht Teil von `verify` | nein (liest den Korpus) |
+| `esa-rule-check.mjs` | Prüft Regelkandidaten gegen R's `$EC`. **Achtung:** `$EC` ist eine Ausgabe, keine Klassifikation — siehe `VALIDATION.md`; das Skript bleibt als Beleg dieses Befunds | nein (liest den Korpus) |
 
 ## Die R-Orakel
 
@@ -29,6 +31,7 @@ Rscript -e 'install.packages("QCA", repos="https://cloud.r-project.org")'
 
 Rscript scripts/r-oracle/oracle.R             # Lösungs-Szenarien
 Rscript scripts/r-oracle/calibrate-oracle.R   # Kalibrierungs-Prüfgitter
+Rscript scripts/r-oracle/esa-corpus.R 3       # ESA-Korpus (dauert; Argument = max. positive Ecken)
 Rscript scripts/r-oracle/lipset-export.R      # optionale Lipset-Referenzdaten (s. u.)
 ```
 
