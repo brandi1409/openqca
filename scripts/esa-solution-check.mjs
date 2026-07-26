@@ -66,7 +66,9 @@ const groups = new Map();
 for (const record of corpus.records) {
   const key = JSON.stringify([record.positives, record.negatives, record.expectations]);
   if (!groups.has(key)) groups.set(key, { record, models: [] });
-  groups.get(key).models.push(record.intermediate);
+  // `intermediate` ist eine Liste von Modellen (je Modell ein Term-Array) — R
+  // liefert je (konservativ × sparsam) Paar unter Umständen mehrere.
+  for (const model of record.intermediate) groups.get(key).models.push(model);
 }
 
 let pass = 0;

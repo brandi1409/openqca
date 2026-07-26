@@ -129,7 +129,10 @@ for (m in 1:min(MAX_POS, n_corners - 1L)) {
               # der Remainder nicht mehr bestimmbar.
               "\"cSol\":", jstrarr(unlist(isol$c.sol)), ",",
               "\"pSol\":", jstrarr(unlist(isol$p.sol)), ",",
-              "\"intermediate\":", jstrarr(unlist(isol$solution)), ",",
+              # $solution ist eine LISTE von Modellen. unlist() wuerde mehrere
+              # Modelle zu einer flachen Termliste verschmelzen -- dieselbe Falle
+              # wie bei der sparsamen Loesung. Deshalb je Modell ein Array.
+              "\"intermediate\":", jarr(lapply(isol$solution, function(m) jstrarr(m))), ",",
               "\"EC\":", jstrarr(rows_to_labels(isol$EC)), ",",
               "\"DC\":", jstrarr(rows_to_labels(isol$DC)),
               "}"

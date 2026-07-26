@@ -17,6 +17,16 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   Kombination von Richtungserwartungen.
 
 ### Korrigiert
+- **Reichweite der ESA-Abweichung erstmals gemessen.** Über 13.216 Konstellationen
+  (drei Bedingungen, bis zu drei positive Ecken, alle Erwartungskombinationen) stimmt die
+  intermediäre Lösung in **86,3 %** der Fälle mit dem R-Paket überein. Bisher war die
+  Abweichung nur als „zwei Szenarien" beschrieben; betroffen ist rund ein Siebtel aller
+  Konstellationen. Konservative und sparsame Lösung sind unverändert nicht betroffen.
+- **Zwei eigene Auswertungsfehler behoben.** Der Korpus-Export verschmolz mehrere
+  intermediäre Modelle über `unlist()` zu einer flachen Termliste; und die Zahl
+  „1.792 von 1.792" war als Beleg für einen Regelkandidaten angeführt, obwohl die
+  bestehende Implementierung dort denselben Wert erreicht — der Teilkorpus mit einer
+  positiven Ecke kann die Regeln gar nicht unterscheiden.
 - **Ein Denkfehler in der ESA-Analyse ist ausgeräumt.** R's `$EC` ist eine *Ausgabe* —
   die einfachen Counterfactuals, die die fertige Lösung nutzt —, nicht die Einstufung
   aller Vereinfachungsannahmen. Regelkandidaten dagegen zu prüfen misst das falsche

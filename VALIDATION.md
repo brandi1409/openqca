@@ -216,22 +216,38 @@ bleiben im Repository:
    erneute Minimierung über (positive Minterme ∪ zugelassene Remainder), liefert die
    Engine auf **Ragins Lipset-Datensatz exakt R's intermediäre Lösung** — die Abweichung
    verschwindet ohne jede Anpassung von Erwartungswerten oder Toleranzen.
-3. **Eine Regel deckt fast alles ab, aber nicht alles.** Der Kandidat „ein Remainder ist
+3. **Die Reichweite der Abweichung ist jetzt gemessen — sie ist größer als gedacht.**
+   Über alle **13.216** Konstellationen des Korpus (drei Bedingungen, bis zu drei positive
+   Ecken, alle Erwartungskombinationen) stimmt die intermediäre Lösung der Engine in
+   **11.408 Fällen (86,3 %)** mit R überein. Die Abweichung betrifft also rund ein Siebtel
+   aller Konstellationen, nicht zwei Szenarien. Der Regelkandidat („ein Remainder ist
    einfach, wenn er aus einer beobachteten positiven Konfiguration hervorgeht, indem
-   Bedingungen in ihren theoriekonformen Zustand wechseln" reproduziert R auf
-   **1.792 von 1.792** Konstellationen des Korpus mit einer positiven Ecke, auf allen 57
-   Engine-Tests und auf Lipset. Er scheitert an `fuzzy_intermediate_all_absent`
-   (mehrere positive Ecken) und erzeugt im Ambiguitätsfall ein zusätzliches Modell.
+   Bedingungen in ihren theoriekonformen Zustand wechseln") kommt auf **12.088 (91,5 %)**
+   — besser, aber ebenfalls nicht vollständig.
+
+   **Wichtig zur Aussagekraft:** Auf dem Teilkorpus mit **einer** positiven Ecke erreichen
+   **beide** Regeln 1.792 von 1.792. Dieser Teil kann sie also gar nicht unterscheiden;
+   erst mehrere positive Ecken trennen sie. Eine frühere Fassung dieses Abschnitts führte
+   die 1.792 als Beleg für den Kandidaten an — das war sie nicht.
 4. **Der Umbau wurde erneut zurückgenommen — aus einem inhaltlichen Grund.** Wo der
    Kandidat scheitert, liefert er eine **zu sparsame** Lösung: Er trifft eine
    Vereinfachungsannahme, die R nicht trifft. Das ist die methodisch gefährliche
    Richtung — die bestehende Implementierung irrt in die andere (zu spezifisch, keine
-   Annahme, die R nicht auch trifft). Zwei Abweichungen gegen zwei Abweichungen zu
-   tauschen und dabei die Fehlerrichtung zu verschlechtern, wäre kein Fortschritt.
+   Annahme, die R nicht auch trifft). In der Kreuzvalidierung tauscht der Kandidat
+   entsprechend: Lipset wird exakt, `fuzzy_intermediate_all_absent` bricht. Fünf
+   Prozentpunkte mehr Übereinstimmung sind das nicht wert, wenn der Preis eine Lösung ist,
+   die mehr behauptet als die Daten hergeben.
 
-**Was der nächste Anlauf zuerst tun sollte:** den Korpus auf mehrere positive Ecken
-erweitern (`Rscript scripts/r-oracle/esa-corpus.R 3`) und Kandidaten mit
-`scripts/esa-solution-check.mjs` gegen die **Lösung** prüfen, nicht gegen `$EC`. Die
+**Eine Falle im Korpus selbst**, die beim Auswerten aufgefallen ist: R gibt in
+`$i.sol[[k]]$solution` eine **Liste von Modellen** zurück. Ein `unlist()` beim Export
+verschmilzt sie zu einer flachen Termliste — sichtbar an Lösungen mit doppelten Termen wie
+`B*C + ~A*B + ~A*~C + ~A*~C`. Der Export schreibt deshalb je Modell ein eigenes Array
+(`esa-corpus.R`). Dieselbe Falle steckt in `$solution` der sparsamen Lösung.
+
+**Was der nächste Anlauf zuerst tun sollte:** Kandidaten mit
+`scripts/esa-solution-check.mjs` gegen die **Lösung** prüfen, nicht gegen `$EC`, und dabei
+auf dem Korpus mit mehreren positiven Ecken messen (`Rscript scripts/r-oracle/esa-corpus.R 3`,
+rund 50 Minuten). Die
 Signatur des offenen Falls ist scharf: Ein Remainder, der aus einer positiven Ecke durch
 einen einzigen theoriekonformen Wechsel hervorgeht, ist bei einer positiven Ecke einfach
 und bei mehreren manchmal schwierig. Was ihn dann blockiert, ist die offene Frage.
