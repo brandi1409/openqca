@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { calibrateDirect, buildTruthTable, intermediateSolution } from "@openqca/engine";
 import { DEMO } from "@/lib/demo";
 import { useLocale } from "@/i18n/locale";
@@ -95,24 +95,232 @@ function fmt3(x: number): string {
 export function Landing() {
   const [locale] = useLocale();
   return (
-    <>
+    <div className="oq-landing">
+      <LandingStyles />
       <LandingNav />
       <main>
         <Hero />
-        <Deliverables />
-        <Rigor />
-        <Compare />
-        <FeatureList />
-        <Steps />
-        <Privacy />
-        <PricingTeaser />
-        <DownloadTeaser />
+        <Reveal>
+          <Deliverables />
+        </Reveal>
+        <Reveal>
+          <Rigor />
+        </Reveal>
+        <Reveal>
+          <Compare />
+        </Reveal>
+        <Reveal>
+          <FeatureList />
+        </Reveal>
+        <Reveal>
+          <Steps />
+        </Reveal>
+        <Reveal>
+          <Privacy />
+        </Reveal>
+        <Reveal>
+          <PricingTeaser />
+        </Reveal>
+        <Reveal>
+          <DownloadTeaser />
+        </Reveal>
         <CtaBand />
       </main>
       <span style={{ display: "none" }} aria-hidden>
         {locale}
       </span>
-    </>
+    </div>
+  );
+}
+
+/* ---------- Motion-System (Landing-weit) ----------
+
+   Kurven und Zeiten folgen einem festen Rahmen:
+   - Einblenden/Enter immer ease-out (sofortige Bewegung = reaktionsschnell),
+     mit einer starken Custom-Curve statt der zu schwachen eingebauten.
+   - UI-Animationen bleiben unter ~500ms; Hover-Feedback bei 140-220ms.
+   - Hover-Effekte nur auf Geräten mit echtem Hover (sonst feuert :hover
+     auf Touch beim Tippen falsch).
+   - :active skaliert auf 0.97 — jedes klickbare Element bestätigt den Druck.
+   - prefers-reduced-motion: keine Bewegung, Inhalte sofort sichtbar. */
+
+function LandingStyles() {
+  return (
+    <style>{`
+      .oq-landing {
+        --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+        --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        html { scroll-behavior: smooth; }
+      }
+
+      /* Enter-Animationen (Hero + Beweis-Streifen) */
+      @keyframes oq-draw { from { stroke-dashoffset: 240; } to { stroke-dashoffset: 0; } }
+      @keyframes oq-fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+      @keyframes oq-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      .oq-anim-curve { stroke-dasharray: 240; animation: oq-draw 900ms var(--ease-out) 250ms both; }
+      .oq-anim-dot { animation: oq-fade 400ms var(--ease-out) both; }
+      .oq-anim-late { animation: oq-fade 600ms var(--ease-out) 1000ms both; }
+      .oq-hero-in { animation: oq-rise 520ms var(--ease-out) both; }
+
+      /* Scroll-Reveal: Sektionen gleiten beim Erreichen des Viewports ein.
+         Interruptible Transition statt Keyframes. Der Startzustand wird erst
+         per JS gesetzt (.is-armed) — ohne JS oder mit reduzierter Bewegung
+         ist der Inhalt von Anfang an voll sichtbar. */
+      .oq-reveal.is-armed {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+      .oq-reveal.is-armed.is-visible {
+        opacity: 1;
+        transform: none;
+        transition: opacity 500ms var(--ease-out), transform 500ms var(--ease-out);
+      }
+
+      /* Buttons: ein System für primary + ghost. */
+      .oq-btn {
+        display: inline-block;
+        font: inherit;
+        font-weight: 600;
+        text-decoration: none;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        transition:
+          transform 160ms var(--ease-out),
+          background-color 160ms ease,
+          border-color 160ms ease,
+          box-shadow 200ms var(--ease-out);
+      }
+      .oq-btn--primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .oq-btn--ghost {
+        background: var(--panel);
+        border-color: var(--line);
+        color: var(--ink);
+      }
+      .oq-btn:active {
+        transform: scale(0.97);
+        transition-duration: 60ms;
+      }
+      @media (hover: hover) and (pointer: fine) {
+        .oq-btn--primary:hover {
+          background: var(--accent-deep);
+          border-color: var(--accent-deep);
+          transform: translateY(-1px);
+          box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+        .oq-btn--ghost:hover {
+          background: var(--line-soft);
+          transform: translateY(-1px);
+        }
+      }
+
+      /* Nav-Links: Unterstrich wächst von links (ease-out). */
+      .oq-nav-link {
+        position: relative;
+        transition: color 160ms ease;
+      }
+      .oq-nav-link::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -4px;
+        height: 1.5px;
+        background: currentColor;
+        transform: scaleX(0);
+        transform-origin: left center;
+        transition: transform 220ms var(--ease-out);
+      }
+      @media (hover: hover) and (pointer: fine) {
+        .oq-nav-link:hover { color: var(--ink); }
+        .oq-nav-link:hover::after { transform: scaleX(1); }
+      }
+
+      /* Karten: heben sich beim Hover leicht, Schatten aus der Textfarbe
+         gemischt (funktioniert in Light + Dark). */
+      .oq-card {
+        transition: transform 220ms var(--ease-out), box-shadow 260ms var(--ease-out);
+      }
+      @media (hover: hover) and (pointer: fine) {
+        .oq-card:hover {
+          transform: translateY(-2px);
+          box-shadow:
+            0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent),
+            0 14px 30px -10px color-mix(in srgb, var(--ink) 16%, transparent);
+        }
+      }
+
+      /* Vergleichstabelle: Zeilen-Feedback. */
+      @media (hover: hover) and (pointer: fine) {
+        .oq-compare tbody tr { transition: background-color 140ms ease; }
+        .oq-compare tbody tr:hover { background: var(--panel-2); }
+      }
+
+      /* Schritt-Zahlen: kleiner Impuls beim Hover über dem Schritt. */
+      .oq-step-num { transition: transform 200ms var(--ease-out); }
+      @media (hover: hover) and (pointer: fine) {
+        .oq-step:hover .oq-step-num { transform: scale(1.08); }
+      }
+
+      /* Beweis-Streifen Layout (unverändert): unterhalb Desktop umbrechen,
+         damit die Lösungsformel nie horizontales Scrollen erzwingt. */
+      .oq-strip { display: flex; align-items: stretch; gap: 0; }
+      .oq-strip-svg { display: block; width: 100%; max-width: 220px; height: auto; }
+      @media (max-width: 1020px) {
+        .oq-strip { flex-wrap: wrap; gap: 18px 26px; }
+        .oq-arrow { display: none; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .oq-anim-curve, .oq-anim-dot, .oq-anim-late, .oq-hero-in { animation: none; }
+        .oq-btn, .oq-card, .oq-nav-link, .oq-nav-link::after, .oq-step-num { transition: none; }
+      }
+    `}</style>
+  );
+}
+
+/** Blendet eine Sektion beim Hereinscrollen ein (einmalig, interruptionssicher). */
+function Reveal({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Ohne Observer-Unterstützung (oder wenn der Konstruktor wirft) nie armen —
+    // sonst bliebe die Sektion dauerhaft unsichtbar.
+    if (typeof IntersectionObserver === "undefined") return;
+    el.classList.add("is-armed");
+    let io: IntersectionObserver;
+    try {
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              el.classList.add("is-visible");
+              io.disconnect();
+            }
+          }
+        },
+        { threshold: 0.12, rootMargin: "0px 0px -40px 0px" },
+      );
+    } catch {
+      el.classList.remove("is-armed");
+      return;
+    }
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="oq-reveal">
+      {children}
+    </div>
   );
 }
 
@@ -152,7 +360,7 @@ function LandingNav() {
 
 function NavLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <a href={href} style={{ fontSize: 14, color: "var(--ink-2)", textDecoration: "none", fontWeight: 500 }}>
+    <a href={href} className="oq-nav-link" style={{ fontSize: 14, color: "var(--ink-2)", textDecoration: "none", fontWeight: 500 }}>
       {children}
     </a>
   );
@@ -164,29 +372,14 @@ function Hero() {
   const [locale] = useLocale();
   return (
     <section style={{ ...sectionStyle, paddingTop: 58, paddingBottom: 28 }}>
-      <style>{`
-        @keyframes oq-draw { from { stroke-dashoffset: 240; } to { stroke-dashoffset: 0; } }
-        @keyframes oq-fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
-        .oq-anim-curve { stroke-dasharray: 240; animation: oq-draw 900ms ease-out 250ms both; }
-        .oq-anim-dot { animation: oq-fade 400ms ease-out both; }
-        .oq-anim-late { animation: oq-fade 600ms ease-out 1000ms both; }
-        @media (prefers-reduced-motion: reduce) {
-          .oq-anim-curve, .oq-anim-dot, .oq-anim-late { animation: none; }
-        }
-        .oq-strip { display: flex; align-items: stretch; gap: 0; }
-        .oq-strip-svg { display: block; width: 100%; max-width: 220px; height: auto; }
-        /* Unterhalb Desktop-Breite umbrechen statt scrollen — die Lösungsformel
-           (die Pointe des Streifens) muss immer ohne Scrollen sichtbar sein. */
-        @media (max-width: 1020px) {
-          .oq-strip { flex-wrap: wrap; gap: 18px 26px; }
-          .oq-arrow { display: none; }
-        }
-      `}</style>
-
-      <p style={{ fontFamily: MONO_FONT, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--brand)", fontWeight: 600, margin: 0 }}>
+      <p
+        className="oq-hero-in"
+        style={{ fontFamily: MONO_FONT, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--brand)", fontWeight: 600, margin: 0, animationDelay: "0ms" }}
+      >
         {t(locale, "landing.h.eyebrow")}
       </p>
       <h1
+        className="oq-hero-in"
         style={{
           fontFamily: DISPLAY_FONT,
           fontSize: "clamp(34px, 5.4vw, 52px)",
@@ -195,21 +388,22 @@ function Hero() {
           letterSpacing: "-0.01em",
           margin: "14px 0 0",
           maxWidth: "22ch",
+          animationDelay: "70ms",
         }}
       >
         {t(locale, "landing.h.title")}
       </h1>
-      <p style={{ color: "var(--ink-2)", fontSize: 17, lineHeight: 1.6, maxWidth: "62ch", margin: "16px 0 0" }}>
+      <p className="oq-hero-in" style={{ color: "var(--ink-2)", fontSize: 17, lineHeight: 1.6, maxWidth: "62ch", margin: "16px 0 0", animationDelay: "140ms" }}>
         {t(locale, "landing.h.sub")}
       </p>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24 }}>
+      <div className="oq-hero-in" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24, animationDelay: "210ms" }}>
         <CtaButton href="/app?demo=1" primary large>{t(locale, "landing.h.ctaDemo")}</CtaButton>
         <CtaButton href="/app" large>{t(locale, "landing.h.ctaOwn")}</CtaButton>
       </div>
 
       <ProofStrip />
 
-      <p style={{ fontFamily: MONO_FONT, fontSize: 12, lineHeight: 1.7, color: "var(--muted)", margin: "14px 0 0" }}>
+      <p className="oq-hero-in" style={{ fontFamily: MONO_FONT, fontSize: 12, lineHeight: 1.7, color: "var(--muted)", margin: "14px 0 0", animationDelay: "280ms" }}>
         {t(locale, "landing.h.proof")}
       </p>
     </section>
@@ -392,7 +586,7 @@ function Deliverables() {
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginTop: 22 }}>
         {items.map(([tag, title, desc]) => (
-          <div key={tag} style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
+          <div key={tag} className="oq-card" style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
             <span
               style={{
                 display: "inline-block",
@@ -485,7 +679,7 @@ function Compare() {
     <section style={sectionStyle}>
       <SectionHeading>{t(locale, "landing.compare.title")}</SectionHeading>
       <div style={{ marginTop: 18, overflowX: "auto", border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
+        <table className="oq-compare" style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
           <thead>
             <tr>
               {head.map((h, i) => (
@@ -566,9 +760,10 @@ function Steps() {
       <SectionHeading>{t(locale, "landing.steps.title")}</SectionHeading>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginTop: 22 }}>
         {steps.map(([n, title, desc]) => (
-          <div key={n} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <div key={n} className="oq-step" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
             <span
               aria-hidden
+              className="oq-step-num"
               style={{
                 flex: "none",
                 width: 34,
@@ -656,7 +851,7 @@ function PricingTeaser() {
 
 function MiniCard({ name, desc }: { name: string; desc: string }) {
   return (
-    <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
+    <div className="oq-card" style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
       <h3 style={{ fontSize: 17, fontWeight: 650, margin: "0 0 8px" }}>{name}</h3>
       <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", margin: 0 }}>{desc}</p>
     </div>
@@ -720,17 +915,10 @@ function CtaButton({ href, children, primary, large }: { href: string; children:
   return (
     <a
       href={href}
+      className={primary ? "oq-btn oq-btn--primary" : "oq-btn oq-btn--ghost"}
       style={{
-        display: "inline-block",
-        font: "inherit",
-        fontWeight: 600,
         fontSize: large ? 15.5 : 14,
-        textDecoration: "none",
-        borderRadius: 8,
         padding: large ? "11px 22px" : "8px 15px",
-        border: primary ? "1px solid var(--accent)" : "1px solid var(--line)",
-        background: primary ? "var(--accent)" : "var(--panel)",
-        color: primary ? "#fff" : "var(--ink)",
       }}
     >
       {children}
