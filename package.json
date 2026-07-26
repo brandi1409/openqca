@@ -1,7 +1,7 @@
 {
   "name": "openqca",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Open-Access QCA (Qualitative Comparative Analysis) — Neubau von Ragins fs/QCA als moderne, reproduzierbare Web- und Desktop-App.",
   "workspaces": [
     "packages/*",
@@ -16,6 +16,7 @@
     "check:reference": "node scripts/reference-check.mjs",
     "check:r": "node scripts/cross-validate.mjs",
     "check:r-calibration": "node scripts/calibrate-cross-validate.mjs",
+    "check:engine-package": "node scripts/check-engine-package.mjs",
     "verify": "npm run test:engine && npm run check:reference && npm run check:r && npm run check:r-calibration && npm run lint --workspace web && npm run build --workspace web"
   },
   "license": "MIT"

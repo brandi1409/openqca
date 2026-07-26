@@ -9,6 +9,8 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
 
 ## [Unveröffentlicht]
 
+## [0.2.0] — 2026-07-26
+
 ### Hinzugefügt
 - **Notwendigkeit von Disjunktionen (SUIN) und RoN.** `necessarySupersets` prüft
   Konjunktionen und minimale Disjunktionen bis zu einer wählbaren Ordnung und weist inclN,
@@ -43,6 +45,17 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   das tatsächliche Validierungsergebnis geprüft.
 - `@openqca/engine` ist als eigenständiges npm-Paket installierbar (gebautes `dist`,
   Typdeklarationen, eigenes README).
+- **Zitierhinweis in App und Bericht.** Eine Karte am Ende von Schritt 6 und ein eigener
+  Abschnitt im Bericht nennen Autor, Titel, Version und — sobald vorhanden — den DOI, dazu
+  ein BibTeX-Eintrag zum Kopieren. Solange kein DOI existiert, sagt die App das ausdrücklich
+  und verweist auf die Repository-Adresse; ein Platzhalter-DOI würde zitierfähig aussehen
+  und ins Leere laufen.
+- **`RELEASING.md` und `.zenodo.json`** — dokumentierter Release-Ablauf samt der Reihenfolge,
+  auf die es ankommt: Zenodo muss vor dem Release verbunden sein, sonst wird kein DOI
+  vergeben.
+- **`scripts/check-engine-package.mjs`** — packt die Engine, installiert das Tarball in ein
+  leeres Projekt und ruft die Funktionen auf. Ein durchlaufendes `npm pack` beweist nicht,
+  dass ein Paket benutzbar ist.
 - `scripts/README.md` — Übersicht über die vier Prüfskripte und die R-Orakel.
 
 ### Korrigiert
@@ -68,6 +81,11 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   darunter „0 von 5 Sets dokumentiert" stand. Solange die Kalibrierung nicht begründet ist,
   bleibt die Ziffer stehen und der Schritt trägt „rechnet — vorläufig"; die
   Vorläufig-Marke nennt jetzt Grund und Weg statt nur eines Warnzeichens.
+- **Schritt 3 als Akkordeon.** Fünf ausgeklappte Set-Karten waren gut vier Bildschirmhöhen
+  lang; bei sechs bis acht Bedingungen war der Schritt nicht mehr bedienbar. Ein Set ist
+  offen, die übrigen stehen als Zeile mit Rolle, Status, Herkunft und den gesetzten Ankern.
+  Die deskriptive Statistik steht jetzt unter den Sets und eingeklappt — sie beschreibt die
+  kalibrierten Werte und stand damit vor ihrer eigenen Ursache.
 - **Ankergriffe auf Touch bedienbar.** Die Trefferfläche steckte im viewBox und schrumpfte
   auf 390px auf 12 CSS-Pixel. Jeder Griff reicht jetzt bis zur Mitte zum Nachbarn (≥ 44px,
   maschinell geprüft), Ziehen ist relativ zum Griff statt springend, und vertikales

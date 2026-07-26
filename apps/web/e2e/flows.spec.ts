@@ -802,3 +802,30 @@ test.describe("A2.23 mobile @390", () => {
     expect(offenders, `Elemente über der 10px-Reserve: ${JSON.stringify(offenders)}`).toEqual([]);
   });
 });
+
+/**
+ * A2.23 — Wie zitiert man das Werkzeug?
+ *
+ * Bisher fand ein Nutzer die Antwort nirgends in der App; die einzigen
+ * Zitat-Treffer waren Negativ-Banner („nicht zitierfähig"). Geprüft wird, dass
+ * die Zitation Autor, Titel und Version nennt, dass ein BibTeX-Eintrag
+ * angeboten wird — und dass die App ehrlich sagt, wenn noch kein DOI existiert,
+ * statt einen Platzhalter auszugeben, der zitierfähig aussähe und ins Leere
+ * liefe.
+ */
+test("A2.23 Zitierhinweis nennt Version und verschweigt den fehlenden DOI nicht", async ({
+  page,
+}) => {
+  await loadDemo(page);
+  const citation = page.getByTestId("citation-plain");
+  await expect(citation).toBeVisible();
+  await expect(citation).toContainText("Brandauer");
+  await expect(citation).toContainText("openQCA");
+  await expect(citation, "Die Zitation muss eine Version nennen").toContainText(/Version \S+/);
+  // Kein erfundener DOI, solange keiner vergeben ist.
+  const text = (await citation.textContent()) ?? "";
+  if (!/doi\.org/i.test(text)) {
+    await expect(page.getByTestId("citation-no-doi")).toBeVisible();
+  }
+  await expect(page.getByRole("button", { name: /BibTeX kopieren/ })).toBeVisible();
+});

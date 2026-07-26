@@ -1,0 +1,34 @@
+{
+  "title": "openQCA: An open, reproducible tool for Qualitative Comparative Analysis",
+  "description": "<p>openQCA is an open-source, local-first web tool for Qualitative Comparative Analysis (QCA). It covers direct and piecewise-linear calibration, truth table construction, Quine&ndash;McCluskey minimization with conservative, parsimonious and intermediate (Enhanced Standard Analysis) solutions, consistency, PRI and coverage measures, necessity analysis including disjunctions (SUIN) and relevance of necessity, case diagnostics, sensitivity and a robustness grid.</p><p>Its dependency-free TypeScript engine is cross-validated against the R package <code>QCA</code>; the current state of that validation, including two documented divergences in the intermediate solution, is recorded in <code>VALIDATION.md</code> in the repository. Calibration decisions &mdash; the step on which every QCA result depends and which is frequently unreported in published work &mdash; are recorded with their evidence and exported as a JSON protocol and an equivalent R script.</p><p>Data never leaves the browser.</p>",
+  "creators": [
+    {
+      "name": "Brandauer, John"
+    }
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "access_right": "open",
+  "keywords": [
+    "qualitative comparative analysis",
+    "QCA",
+    "fsQCA",
+    "fuzzy sets",
+    "set-theoretic methods",
+    "social science methods",
+    "reproducible research",
+    "calibration"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/brandi1409/openqca",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://openqca.vercel.app",
+      "relation": "isIdenticalTo",
+      "scheme": "url"
+    }
+  ]
+}

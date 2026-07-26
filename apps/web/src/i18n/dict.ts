@@ -814,6 +814,14 @@ const de = {
     "Typisch = X > 0,5, Y > 0,5, X ≤ Y · Abweichend (Art) = X > 0,5, Y ≤ 0,5 (widerspricht der Hinreichendheit) · Abweichend (Grad) = X > Y, beide > 0,5 · Irrelevant = X ≤ 0,5, der Pfad sagt über den Fall nichts aus. „Vom Modell nicht gedeckt (deviant coverage)“ erscheint nur, wenn es solche Fälle gibt — fehlt die Zeile, ist jeder Outcome-Fall von mindestens einem Pfad gedeckt.",
 
   // -- Protokoll --------------------------------------------------------------
+  "cite.title": "openQCA zitieren",
+  "cite.desc":
+    "Wer openQCA in einer Arbeit verwendet, sollte die genaue Version angeben — Ergebnisse hängen von der Fassung ab, mit der sie gerechnet wurden.",
+  "cite.noDoi":
+    "Noch ohne DOI: Der zitierfähige Bezeichner entsteht mit dem nächsten über Zenodo archivierten Release. Bis dahin ist die Repository-Adresse die verlässliche Angabe.",
+  "cite.copy": "Zitation kopieren",
+  "cite.copyBibtex": "BibTeX kopieren",
+  "cite.copied": "kopiert",
   "proto.title": "Analyseprotokoll",
   "proto.desc":
     "Reproduzierbar: Kalibrierungsprotokoll (JSON + Markdown) und R-Skript (package QCA; logistic = TRUE für direkte, logistic = FALSE für lineare Fuzzy-Kalibrierung).",
@@ -1919,6 +1927,14 @@ const en: Record<DictKey, string> = {
     "Typical = X > 0.5, Y > 0.5, X ≤ Y · Deviant (kind) = X > 0.5, Y ≤ 0.5 (contradicts sufficiency) · Deviant (degree) = X > Y, both > 0.5 · Irrelevant = X ≤ 0.5, the path says nothing about the case. “Not covered by the model (deviant coverage)” only appears when such cases exist — if the line is absent, every outcome case is covered by at least one path.",
 
   // -- Protocol ---------------------------------------------------------------
+  "cite.title": "Cite openQCA",
+  "cite.desc":
+    "If you use openQCA in your work, state the exact version — results depend on the release they were computed with.",
+  "cite.noDoi":
+    "No DOI yet: the citable identifier is minted with the next release archived through Zenodo. Until then the repository URL is the reliable reference.",
+  "cite.copy": "Copy citation",
+  "cite.copyBibtex": "Copy BibTeX",
+  "cite.copied": "copied",
   "proto.title": "Analysis protocol",
   "proto.desc":
     "Reproducible: calibration protocol (JSON + Markdown) and R script (QCA package; logistic = TRUE for direct and logistic = FALSE for piecewise-linear fuzzy calibration).",

@@ -6,6 +6,7 @@
 
 import type { NecessityEntry, Solution, TruthTableResult, TruthTableRow } from "@openqca/engine";
 import type { CalibSpecs } from "@/lib/calibration-model";
+import { citationInfo } from "@/lib/citation";
 
 export interface ReportInput {
   datasetName: string;
@@ -123,6 +124,9 @@ const REPORT_COPY = {
     necessity: "Notwendige Bedingungen",
     necessityHint: "Konvention: Konsistenz ≥ 0,9 als Hinweis auf Notwendigkeit — mit Coverage und Fallkenntnis interpretieren.",
     reproducibility: "Reproduzierbarkeit",
+    citation: "Zitation",
+    citationHint:
+      "Bitte die genaue Version angeben — Ergebnisse hängen von der Fassung ab, mit der sie gerechnet wurden.",
     footer: "Dieser Bericht dokumentiert Rechenschritte und Parameter einer fsQCA-Analyse. Die inhaltliche Interpretation der Ergebnisse — insbesondere Kausalitätsannahmen, Fallauswahl und theoretische Einordnung — liegt in der wissenschaftlichen Verantwortung der Nutzerin bzw. des Nutzers.",
     roles: { condition: "Bedingung", outcome: "Outcome", ignore: "ignoriert" } as Record<string, string>,
     statuses: {
@@ -189,6 +193,9 @@ const REPORT_COPY = {
     necessity: "Necessary conditions",
     necessityHint: "Convention: consistency ≥ 0.9 is a candidate signal for necessity; interpret it with coverage and case knowledge.",
     reproducibility: "Reproducibility",
+    citation: "Citation",
+    citationHint:
+      "Please state the exact version — results depend on the release they were computed with.",
     footer: "This report documents the calculation steps and parameters of an fsQCA analysis. Substantive interpretation of the results—especially causal assumptions, case selection, and theoretical positioning—remains the scientific responsibility of the user.",
     roles: { condition: "condition", outcome: "outcome", ignore: "ignored" } as Record<string, string>,
     statuses: {
@@ -454,6 +461,8 @@ export function generateReportHtml(input: ReportInput): string {
     locale,
   );
 
+  const cite = citationInfo();
+
   return `<!DOCTYPE html>
 <html lang="${locale}">
 <head>
@@ -491,6 +500,11 @@ export function generateReportHtml(input: ReportInput): string {
 
   <h2>${copy.reproducibility}</h2>
   <pre>${esc(input.rScript)}</pre>
+
+  <h2>${copy.citation}</h2>
+  <p>${esc(cite.plain)}</p>
+  <p class="hint">${copy.citationHint}</p>
+  <pre>${esc(cite.bibtex)}</pre>
 
   <footer>${copy.footer}</footer>
 </body>

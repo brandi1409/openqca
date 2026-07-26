@@ -8,8 +8,8 @@ abstract: >-
   Quine–McCluskey minimization, consistency and coverage measures, and
   necessity analysis, together with a reproducibility protocol.
 type: software
-version: "0.1.0"
-date-released: "2026-07-16"
+version: "0.2.0"
+date-released: "2026-07-26"
 license: MIT
 repository-code: "https://github.com/brandi1409/openqca"
 url: "https://openqca.vercel.app"

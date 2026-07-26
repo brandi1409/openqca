@@ -1,12 +1,13 @@
 # scripts/ — Prüf- und Validierungsskripte
 
-Vier Skripte, jedes mit einem eigenen Zweck. Alle laufen aus dem
+Fünf Skripte, jedes mit einem eigenen Zweck. Alle laufen aus dem
 **Repository-Wurzelverzeichnis** mit **Node ≥ 22.18** (ab dieser Version führt Node
 TypeScript ohne Zusatz-Flag aus; die Skripte importieren die Engine-Quellen direkt,
 ohne Build-Schritt).
 
-Alle vier zusammen plus Lint und Produktions-Build laufen mit `npm run verify` —
-dieselbe Kette wie in CI.
+Die ersten vier plus Lint und Produktions-Build laufen mit `npm run verify` —
+dieselbe Kette wie in CI. Die Paketprüfung läuft separat, weil sie ein Tarball baut
+und installiert.
 
 | Skript | Zweck | Braucht R? |
 |---|---|---|
@@ -14,6 +15,7 @@ dieselbe Kette wie in CI.
 | `cross-validate.mjs` | **Externe** Kreuzvalidierung der Lösungslogik gegen das R-Paket `QCA` | nein (liest eingechecktes Orakel) |
 | `calibrate-cross-validate.mjs` | **Externe** Kreuzvalidierung der Kalibrierung gegen `QCA::calibrate()` | nein (liest eingechecktes Orakel) |
 | `performance-benchmark.mjs` | Laufzeitmessung des Truth-Table-Pfads über wachsende Bedingungs-/Fallzahlen | nein |
+| `check-engine-package.mjs` | Packt `@openqca/engine`, installiert das Tarball in ein leeres Projekt und ruft die Funktionen auf — ein durchlaufendes `npm pack` beweist nicht, dass ein Paket benutzbar ist | nein |
 
 ## Die R-Orakel
 

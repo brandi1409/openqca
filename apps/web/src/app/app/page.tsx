@@ -35,6 +35,7 @@ import { RobustnessPanel } from "@/components/RobustnessPanel";
 import NegatedOutcomePanel from "@/components/NegatedOutcomePanel";
 import { ReportButton } from "@/components/ReportButton";
 import { type ReportInput } from "@/lib/report";
+import { citationInfo } from "@/lib/citation";
 import { useLocale } from "@/i18n/locale";
 import { t, type DictKey } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -1120,6 +1121,7 @@ export default function Home() {
                 }}
               />
             </Card>
+            <CitationCard />
           </>
         )}
       </Step>
@@ -1131,6 +1133,64 @@ export default function Home() {
         steps={tourSteps}
       />
     </div>
+  );
+}
+
+/* ---------- Zitation ---------- */
+
+/**
+ * Wie zitiert man dieses Werkzeug? Bisher fand ein Nutzer die Antwort nirgends
+ * in der App — die einzigen Zitat-Treffer waren Negativ-Banner („nicht
+ * zitierfähig"). Steht am Ende von Schritt 6, wo der Bericht entsteht.
+ */
+function CitationCard() {
+  const [locale] = useLocale();
+  const [copied, setCopied] = useState<"plain" | "bibtex" | null>(null);
+  const cite = useMemo(() => citationInfo(), []);
+
+  async function copy(what: "plain" | "bibtex") {
+    try {
+      await navigator.clipboard.writeText(what === "plain" ? cite.plain : cite.bibtex);
+      setCopied(what);
+      window.setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // Zwischenablage kann blockiert sein — der Text steht sichtbar da und
+      // lässt sich markieren. Kein Fehlerdialog für eine Bequemlichkeit.
+    }
+  }
+
+  return (
+    <Card id="zitation">
+      <H2>{t(locale, "cite.title")}</H2>
+      <p style={{ color: "var(--ink-2)", marginTop: 0, fontSize: 13.5 }}>{t(locale, "cite.desc")}</p>
+      <p
+        data-testid="citation-plain"
+        style={{
+          fontSize: 13.5,
+          lineHeight: 1.6,
+          background: "var(--panel-2)",
+          border: "1px solid var(--line-soft)",
+          borderRadius: 8,
+          padding: "10px 12px",
+          margin: "0 0 10px",
+        }}
+      >
+        {cite.plain}
+      </p>
+      {!cite.doi && (
+        <p className="hint" style={{ ...hintStyle, marginTop: 0 }} data-testid="citation-no-doi">
+          {t(locale, "cite.noDoi")}
+        </p>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <Button onClick={() => copy("plain")}>
+          {copied === "plain" ? t(locale, "cite.copied") : t(locale, "cite.copy")}
+        </Button>
+        <Button onClick={() => copy("bibtex")}>
+          {copied === "bibtex" ? t(locale, "cite.copied") : t(locale, "cite.copyBibtex")}
+        </Button>
+      </div>
+    </Card>
   );
 }
 

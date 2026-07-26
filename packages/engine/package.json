@@ -1,6 +1,6 @@
 {
   "name": "@openqca/engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dependency-free QCA engine: calibration, truth tables, Quine-McCluskey minimization, consistency/coverage/PRI, necessity and robustness. Cross-validated against the R package QCA.",
   "keywords": [
     "qca",
