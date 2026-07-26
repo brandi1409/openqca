@@ -43,6 +43,9 @@ test("A2.2 Demo — komplexe Lösung enthält WOHLSTAND*BILDUNG*STABIL", async (
 test("A2.3 Crisp-Beispiel — FOERDERUNG Min 0 / Max 1, bereits kalibriert", async ({ page }) => {
   await loadExample(page, /Crisp-Sets Beispiel/);
 
+  // Die Kennzahlen stehen unter den Sets und sind eingeklappt — sie folgen aus
+  // den Ankern und sind Kontrolle, nicht Eingabe.
+  await page.locator("#deskriptiv summary").click();
   // Deskriptivstatistik-Zeile FOERDERUNG: Minimum 0, Maximum 1 (als 0,000 / 1,000 gerendert).
   const row = page.locator("#deskriptiv tbody tr").filter({ hasText: "FOERDERUNG" });
   await expect(row).toBeVisible();
@@ -63,6 +66,7 @@ test("A2.3 Crisp-Beispiel — FOERDERUNG Min 0 / Max 1, bereits kalibriert", asy
 test("A2.4 Fuzzy-Beispiel — WOHLSTAND Min 0,100 / Max 0,900", async ({ page }) => {
   await loadExample(page, /Fuzzy-Sets Beispiel/);
 
+  await page.locator("#deskriptiv summary").click();
   const row = page.locator("#deskriptiv tbody tr").filter({ hasText: "WOHLSTAND" });
   await expect(row).toBeVisible();
   await expect(row).toContainText("0,100");

@@ -864,12 +864,6 @@ export default function Home() {
                 onDocument={documentVariable}
               />
             </Card>
-            {setCols.length > 0 && (
-              <Card id="deskriptiv">
-                <H2>{t(locale, "descriptives.title")}</H2>
-                <Descriptives columns={setCols} cases={cases} />
-              </Card>
-            )}
             {calibView === "quick" ? (
               <CalibrationQuick
                 ds={ds}
@@ -900,6 +894,21 @@ export default function Home() {
                 freqCut={freqCut}
                 consCut={consCut}
               />
+            )}
+            {/* Die Kennzahlen beschreiben die KALIBRIERTEN Sets — sie folgen aus den
+                Ankern und standen deshalb vor ihrer eigenen Ursache. Eingeklappt,
+                weil sie zur Kontrolle dienen, nicht zur Eingabe. */}
+            {setCols.length > 0 && (
+              <Card id="deskriptiv">
+                <details>
+                  <summary style={{ fontSize: 16.5, fontWeight: 600, cursor: "pointer" }}>
+                    {t(locale, "descriptives.title")}
+                  </summary>
+                  <div style={{ marginTop: 12 }}>
+                    <Descriptives columns={setCols} cases={cases} />
+                  </div>
+                </details>
+              </Card>
             )}
           </>
         )}

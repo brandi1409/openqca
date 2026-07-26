@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { calibrateDirect, calibrateLinear } from "@openqca/engine";
 import type { RawDataset } from "@/lib/demo";
 import {
@@ -160,6 +161,37 @@ export function CalibrationQuick({
     (column) => varMeta[column]?.type === "raw" && calibSpecs[column]?.anchorsFromData,
   );
 
+  /**
+   * Ein Set offen, die übrigen als Zeile. Fünf ausgeklappte Karten waren gut
+   * 3.600px hoch — bei sechs oder acht Bedingungen, wie in einer Dissertation
+   * üblich, ist der Schritt so nicht mehr bedienbar, und man sieht nirgends,
+   * welche Sets man schon angefasst hat. Offen ist zunächst das erste Set, das
+   * überhaupt kalibriert werden muss.
+   */
+  const firstRaw = activeCols.find((column) => varMeta[column]?.type === "raw");
+  const [openColumn, setOpenColumn] = useState<string | null>(firstRaw ?? activeCols[0] ?? null);
+
+  /** Kurzfassung fürs eingeklappte Set: Methode und die gesetzten Schwellen. */
+  function summaryOf(column: string): string {
+    const meta = varMeta[column];
+    const spec = calibSpecs[column];
+    if (!meta || !spec) return "";
+    if (meta.type !== "raw")
+      return t(locale, "calib.quick.passthrough", {
+        type: t(locale, meta.type === "fuzzy" ? "vars.type.fuzzy" : "vars.type.crisp"),
+      });
+    const num = (v: number) => String(roundForDisplay(v)).replace(".", ",");
+    if (spec.method === "crisp" && spec.crisp)
+      return `${t(locale, "calib.quick.method.crisp")} · ≥ ${num(spec.crisp.threshold)}`;
+    const a = spec.method === "direct" ? spec.direct : spec.linear;
+    if (!a) return t(locale, "calib.quick.noMethod");
+    const label = t(
+      locale,
+      spec.method === "direct" ? "calib.quick.method.direct" : "calib.quick.method.linear",
+    );
+    return `${label} · ${num(a.fullOut)} / ${num(a.crossover)} / ${num(a.fullIn)}`;
+  }
+
   return (
     <div data-testid="calibration-quick">
       <div
@@ -240,25 +272,33 @@ export function CalibrationQuick({
             patchSpec(column, { linear: { ...fuzzyAnchors, ...patch } });
         }
 
+        const isOpen = openColumn === column;
+
         return (
-          <div
+          <details
             key={column}
             data-testid={`calibration-quick-card-${column}`}
+            open={isOpen}
+            onToggle={(e) => {
+              const nowOpen = (e.currentTarget as HTMLDetailsElement).open;
+              setOpenColumn(nowOpen ? column : (prev) => (prev === column ? null : prev));
+            }}
             style={{
               background: "var(--panel)",
-              border: "1px solid var(--line)",
+              border: `1px solid ${isOpen ? "var(--line)" : "var(--line-soft)"}`,
               borderRadius: 12,
-              padding: "16px 18px",
-              marginBottom: 14,
+              padding: isOpen ? "16px 18px" : "10px 18px",
+              marginBottom: isOpen ? 14 : 8,
             }}
           >
-            <div
+            <summary
               style={{
                 display: "flex",
                 flexWrap: "wrap",
                 alignItems: "center",
                 gap: 8,
-                marginBottom: 12,
+                marginBottom: isOpen ? 12 : 0,
+                cursor: "pointer",
               }}
             >
               <span className="mono" style={{ fontSize: 15, fontWeight: 700, minWidth: 0, overflowWrap: "anywhere" }}>
@@ -291,16 +331,18 @@ export function CalibrationQuick({
                   {t(locale, "calib.quick.anchorsFromData.chip")}
                 </span>
               )}
-              <button
-                type="button"
-                className="oq-btn oq-btn--quiet"
-                data-testid={`calibration-quick-document-${column}`}
-                onClick={() => onDocument(column)}
-                style={{ fontSize: 12, padding: "4px 8px", marginLeft: "auto", color: "var(--accent-deep)" }}
-              >
-                {t(locale, "calib.meter.docBtn")}
-              </button>
-            </div>
+              {/* Eingeklappt trägt die Zeile den Stand des Sets — sonst müsste man
+                  jedes Set aufklappen, um zu sehen, wo die Anker stehen. */}
+              {!isOpen && (
+                <span
+                  data-testid={`calibration-quick-summary-${column}`}
+                  className="mono"
+                  style={{ fontSize: 12, color: "var(--muted)", marginLeft: "auto" }}
+                >
+                  {summaryOf(column)}
+                </span>
+              )}
+            </summary>
 
             {meta.type !== "raw" ? (
               <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: 0 }}>
@@ -438,19 +480,47 @@ export function CalibrationQuick({
               </>
             )}
 
-            <p
-              data-testid={`calibration-quick-dist-${column}`}
-              style={{ fontSize: 12, color: "var(--muted)", margin: "10px 0 0", lineHeight: 1.6 }}
+            {/* Verteilung links, der Weg zur Begründung rechts — beides gehört ans
+                Ende des Sets, nicht über die Anker. */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                marginTop: 10,
+              }}
             >
-              {t(locale, "calib.quick.dist", { inCount, outCount })}
-              {nearCount > 0 ? ` · ${t(locale, "calib.quick.nearHalf", { n: nearCount })}` : ""}
-              {missingCount > 0 ? ` · ${t(locale, "calib.quick.missing", { n: missingCount })}` : ""}
-            </p>
-          </div>
+              <p
+                data-testid={`calibration-quick-dist-${column}`}
+                style={{ fontSize: 12, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}
+              >
+                {t(locale, "calib.quick.dist", { inCount, outCount })}
+                {nearCount > 0 ? ` · ${t(locale, "calib.quick.nearHalf", { n: nearCount })}` : ""}
+                {missingCount > 0 ? ` · ${t(locale, "calib.quick.missing", { n: missingCount })}` : ""}
+              </p>
+              <button
+                type="button"
+                className="oq-btn oq-btn--quiet"
+                data-testid={`calibration-quick-document-${column}`}
+                onClick={() => onDocument(column)}
+                style={{ fontSize: 12, padding: "4px 8px", color: "var(--accent-deep)" }}
+              >
+                {t(locale, "calib.meter.docBtn")}
+              </button>
+            </div>
+          </details>
         );
       })}
     </div>
   );
+}
+
+/** Kurzfassung in der eingeklappten Zeile: höchstens drei Nachkommastellen. */
+function roundForDisplay(v: number): number {
+  if (!Number.isFinite(v)) return Number.NaN;
+  return Math.round(v * 1000) / 1000;
 }
 
 function pillStyle(kind: "neutral" | "good" | "warn"): React.CSSProperties {
