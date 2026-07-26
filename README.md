@@ -14,6 +14,20 @@ Quelloffenes, reproduzierbares Werkzeug für **Qualitative Comparative Analysis 
 > are internal regression snapshots. Interface and reports are available in German and English;
 > methodology documentation is in [`docs/qca-primer.en.md`](docs/qca-primer.en.md).
 
+## So sieht es aus
+
+| | |
+|---|---|
+| ![Startseite](docs/screenshots/01-start.png) | ![Kalibrierung mit Ankerkurve](docs/screenshots/02-kalibrierung.png) |
+| Startseite — die Zahlen der Beispiel-Pipeline rechnet die Engine beim Laden live. | Schritt 3: drei begründbare Anker je Set, ziehbare Kurve, Verteilung der Rohwerte als Striche unter der Achse. |
+| ![Notwendigkeitsanalyse](docs/screenshots/03-notwendigkeit.png) | ![Truth Table](docs/screenshots/04-truthtable.png) |
+| Schritt 4: Der Befund steht über der Tabelle — Kandidaten namentlich, SUIN-Kombinationen nach RoN sortiert. | Schritt 5: Truth Table mit Frequenz- und Konsistenz-Cutoff. |
+
+![Lösungen](docs/screenshots/05-loesungen.png)
+
+Schritt 5: komplexe, intermediäre und sparsame Lösung mit Fit-Kennzahlen, Fall-Diagnostik
+je Pfad und dem Hinweis, welche Lösung üblicherweise berichtet wird.
+
 ## Warum es das gibt
 
 QCA scheitert in der Praxis selten an der Minimierung, sondern an der **Kalibrierung**: Wer nicht
