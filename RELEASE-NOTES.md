@@ -27,6 +27,14 @@ dieselbe analysierte Ursache und sind offen dokumentiert
 eine dokumentierte Abweichung unbemerkt verschwindet; ein zweiter prüft, dass die
 öffentlichen Zahlenangaben dem tatsächlichen Validierungsergebnis entsprechen.
 
+**Reichweite der ESA-Abweichung, erstmals gemessen.** Über 13.216 Konstellationen
+(drei Bedingungen, bis zu drei positive Ecken, alle Erwartungskombinationen)
+stimmt die **intermediäre** Lösung in **86,3 %** der Fälle mit dem R-Paket
+überein. Betroffen ist damit rund ein Siebtel aller Konstellationen — bisher war
+die Abweichung nur als „zwei Szenarien" beschrieben. Konservative und sparsame
+Lösung sind nicht betroffen. Reproduzierbar mit
+`Rscript scripts/r-oracle/esa-corpus.R 3` und `node scripts/esa-solution-check.mjs`.
+
 **Zurückgenommen:** Die Berufung auf das Robustness-Protokoll von Oana &
 Schneider — dessen Kennzahlen RF_incl, RF_cov und RF_case sind *nicht*
 implementiert.
