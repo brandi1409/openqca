@@ -13,10 +13,10 @@ Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft 
 - [x] Auth → E-Mail-Anmeldung (Magic Link) aktivieren; unter „Redirect URLs" die Live-Domain und `http://localhost:3000` eintragen. → config push
 - [x] Werte eintragen: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. → Vercel prod/preview/dev + apps/web/.env.local
 
-## 2. OpenAI (optionale KI — P4)
-- [ ] OpenAI-Projekt und getrennten Staging-API-Key anlegen.
-- [ ] Auf dem Staging-VPS `AI_ENABLED=true`, `OPENAI_API_KEY` und das festgelegte `OPENAI_AI_MODEL` als Runtime-Secrets setzen; den Key niemals als Docker-Build-Argument verwenden.
-- [ ] `AI_GOLD_LIVE=true AI_ENABLED=true OPENAI_API_KEY=… npm run test:ai-gold:live --workspace web` ausführen und null Sicherheitsverstöße sowie mindestens 46 von 48 Status-/Qualitätsübereinstimmungen belegen.
+## 2. KI-Provider (optionale KI — P4)
+- [x] Für lokale Integrationstests ist ein getrennt konfigurierbarer Gemini-Pfad vorhanden; OpenAI bleibt unterstützt.
+- [ ] Auf dem Staging-VPS `AI_ENABLED=true`, `AI_PROVIDER=openai|gemini`, den passenden serverseitigen API-Key und das festgelegte Modell als Runtime-Secrets setzen; Keys niemals als Docker-Build-Argument verwenden.
+- [ ] Mit derselben Provider-Konfiguration `AI_GOLD_LIVE=true npm run test:ai-gold:live --workspace web` ausführen und null Sicherheitsverstöße sowie mindestens 46 von 48 Status-/Qualitätsübereinstimmungen belegen.
 
 ## 3. Stripe (Zahlungen — P5)
 - [ ] Konto auf **stripe.com**. Zwei Preise anlegen (Abo monatlich; Institutions-Lizenz) → Preis-IDs kopieren.
@@ -25,7 +25,7 @@ Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft 
 
 ## 4. Recht (P6) — nur du + Prüfung
 - [ ] Impressum: echte Angaben (Name, ladungsfähige Anschrift, E-Mail, ggf. USt-IdNr.) in `legal/impressum.md` einsetzen.
-- [ ] `legal/datenschutz.md` und `legal/agb.md` mit echten Angaben füllen und **von einer qualifizierten Person (Anwalt/Datenschutzbeauftragte) prüfen lassen** — besonders VPS-Hosting, Drittlandübermittlung für Supabase/Stripe/OpenAI, AV-Verträge und Widerrufsbelehrung.
+- [ ] `legal/datenschutz.md` und `legal/agb.md` mit echten Angaben füllen und **von einer qualifizierten Person (Anwalt/Datenschutzbeauftragte) prüfen lassen** — besonders VPS-Hosting, Drittlandübermittlung für Supabase/Stripe und den ausgewählten KI-Provider (OpenAI oder Google/Gemini), AV-Verträge und Widerrufsbelehrung.
 
 ## 5. VPS-Staging und produktiver Cutover (P7)
 - [ ] Staging-Domain, DNS-A/AAAA-Einträge, VPS-Host, SSH-Benutzer, geprüften Host-Fingerprint und Deployment-Verzeichnis festlegen.
