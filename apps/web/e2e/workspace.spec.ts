@@ -66,7 +66,39 @@ test("decision controls expose methodological explanations", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Richtungserwartungen (nur einfache Counterfactuals)" })).toBeVisible();
 });
 
-test("all three AI jobs expose only their reviewed typed payload", async ({ page }) => {
+test("AI review stays local until required fields are complete", async ({ page }) => {
+  let requests = 0;
+  await page.route("**/api/ai/assist", async (route) => {
+    requests += 1;
+    await route.abort();
+  });
+  await loadDemo(page);
+  await openDestination(page, "decisions");
+  const rationale = page.getByRole("region", { name: "Begründung prüfen" }).first();
+  await rationale.getByRole("button", { name: "Begründung prüfen" }).click();
+  await expect(rationale.getByRole("status")).toHaveText(
+    "Füllen Sie alle erforderlichen Felder aus und begrenzen Sie jeden Eintrag auf 2.000 Zeichen, bevor Sie eine KI-Prüfung vorbereiten.",
+  );
+  await expect(rationale.getByText("Geprüfte Nutzlast", { exact: true })).toHaveCount(0);
+  await expect(rationale.getByRole("button", { name: "Geprüfte Nutzlast senden" })).toHaveCount(0);
+  expect(requests).toBe(0);
+});
+
+test("all three AI jobs expose and send only their normalized reviewed payload", async ({ page }) => {
+  const requests: Array<Record<string, unknown>> = [];
+  await page.route("**/api/ai/assist", async (route) => {
+    requests.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        version: "v1",
+        summary: { status: "ok", draft: "Geprüfter Entwurf.", uncertainty: [], evidenceNeeds: [], limitations: [] },
+        model: "test-model",
+        provider: "mock",
+      }),
+    });
+  });
   await loadDemo(page);
 
   await openDestination(page, "research");
@@ -80,12 +112,47 @@ test("all three AI jobs expose only their reviewed typed payload", async ({ page
     "Outcome concept",
     "Condition rationale",
   ]);
+  await expect(brief.locator("dd")).toHaveText([
+    "Welche Kombinationen der synthetischen Bedingungen sind mit dem Set „Überleben“ in demo_zwischenkriegszeit (synthetisch) verbunden?",
+    "Synthetische Lehrfälle aus demo_zwischenkriegszeit (synthetisch)",
+    "Kein realer Zeitraum, synthetisches Lehrbeispiel",
+    "dem Set „Überleben“",
+    "Die Bedingungen wurden ausschließlich zur Demonstration des QCA-Rechenwegs konstruiert.",
+  ]);
+  expect(requests).toHaveLength(0);
+  await brief.getByRole("button", { name: "Geprüfte Nutzlast senden" }).click();
+  await expect(brief.getByText("Anbieter: mock · test-model")).toBeVisible();
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).toEqual({
+    version: "v1",
+    task: "brief_clarify",
+    locale: "de",
+    payload: {
+      question: "Welche Kombinationen der synthetischen Bedingungen sind mit dem Set „Überleben“ in demo_zwischenkriegszeit (synthetisch) verbunden?",
+      caseUniverse: "Synthetische Lehrfälle aus demo_zwischenkriegszeit (synthetisch)",
+      timePeriod: "Kein realer Zeitraum, synthetisches Lehrbeispiel",
+      outcomeConcept: "dem Set „Überleben“",
+      conditionSelectionRationale: "Die Bedingungen wurden ausschließlich zur Demonstration des QCA-Rechenwegs konstruiert.",
+    },
+  });
 
   await openDestination(page, "decisions");
+  const decisionText = "Die Entscheidung folgt der begrenzten Fallzahl und dem vorab festgelegten Vergleichsdesign.";
+  await page.locator("textarea").first().fill(`  ${decisionText}  `);
   const rationale = page.getByRole("region", { name: "Begründung prüfen" }).first();
   await rationale.getByRole("button", { name: "Begründung prüfen" }).click();
   await expect(rationale.locator("dt")).toHaveText(["Decision", "Rationale"]);
-  await expect(rationale.locator("dd").first()).toHaveText("frequencyCutoff");
+  await expect(rationale.locator("dd")).toHaveText(["frequencyCutoff", decisionText]);
+  expect(requests).toHaveLength(1);
+  await rationale.getByRole("button", { name: "Geprüfte Nutzlast senden" }).click();
+  await expect(rationale.getByText("Anbieter: mock · test-model")).toBeVisible();
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toEqual({
+    version: "v1",
+    task: "decision_rationale_review",
+    locale: "de",
+    payload: { decision: "frequencyCutoff", rationale: decisionText },
+  });
 
   await page.getByTestId("calibration-view-doc").click();
   const evidence = page.getByRole("region", { name: "Evidenzlücken prüfen" }).first();
@@ -97,7 +164,28 @@ test("all three AI jobs expose only their reviewed typed payload", async ({ page
     "Set definition",
     "Researcher rationale",
   ]);
+  await expect(evidence.locator("dd")).toHaveText([
+    "wohlstand",
+    "wohlstand",
+    "Zugehörigkeit zur Menge «wohlstand» (vorläufiger Platzhalter — durch eine inhaltliche Definition ersetzen).",
+    "Keine Begründung angegeben.",
+  ]);
   expect((await evidence.locator("dt").allTextContents()).join(" ")).not.toMatch(/Fall|Case|Row|Datei|File/);
+  expect(requests).toHaveLength(2);
+  await evidence.getByRole("button", { name: "Geprüfte Nutzlast senden" }).click();
+  await expect(evidence.getByText("Anbieter: mock · test-model")).toBeVisible();
+  expect(requests).toHaveLength(3);
+  expect(requests[2]).toEqual({
+    version: "v1",
+    task: "calibration_evidence_gaps",
+    locale: "de",
+    payload: {
+      variable: "wohlstand",
+      setLabel: "wohlstand",
+      definition: "Zugehörigkeit zur Menge «wohlstand» (vorläufiger Platzhalter — durch eine inhaltliche Definition ersetzen).",
+      rationale: "Keine Begründung angegeben.",
+    },
+  });
 });
 
 test("destination buttons update hash, focus, and browser history", async ({ page }) => {
