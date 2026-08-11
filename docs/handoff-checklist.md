@@ -31,7 +31,7 @@ Der **kostenlose Kern** läuft bereits ohne alles Weitere. Diese Liste betrifft 
 - [ ] Staging-Domain, DNS-A/AAAA-Einträge, VPS-Host, SSH-Benutzer, geprüften Host-Fingerprint und Deployment-Verzeichnis festlegen.
 - [ ] GHCR-Paketsichtbarkeit bestimmen; bei privatem Paket ein nur lesendes `read:packages`-Credential auf dem VPS hinterlegen.
 - [ ] Repository-Variablen `STAGING_NEXT_PUBLIC_SITE_URL` sowie optional die öffentlichen Supabase-/Stripe-Buildwerte setzen und den erfolgreichen GHCR-Workflow-Digest übernehmen.
-- [ ] Docker Engine + Compose v2, Ports 80/443 und persistente Caddy-Volumes bereitstellen; App- und Caddy-Image ausschließlich per Digest konfigurieren.
+- [ ] Docker Engine + Compose v2 bereitstellen und den Proxy-Modus wählen: auf freiem Host Compose-Caddy mit 80/443 und persistenten Volumes; auf gemeinsam genutztem Host den bestehenden Caddy nach Backup/Validierung um einen separaten Site-Block ergänzen und openQCA nur über einen unprivilegierten Loopback-Port anbinden. Alle verwendeten Images ausschließlich per Digest konfigurieren.
 - [ ] Mit `npm run release:staging -- promote …` freigeben, öffentlichen HTTPS-Smoke und Browser-Canary ausführen, anschließend den dokumentierten Rollback einmal proben.
 - [ ] Erst nach Goldset, fünf beobachteten Forschenden und juristischer Freigabe den Produktions-DNS-/Env-Cutover durchführen. Vercel bleibt Vorschau.
 
