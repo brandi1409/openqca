@@ -43,6 +43,18 @@ for (const colorScheme of SCHEMES) {
         }
       });
 
+      test("A3.6 AI-Freigabe bleibt innerhalb der Seitenbreite", async ({ page }) => {
+        await loadDemo(page);
+        await openDestination(page, "research");
+        const brief = page.getByRole("region", { name: "Forschungsdesign klären" });
+        await brief.getByRole("button", { name: "Forschungsdesign klären" }).click();
+        await expect(brief.getByText("Geprüfte Nutzlast", { exact: true })).toBeVisible();
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow, "AI-Freigabe verursacht horizontalen Overflow").toBeLessThanOrEqual(1);
+      });
+
       test("A3.3 Consent-Banner — beide Buttons vollständig im Viewport", async ({ page }) => {
         await page.goto("/app");
         // localStorage-Reset erzwingt das Banner beim Reload.
