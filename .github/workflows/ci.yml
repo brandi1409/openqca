@@ -31,6 +31,9 @@ jobs:
       - name: Engine — R-Kalibrierungs-Kreuzvalidierung (QUALITY-SPEC A1.5)
         run: node scripts/calibrate-cross-validate.mjs
 
+      - name: Deployment — Compose contracts
+        run: npm run check:deployment
+
       - name: Web — Lint
         run: npm run lint --workspace web
 

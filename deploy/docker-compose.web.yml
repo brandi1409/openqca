@@ -1,0 +1,41 @@
+services:
+  web:
+    image: ${OPENQCA_IMAGE:?Set OPENQCA_IMAGE to an immutable image digest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set NEXT_PUBLIC_SITE_URL}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_REQUIRE_CLOUD_TIER: ${AI_REQUIRE_CLOUD_TIER:-true}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_AI_MODEL: ${OPENAI_AI_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_AI_MODEL: ${GEMINI_AI_MODEL:-}
+      AI_REQUEST_BODY_BYTES: ${AI_REQUEST_BODY_BYTES:-12000}
+      AI_PREAUTH_RATE_LIMIT: ${AI_PREAUTH_RATE_LIMIT:-20}
+      AI_USER_RATE_LIMIT: ${AI_USER_RATE_LIMIT:-6}
+      AI_MAX_CONCURRENT: ${AI_MAX_CONCURRENT:-2}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_MONTHLY: ${STRIPE_PRICE_MONTHLY:-}
+      STRIPE_PRICE_INSTITUTION: ${STRIPE_PRICE_INSTITUTION:-}
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+        reservations:
+          memory: 256M

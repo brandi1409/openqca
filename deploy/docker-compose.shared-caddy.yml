@@ -1,7 +1,7 @@
 services:
   web:
     extends:
-      file: docker-compose.yml
+      file: docker-compose.web.yml
       service: web
     ports:
       - "127.0.0.1:${OPENQCA_UPSTREAM_PORT:?Set OPENQCA_UPSTREAM_PORT}:3000"
