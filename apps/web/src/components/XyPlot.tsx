@@ -178,13 +178,13 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
   ];
 
   return (
-    <div>
-      <div style={kpiRowStyle}>
+    <div className="oq-xy-plot">
+      <div className="oq-xy-plot__kpis" style={kpiRowStyle}>
         <Kpi value={fmt(consistency)} label={t(locale, "xyplot.kpi.consistency")} />
         <Kpi value={fmt(coverage)} label={t(locale, "xyplot.kpi.coverage")} />
       </div>
 
-      <div style={toggleRowStyle}>
+      <div className="oq-xy-plot__controls" style={toggleRowStyle}>
         <span style={toggleLabelStyle}>{t(locale, "xy.labelsToggle")}</span>
         <div
           role="group"
@@ -208,6 +208,7 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
         </div>
       </div>
 
+      <div className="oq-xy-plot__visual">
       <ChartFrame filename={`xy-${xLabel}-${yLabel}`}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
@@ -331,8 +332,9 @@ export function XyPlot({ xLabel, yLabel, points }: XyPlotProps) {
           </text>
         </svg>
       </ChartFrame>
+      </div>
 
-      <div style={legendRowStyle}>
+      <div className="oq-xy-plot__legend" style={legendRowStyle}>
         <span style={legendItemStyle}>
           <span style={legendDotStyle("var(--accent)")} />
           {t(locale, "xy.legend.consistent")}
@@ -391,6 +393,7 @@ function segmentButtonStyle(active: boolean): React.CSSProperties {
     fontSize: 12,
     fontWeight: 600,
     padding: "3px 11px",
+    minHeight: 44,
     border: "none",
     borderLeft: "1px solid var(--line)",
     cursor: "pointer",

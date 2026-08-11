@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, startTransition, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildTruthTable,
   complexSolution,
@@ -26,10 +26,7 @@ import { parseXlsxToDataset } from "@/lib/xlsx";
 import { AccountButton, CloudSaveLoad } from "@/components/cloud";
 import { XyPlot } from "@/components/XyPlot";
 import { Descriptives } from "@/components/Descriptives";
-// Onboarding-Karte entfernt: Der 6-Schritte-Stepper + Tour + Glossar ersetzen sie
-// (die alte Karte sprach widersprüchlich von „drei Schritten").
 import { Glossary } from "@/components/Glossary";
-import { GuidedTour, type GuidedTourStep } from "@/components/GuidedTour";
 import { ExampleDatasets } from "@/components/ExampleDatasets";
 import { RobustnessPanel } from "@/components/RobustnessPanel";
 import NegatedOutcomePanel from "@/components/NegatedOutcomePanel";
@@ -37,21 +34,29 @@ import { ReportButton } from "@/components/ReportButton";
 import { type ReportInput } from "@/lib/report";
 import { citationInfo } from "@/lib/citation";
 import { useLocale } from "@/i18n/locale";
+import type { Locale } from "@/i18n/locale";
 import { t, type DictKey } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { InfoHint } from "@/components/InfoHint";
 import { Kpi as UiKpi, SectionHeading } from "@/components/ui";
 import { CalibrationWorkbench } from "@/components/calibration/CalibrationWorkbench";
+import { AiAssist } from "@/components/AiAssist";
 import { CalibrationQuick } from "@/components/calibration/CalibrationQuick";
 import {
   anchorsFromSpecs,
   migrateSpecsFromAnchors,
+  effectiveStatus,
   specIsComputable,
   specIsProtocolReady,
   type CalibSpecs,
+  type VarType,
 } from "@/lib/calibration-model";
 import { numericColumns, numericValues } from "@/lib/dataset-columns";
-import { readLocalProject, writeLocalProject } from "@/lib/project-storage";
+import {
+  readLocalProject,
+  writeLocalProject,
+  type LocalProjectEnvelope,
+} from "@/lib/project-storage";
 import {
   buildRobustnessScenarios,
   buildSensitivityBundle,
@@ -65,41 +70,45 @@ import {
   buildCalibrationProtocolJson,
   buildCalibrationNarrative,
   downloadText,
+  METHODOLOGY_REFERENCES,
   RAW_DATA_FILENAME,
 } from "@/lib/protocol-export";
+import {
+  EMPTY_ANALYSIS_DECISIONS,
+  EMPTY_RESEARCH_BRIEF,
+  aggregateCaseDiagnostics,
+  analysisDecisionReadiness,
+  calibrationDefenseReadiness,
+  deriveDecisionIssues,
+  deriveSuggestedVarMeta,
+  normalizeExpectations,
+  normalizeSavedState,
+  type CalibrationDefenseResult,
+  researchBriefReadiness,
+  type AnalysisDecisionState,
+  type Anchors,
+  type DecisionIssue,
+  type ResearchBrief,
+  type ReadinessResult,
+  type SavedState,
+  type VarMeta,
+  type VarRole,
+  type WorkspaceDestination,
+} from "@/lib/workspace-model";
+import { inspectImport, type ImportPreflight } from "@/lib/import-preflight";
 
-/** Datenart je numerischer Spalte: Rohwert (muss kalibriert werden), bereits Fuzzy, oder Crisp. */
-type VarType = "raw" | "fuzzy" | "crisp";
-/** Rolle je Spalte in der Analyse. */
-type VarRole = "condition" | "outcome" | "ignore";
-interface VarMeta {
-  type: VarType;
-  role: VarRole;
-}
 
-interface SavedState {
-  dataset: RawDataset;
-  anchors: Anchors;
-  varMeta?: Record<string, VarMeta>;
-  calibSpecs?: CalibSpecs;
-  demoMode?: boolean;
-  // Ältere Speicherstände hielten Bedingungen/Outcome (mit fs_-Präfix) direkt —
-  // werden beim Laden bewusst ignoriert und aus varMeta neu abgeleitet.
-  conditions?: string[];
-  outcome?: string;
-  freqCut: number;
-  consCut: number;
-}
-
-type Anchors = Record<string, [number, number, number]>;
 type SolBundle = {
   complex: ReturnType<typeof complexSolution>;
   intermediate: ReturnType<typeof intermediateSolution>;
   parsimonious: ReturnType<typeof parsimoniousSolution>;
 };
 
-const fmt = (v: number, d = 3) =>
-  v == null || Number.isNaN(v) ? "—" : v.toFixed(d).replace(".", ",");
+const fmt = (v: number, d = 3) => {
+  if (v == null || Number.isNaN(v)) return "—";
+  const locale = typeof document !== "undefined" && document.documentElement.lang === "en" ? "en-GB" : "de-DE";
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
+};
 
 /**
  * Ansicht des Kalibrier-Schritts. „Schnell" ist der Standard: Anker setzen,
@@ -110,13 +119,6 @@ const fmt = (v: number, d = 3) =>
 type CalibrationView = "quick" | "doc";
 const CALIBRATION_VIEW_STORAGE_KEY = "openqca_calibration_view";
 
-/** Zustand eines Stepper-Schritts: erledigt / aktiv (bereit) / gesperrt. */
-type StepStatus = "done" | "active" | "locked";
-/** Gesperrt wenn Voraussetzung fehlt, sonst erledigt wenn fertig, sonst aktiv. */
-function statusOf(unlocked: boolean, done: boolean): StepStatus {
-  if (!unlocked) return "locked";
-  return done ? "done" : "active";
-}
 
 
 /** Numerische Werte einer Spalte (NaN herausgefiltert). */
@@ -151,30 +153,6 @@ function isColUsable(
   return true;
 }
 
-/**
- * Auto-Ableitung des Variablen-Metamodells: Datenart erkennen, Rollen vorbelegen.
- *
- * Regel ohne Ausnahme: die LETZTE numerische Spalte ist das Outcome, JEDE andere
- * numerische Spalte ist eine Bedingung. Früher hat hier ein stilles Budget von
- * drei Bedingungen alle weiteren Spalten auf „ignore" gesetzt — Variablen
- * verschwanden ohne Hinweis aus Analyse und Dokumentations-Meter, und die
- * Landing rechnete deshalb mit anderen Bedingungen als die App. Wer weniger
- * Bedingungen will, wählt sie im Schritt „Variablen & Rollen" bewusst ab; auf
- * das methodische Risiko vieler Bedingungen weist `limited diversity` dort
- * sichtbar hin.
- */
-function deriveVarMeta(ds: RawDataset): Record<string, VarMeta> {
-  const cols = numericColumns(ds);
-  const meta: Record<string, VarMeta> = {};
-  const outcomeCol = cols.length ? cols[cols.length - 1] : "";
-  cols.forEach((col) => {
-    const type = detectVarType(numericValues(ds, col));
-    const role: VarRole = col === outcomeCol ? "outcome" : "condition";
-    meta[col] = { type, role };
-  });
-  return meta;
-}
-
 /** Legacy ascending anchors for active raw fuzzy calibrations — used by report fallbacks. */
 function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, calibSpecs: CalibSpecs): Anchors {
   return anchorsFromSpecs(
@@ -192,134 +170,221 @@ function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, calibSpe
 
 export default function Home() {
   const [locale] = useLocale();
+  const [destination, setDestination] = useState<WorkspaceDestination>("answer");
   const [ds, setDs] = useState<RawDataset | null>(null);
   const [anchors, setAnchors] = useState<Anchors>({});
   const [calibSpecs, setCalibSpecs] = useState<CalibSpecs>({});
-  // Synthetic demo data may illustrate the full calculation chain, but it is
-  // never treated as a research-ready export.
   const [demoMode, setDemoMode] = useState(false);
   const [calibMigrateBanner, setCalibMigrateBanner] = useState(false);
   const [varMeta, setVarMeta] = useState<Record<string, VarMeta>>({});
-  const [focusVar, setFocusVar] = useState<string>("");
-  // Serverseitig gibt es keine sessionStorage — der Standard „Schnell" wird
-  // deshalb erst nach dem Mount durch die gemerkte Wahl ersetzt (keine
-  // Hydration-Abweichung).
+  const [focusVar, setFocusVar] = useState("");
   const [calibView, setCalibView] = useState<CalibrationView>("quick");
   const [freqCut, setFreqCut] = useState(1);
   const [consCut, setConsCut] = useState(0.8);
-  /**
-   * Auswahl der X-Achse im XY-Plot: `cond:<Name>` (Einzelbedingung),
-   * `path:<Term-Bits>` (Lösungspfad) oder `solution` (Gesamtlösung).
-   */
   const [xySource, setXySource] = useState("");
   const [expectations, setExpectations] = useState<Record<string, Expectation>>({});
-  // Geführte Beispiel-Tour: null = aus, sonst Index der aktiven Station.
-  const [tourStep, setTourStep] = useState<number | null>(null);
+  const [researchBrief, setResearchBrief] = useState<ResearchBrief>({ ...EMPTY_RESEARCH_BRIEF });
+  const [analysisDecisions, setAnalysisDecisions] = useState<AnalysisDecisionState>({
+    frequencyCutoff: { ...EMPTY_ANALYSIS_DECISIONS.frequencyCutoff },
+    consistencyCutoff: { ...EMPTY_ANALYSIS_DECISIONS.consistencyCutoff },
+    directionalExpectations: { ...EMPTY_ANALYSIS_DECISIONS.directionalExpectations },
+  });
+  const [resumeCandidate, setResumeCandidate] = useState<LocalProjectEnvelope | null>(null);
   const [localProjectStatus, setLocalProjectStatus] = useState("");
-
+  const [importError, setImportError] = useState("");
+  const [pendingImport, setPendingImport] = useState<ImportPreflight | null>(null);
+  const [importReceipt, setImportReceipt] = useState<ImportPreflight | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const localRestoreRef = useRef(false);
 
-  const tourSteps: GuidedTourStep[] = useMemo(
-    () => [
-      { targetId: "daten", title: t(locale, "tour.s1.title"), body: t(locale, "tour.s1.body") },
-      { targetId: "variablen", title: t(locale, "tour.s2.title"), body: t(locale, "tour.s2.body") },
-      { targetId: "kalibrierung", title: t(locale, "tour.s3.title"), body: t(locale, "tour.s3.body") },
-      { targetId: "notwendigkeit", title: t(locale, "tour.s4.title"), body: t(locale, "tour.s4.body") },
-      { targetId: "truthtable", title: t(locale, "tour.s5.title"), body: t(locale, "tour.s5.body") },
-      { targetId: "loesungen", title: t(locale, "tour.s6.title"), body: t(locale, "tour.s6.body") },
-      { targetId: "protokoll", title: t(locale, "tour.s7.title"), body: t(locale, "tour.s7.body") },
-    ],
-    [locale],
-  );
-
-  function firstRawFocus(dataset: RawDataset, meta: Record<string, VarMeta>): string {
-    return (
-      numericColumns(dataset).find((c) => meta[c]?.type === "raw" && meta[c]?.role !== "ignore") ?? ""
-    );
-  }
-
-  function applyDataset(dataset: RawDataset, options: { demo?: boolean } = {}) {
-    setDemoMode(options.demo === true);
-    setDs(dataset);
-    setAnchors({ ...dataset.anchors });
-    const meta = deriveVarMeta(dataset);
-    setVarMeta(meta);
-    const cols = numericColumns(dataset);
-    const specs = migrateSpecsFromAnchors(cols, dataset.anchors);
-    for (const col of cols) {
-      const m = meta[col];
-      if (!m) continue;
-      if (m.type === "raw") {
-        const s = specs[col];
-        if (!s.set.setLabel.trim()) s.set.setLabel = col;
-        if (!s.set.definition.trim()) {
-          s.set.definition = t(locale, "calib.ph.definition", { col });
-        }
-        const fuzzyAnchors =
-          s.method === "direct" ? s.direct : s.method === "linear" ? s.linear : undefined;
-        if (fuzzyAnchors) {
-          if (!fuzzyAnchors.meaningFullOut.trim()) fuzzyAnchors.meaningFullOut = t(locale, "calib.ph.fullOut");
-          if (!fuzzyAnchors.meaningCrossover.trim()) fuzzyAnchors.meaningCrossover = t(locale, "calib.ph.crossover");
-          if (!fuzzyAnchors.meaningFullIn.trim()) fuzzyAnchors.meaningFullIn = t(locale, "calib.ph.fullIn");
-        }
-        specs[col] = {
-          ...s,
-          provisionalDefaults: true,
-          // Die Anker kommen aus der Perzentil-Heuristik des Imports — bis der
-          // Nutzer einen davon anfasst, bleibt diese Herkunft ausgewiesen.
-          anchorsFromData: true,
-          status: s.status === "unresolved" ? "provisional" : s.status,
-        };
-        continue;
-      }
-      specs[col] = {
-        ...specs[col],
-        method: undefined,
-        alreadyCalibratedProvenance: specs[col].alreadyCalibratedProvenance?.trim() ||
-          t(locale, "calib.ph.provenance", { type: m.type, dataset: dataset.name }),
-        set: {
-          ...specs[col].set,
-          setLabel: specs[col].set.setLabel || col,
-          definition:
-            specs[col].set.definition || t(locale, "calib.ph.precalibratedDefinition", { col }),
-        },
-        provisionalDefaults: true,
-        status: specs[col].status === "unresolved" ? "provisional" : specs[col].status,
-      };
+  function selectDestination(
+    next: WorkspaceDestination,
+    options: { history?: "push" | "replace" | "none"; focus?: boolean } = {},
+  ) {
+    const historyMode = options.history ?? "push";
+    setDestination(next);
+    if (historyMode !== "none") {
+      const url = `${window.location.pathname}${window.location.search}#${next}`;
+      window.history[historyMode === "push" ? "pushState" : "replaceState"](null, "", url);
     }
-    setCalibSpecs(specs);
-    setCalibMigrateBanner(false);
-    setFocusVar(firstRawFocus(dataset, meta));
-  }
-
-  function loadDemo() {
-    applyDataset(DEMO, { demo: true });
-  }
-
-  function startTour() {
-    loadDemo();
-    setTourStep(0);
-  }
-  function nextTourStep() {
-    setTourStep((s) => (s === null ? null : s + 1 >= tourSteps.length ? null : s + 1));
-  }
-  function endTour() {
-    setTourStep(null);
+    if (options.focus !== false) {
+      window.setTimeout(() => {
+        document.getElementById(`workspace-${next}-heading`)?.focus();
+      }, 0);
+    }
   }
 
   useEffect(() => {
-    let saved: string | null = null;
-    try {
-      saved = window.sessionStorage.getItem(CALIBRATION_VIEW_STORAGE_KEY);
-    } catch {
-      // Ohne sessionStorage bleibt es bei „Schnell" — kein Fehlerfall.
+    const valid = new Set<WorkspaceDestination>(["answer", "research", "decisions", "evidence", "defense"]);
+    const restoreDestination = () => {
+      const hash = window.location.hash.slice(1);
+      setDestination(valid.has(hash as WorkspaceDestination) ? (hash as WorkspaceDestination) : "answer");
+    };
+    restoreDestination();
+    if (!valid.has(window.location.hash.slice(1) as WorkspaceDestination)) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#answer`);
     }
-    if (saved !== "quick" && saved !== "doc") return;
-    // Nach dem Mount statt im Effektrumpf: keine Kaskadenrenders, und das
-    // vorgerenderte Markup bleibt für die Hydration identisch.
-    const timer = window.setTimeout(() => setCalibView(saved as CalibrationView), 0);
-    return () => window.clearTimeout(timer);
+    window.addEventListener("popstate", restoreDestination);
+    window.addEventListener("hashchange", restoreDestination);
+    return () => {
+      window.removeEventListener("popstate", restoreDestination);
+      window.removeEventListener("hashchange", restoreDestination);
+    };
+  }, []);
+
+  function firstRawFocus(dataset: RawDataset, meta: Record<string, VarMeta>): string {
+    return (
+      numericColumns(dataset).find(
+        (column) => meta[column]?.type === "raw" && meta[column]?.role !== "ignore",
+      ) ?? ""
+    );
+  }
+
+  function resetAnalysisDecisions() {
+    setAnalysisDecisions({
+      frequencyCutoff: { ...EMPTY_ANALYSIS_DECISIONS.frequencyCutoff },
+      consistencyCutoff: { ...EMPTY_ANALYSIS_DECISIONS.consistencyCutoff },
+      directionalExpectations: { ...EMPTY_ANALYSIS_DECISIONS.directionalExpectations },
+    });
+  }
+
+  function syntheticBrief(dataset: RawDataset, outcomeLabel: string): ResearchBrief {
+    return locale === "de"
+      ? {
+          question: `Welche Kombinationen der synthetischen Bedingungen sind mit dem Set „${outcomeLabel}“ in ${dataset.name} verbunden?`,
+          caseUniverse: `Synthetische Lehrfälle aus ${dataset.name}`,
+          timePeriod: "Kein realer Zeitraum, synthetisches Lehrbeispiel",
+          outcomeConcept: `dem Set „${outcomeLabel}“`,
+          conditionSelectionRationale: "Die Bedingungen wurden ausschließlich zur Demonstration des QCA-Rechenwegs konstruiert.",
+          confirmed: true,
+        }
+      : {
+          question: `Which combinations of synthetic conditions are associated with the set “${outcomeLabel}” in ${dataset.name}?`,
+          caseUniverse: `Synthetic teaching cases from ${dataset.name}`,
+          timePeriod: "No real period, synthetic teaching example",
+          outcomeConcept: `the set “${outcomeLabel}”`,
+          conditionSelectionRationale: "The conditions were constructed solely to demonstrate the QCA workflow.",
+          confirmed: true,
+        };
+  }
+
+  function applyDataset(
+    dataset: RawDataset,
+    options: { demo?: boolean; destination?: WorkspaceDestination } = {},
+  ) {
+    const isDemo = options.demo === true;
+    const meta = deriveSuggestedVarMeta(dataset);
+    const columns = numericColumns(dataset);
+    const specs = migrateSpecsFromAnchors(columns, dataset.anchors);
+    for (const column of columns) {
+      const metadata = meta[column];
+      if (!metadata) continue;
+      if (metadata.type === "raw") {
+        const spec = specs[column];
+        if (!spec.set.setLabel.trim()) spec.set.setLabel = column;
+        if (!spec.set.definition.trim()) {
+          spec.set.definition = t(locale, "calib.ph.definition", { col: column });
+        }
+        const fuzzyAnchors =
+          spec.method === "direct" ? spec.direct : spec.method === "linear" ? spec.linear : undefined;
+        if (fuzzyAnchors) {
+          if (!fuzzyAnchors.meaningFullOut.trim()) {
+            fuzzyAnchors.meaningFullOut = t(locale, "calib.ph.fullOut");
+          }
+          if (!fuzzyAnchors.meaningCrossover.trim()) {
+            fuzzyAnchors.meaningCrossover = t(locale, "calib.ph.crossover");
+          }
+          if (!fuzzyAnchors.meaningFullIn.trim()) {
+            fuzzyAnchors.meaningFullIn = t(locale, "calib.ph.fullIn");
+          }
+        }
+        specs[column] = {
+          ...spec,
+          provisionalDefaults: true,
+          anchorsFromData: true,
+          status: spec.status === "unresolved" ? "provisional" : spec.status,
+        };
+      } else {
+        const spec = specs[column];
+        specs[column] = {
+          ...spec,
+          method: undefined,
+          alreadyCalibratedProvenance:
+            spec.alreadyCalibratedProvenance?.trim() ||
+            t(locale, "calib.ph.provenance", { type: metadata.type, dataset: dataset.name }),
+          set: {
+            ...spec.set,
+            setLabel: spec.set.setLabel || column,
+            definition:
+              spec.set.definition ||
+              t(locale, "calib.ph.precalibratedDefinition", { col: column }),
+          },
+          provisionalDefaults: true,
+          status: spec.status === "unresolved" ? "provisional" : spec.status,
+        };
+      }
+    }
+    const conditionColumns = columns.filter((column) => meta[column]?.role === "condition");
+    const outcomeColumn = columns.find((column) => meta[column]?.role === "outcome") ?? "outcome";
+    const outcomeLabel = outcomeColumn
+      .replace(/^fs_|^demo_/, "")
+      .replaceAll("_", " ")
+      .replace(/ae/g, "ä")
+      .replace(/oe/g, "ö")
+      .replace(/ue/g, "ü")
+      .replace(/^\p{Ll}/u, (letter) => letter.toLocaleUpperCase(locale));
+    setDemoMode(isDemo);
+    setDs(dataset);
+    setAnchors({ ...dataset.anchors });
+    setVarMeta(meta);
+    setCalibSpecs(specs);
+    setCalibMigrateBanner(false);
+    setFocusVar(firstRawFocus(dataset, meta));
+    setFreqCut(1);
+    setConsCut(0.8);
+    setExpectations(normalizeExpectations(conditionColumns, {}));
+    setResearchBrief(isDemo ? syntheticBrief(dataset, outcomeLabel) : { ...EMPTY_RESEARCH_BRIEF });
+    resetAnalysisDecisions();
+    setXySource("");
+    setImportError("");
+    if (options.destination) {
+      selectDestination(options.destination, { history: "replace", focus: false });
+    }
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedDemo = params.get("demo") === "1";
+    if (requestedDemo) {
+      params.delete("demo");
+      const query = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${query ? `?${query}` : ""}#answer`,
+      );
+    }
+    const initialization = window.setTimeout(() => {
+      if (requestedDemo) {
+        applyDataset(DEMO, { demo: true, destination: "answer" });
+      } else {
+        setResumeCandidate(readLocalProject());
+      }
+    }, 0);
+    return () => window.clearTimeout(initialization);
+    // Dataset loading is intentionally one-shot on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const restorePreference = window.setTimeout(() => {
+      try {
+        const saved = window.sessionStorage.getItem(CALIBRATION_VIEW_STORAGE_KEY);
+        if (saved === "quick" || saved === "doc") setCalibView(saved);
+      } catch {
+        // Session-only display preference is optional.
+      }
+    }, 0);
+    return () => window.clearTimeout(restorePreference);
   }, []);
 
   function chooseCalibView(next: CalibrationView) {
@@ -327,135 +392,248 @@ export default function Home() {
     try {
       window.sessionStorage.setItem(CALIBRATION_VIEW_STORAGE_KEY, next);
     } catch {
-      // Die Wahl gilt dann nur bis zum Neuladen.
+      // The view still changes for this session.
     }
   }
 
-  /** „Dokumentieren →": Ansicht wechseln UND die Variable in der Workbench fokussieren. */
   function documentVariable(column: string) {
     setFocusVar(column);
     chooseCalibView("doc");
-    window.setTimeout(
-      () => document.getElementById("kalibrierung")?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      0,
-    );
+    selectDestination("decisions");
+    window.setTimeout(() => {
+      document.getElementById("decision-calibration")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+  function jumpToDecisionIssue(issue: DecisionIssue) {
+    if (issue.kind === "researchBrief") {
+      selectDestination("research");
+      window.setTimeout(() => document.getElementById("brief-question")?.focus(), 0);
+      return;
+    }
+    if (issue.kind === "calibration" && issue.column) {
+      documentVariable(issue.column);
+      return;
+    }
+    selectDestination("decisions");
+    window.setTimeout(() => {
+      document.getElementById(`decision-${issue.kind}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 0);
   }
 
-  // Local-first restore: an explicit demo deep-link always wins over a saved project.
-  useEffect(() => {
-    if (localRestoreRef.current) return;
-    localRestoreRef.current = true;
-    if (new URLSearchParams(window.location.search).get("demo") === "1") return;
-    const saved = readLocalProject();
-    if (!saved) return;
-    startTransition(() => {
-      loadState(saved.state);
-      setLocalProjectStatus(t(locale, "data.localRestored"));
-    });
-    // Restore only once per mount; state changes are handled by the autosave effect below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Deep-Link von der Landing: /app?demo=1 lädt sofort den Demo-Datensatz.
-  // Der Parameter wird danach entfernt, damit ein Reload nicht erneut lädt.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("demo") !== "1") return;
-    const timer = window.setTimeout(() => applyDataset(DEMO, { demo: true }), 0);
-    params.delete("demo");
-    const qs = params.toString();
-    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function stageImport(dataset: RawDataset, filename: string) {
+    setPendingImport(inspectImport(dataset, filename));
+    setImportError("");
+  }
 
   function importCsv(file: File) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        applyDataset(parseCsv(String(reader.result), file.name));
-      } catch (e) {
-        alert(t(locale, "alert.csvError", { msg: e instanceof Error ? e.message : t(locale, "alert.unknown") }));
+        stageImport(parseCsv(String(reader.result), file.name), file.name);
+      } catch (error) {
+        setImportError(t(locale, "workspace.import.error", {
+          message: error instanceof Error ? error.message : t(locale, "alert.unknown"),
+        }));
       }
     };
+    reader.onerror = () => setImportError(t(locale, "workspace.import.error", { message: t(locale, "alert.unknown") }));
     reader.readAsText(file);
   }
 
   async function importXlsx(file: File) {
     try {
-      applyDataset(await parseXlsxToDataset(file));
-    } catch (e) {
-      alert(t(locale, "alert.xlsxError", { msg: e instanceof Error ? e.message : t(locale, "alert.unknown") }));
+      stageImport(await parseXlsxToDataset(file), file.name);
+    } catch (error) {
+      setImportError(t(locale, "workspace.import.error", {
+        message: error instanceof Error ? error.message : t(locale, "alert.unknown"),
+      }));
     }
   }
 
   function importFile(file: File) {
-    if (/\.(xlsx|xls)$/i.test(file.name)) {
-      importXlsx(file);
-    } else {
-      importCsv(file);
-    }
+    setImportError("");
+    if (/\.(xlsx|xls)$/i.test(file.name)) void importXlsx(file);
+    else importCsv(file);
+  }
+
+  function commitImport() {
+    if (!pendingImport) return;
+    const receipt = pendingImport;
+    applyDataset(receipt.dataset, { demo: false });
+    setImportReceipt(receipt);
+    setPendingImport(null);
+    selectDestination("research", { history: "replace", focus: true });
   }
 
   function currentState(): SavedState {
-    return { dataset: ds!, anchors, varMeta, calibSpecs, demoMode, freqCut, consCut };
+    if (!ds) throw new Error("No active dataset");
+    return {
+      dataset: ds,
+      anchors,
+      varMeta,
+      calibSpecs,
+      demoMode,
+      freqCut,
+      consCut,
+      expectations,
+      researchBrief,
+      analysisDecisions,
+    };
   }
-  function loadState(raw: unknown) {
-    const s = raw as SavedState;
-    if (!s?.dataset) return;
-    setDemoMode(s.demoMode === true);
-    setDs(s.dataset);
-    setAnchors(s.anchors ?? {});
-    // Fehlt das Variablen-Metamodell (alter Speicherstand), neu ableiten;
-    // alte fs_-Bedingungen werden bewusst ignoriert (kein Crash).
-    const meta =
-      s.varMeta && Object.keys(s.varMeta).length > 0 ? s.varMeta : deriveVarMeta(s.dataset);
-    setVarMeta(meta);
-    const cols = numericColumns(s.dataset);
-    const hadSpecs = !!(s.calibSpecs && Object.keys(s.calibSpecs).length > 0);
-    setCalibSpecs(migrateSpecsFromAnchors(cols, s.anchors ?? s.dataset.anchors ?? {}, s.calibSpecs));
-    setCalibMigrateBanner(!hadSpecs);
-    setFreqCut(s.freqCut ?? 1);
-    setConsCut(s.consCut ?? 0.8);
-    setFocusVar(firstRawFocus(s.dataset, meta));
+
+  function loadState(raw: unknown): boolean {
+    let state: SavedState | null;
+    try {
+      state = normalizeSavedState(raw);
+    } catch {
+      return false;
+    }
+    if (!state) return false;
+    setDemoMode(state.demoMode);
+    setDs(state.dataset);
+    setAnchors(state.anchors);
+    setVarMeta(state.varMeta);
+    setCalibSpecs(state.calibSpecs);
+    setCalibMigrateBanner(
+      !(
+        typeof raw === "object" &&
+        raw !== null &&
+        "calibSpecs" in raw &&
+        raw.calibSpecs
+      ),
+    );
+    setFreqCut(state.freqCut);
+    setConsCut(state.consCut);
+    setExpectations(state.expectations);
+    setResearchBrief(state.researchBrief);
+    setAnalysisDecisions(state.analysisDecisions);
+    setFocusVar(firstRawFocus(state.dataset, state.varMeta));
+    setImportError("");
+    return true;
   }
 
   function saveLocalProject() {
     if (!ds) return;
-    setLocalProjectStatus(
-      writeLocalProject(currentState())
-        ? t(locale, "data.localSaved")
-        : t(locale, "data.localSaveFailed"),
-    );
+    const saved = writeLocalProject(currentState());
+    setLocalProjectStatus(saved ? t(locale, "data.localSaved") : t(locale, "data.localSaveFailed"));
+    if (saved) setResumeCandidate(readLocalProject());
   }
 
   function restoreLocalProject() {
     const saved = readLocalProject();
-    if (!saved) {
+    if (!saved || !loadState(saved.state)) {
       setLocalProjectStatus(t(locale, "data.localMissing"));
       return;
     }
-    loadState(saved.state);
+    setResumeCandidate(saved);
     setLocalProjectStatus(t(locale, "data.localRestored"));
+    selectDestination("answer");
   }
 
   useEffect(() => {
     if (!ds || demoMode) return;
-    writeLocalProject({ dataset: ds, anchors, varMeta, calibSpecs, demoMode, freqCut, consCut });
-  }, [anchors, calibSpecs, consCut, demoMode, ds, freqCut, varMeta]);
+    writeLocalProject({
+      dataset: ds,
+      anchors,
+      varMeta,
+      calibSpecs,
+      demoMode,
+      freqCut,
+      consCut,
+      expectations,
+      researchBrief,
+      analysisDecisions,
+    } satisfies SavedState);
+  }, [
+    analysisDecisions,
+    anchors,
+    calibSpecs,
+    consCut,
+    demoMode,
+    ds,
+    expectations,
+    freqCut,
+    researchBrief,
+    varMeta,
+  ]);
 
-  // Berechnungskette: crisp/fuzzy → Wert unverändert; raw → calibrateValue per CalibrationSpec.
-  // Fälle mit NaN in genutzten Spalten werden für TT/Lösungen ausgeschlossen.
+  function changeResearchBrief(
+    field: keyof Omit<ResearchBrief, "confirmed">,
+    value: string,
+  ) {
+    setResearchBrief((current) => ({ ...current, [field]: value, confirmed: false }));
+  }
+
+  function changeVarMeta(next: Record<string, VarMeta>) {
+    setVarMeta(next);
+    setResearchBrief((current) => ({ ...current, confirmed: false }));
+    const activeConditions = ds
+      ? numericColumns(ds).filter((column) => next[column]?.role === "condition")
+      : [];
+    setExpectations((current) => normalizeExpectations(activeConditions, current));
+    setAnalysisDecisions((current) => ({
+      ...current,
+      directionalExpectations: {
+        ...current.directionalExpectations,
+        confirmed: false,
+      },
+    }));
+  }
+
+  function changeFreqCut(value: number) {
+    setFreqCut(value);
+    setAnalysisDecisions((current) => ({
+      ...current,
+      frequencyCutoff: { ...current.frequencyCutoff, confirmed: false },
+    }));
+  }
+
+  function changeConsCut(value: number) {
+    setConsCut(value);
+    setAnalysisDecisions((current) => ({
+      ...current,
+      consistencyCutoff: { ...current.consistencyCutoff, confirmed: false },
+    }));
+  }
+
+  function changeExpectations(next: Record<string, Expectation>) {
+    setExpectations(next);
+    setAnalysisDecisions((current) => ({
+      ...current,
+      directionalExpectations: {
+        ...current.directionalExpectations,
+        confirmed: false,
+      },
+    }));
+  }
+
+  const activeAnalysisCols = useMemo(
+    () =>
+      ds
+        ? numericColumns(ds).filter((column) => {
+            const meta = varMeta[column];
+            return meta && meta.role !== "ignore";
+          })
+        : [],
+    [ds, varMeta],
+  );
+  const selectedConditions = useMemo(
+    () => activeAnalysisCols.filter((column) => varMeta[column]?.role === "condition"),
+    [activeAnalysisCols, varMeta],
+  );
+  const selectedOutcomes = useMemo(
+    () => activeAnalysisCols.filter((column) => varMeta[column]?.role === "outcome"),
+    [activeAnalysisCols, varMeta],
+  );
+  const selectedOutcome = selectedOutcomes[0] ?? "";
   const evaluation: CalibrationEvaluation = useMemo(
     () =>
       ds
         ? evaluateCalibration(ds, varMeta, calibSpecs)
-        : {
-            cases: [],
-            cells: [],
-            excludedCaseLabels: [],
-            unresolvedCaseLabels: [],
-          },
+        : { cases: [], cells: [], excludedCaseLabels: [], unresolvedCaseLabels: [] },
     [ds, varMeta, calibSpecs],
   );
   const setCols = useMemo(
@@ -477,53 +655,45 @@ export default function Home() {
     ...evaluation.excludedCaseLabels,
     ...evaluation.unresolvedCaseLabels,
   ]).size;
-
-  // Bedingungen/Outcome leiten sich aus varMeta ab (nur nutzbare Set-Spalten).
   const conditions = useMemo(
-    () => setCols.filter((c) => varMeta[c]?.role === "condition"),
+    () => setCols.filter((column) => varMeta[column]?.role === "condition"),
     [setCols, varMeta],
   );
   const outcome = useMemo(
-    () => setCols.find((c) => varMeta[c]?.role === "outcome") ?? "",
+    () => setCols.find((column) => varMeta[column]?.role === "outcome") ?? "",
     [setCols, varMeta],
   );
-
+  const computedRoleContractReady =
+    selectedConditions.length >= 1 &&
+    selectedOutcomes.length === 1 &&
+    activeAnalysisCols.length === setCols.length &&
+    activeAnalysisCols.every((column) => setCols.includes(column)) &&
+    conditions.length === selectedConditions.length &&
+    outcome === selectedOutcomes[0];
   const tt: TruthTableResult | null = useMemo(() => {
-    if (!ds || conditions.length < 1 || !outcome) return null;
-    if (conditions.includes(outcome)) return null;
+    if (!ds || cases.length === 0 || conditions.length < 1 || conditions.length > 12 || !outcome) {
+      return null;
+    }
     try {
       return buildTruthTable({ cases, conditions, outcome, freqCut, consCut });
     } catch {
       return null;
     }
-  }, [ds, cases, conditions, outcome, freqCut, consCut]);
-  const sensitivity: SensitivityBundle = useMemo(
-    () => {
-      if (!ds || conditions.length > 12) {
-        return { resultsByColumn: {}, variantsByColumn: {} };
-      }
-      return buildSensitivityBundle({
-        ds,
-        varMeta,
-        calibSpecs,
-        conditions,
-        outcome,
-        freqCut,
-        consCut,
-      });
-    },
-    [ds, varMeta, calibSpecs, conditions, outcome, freqCut, consCut],
-  );
+  }, [cases, conditions, ds, outcome, freqCut, consCut]);
+  const sensitivity: SensitivityBundle = useMemo(() => {
+    if (!ds || conditions.length > 12) return { resultsByColumn: {}, variantsByColumn: {} };
+    return buildSensitivityBundle({
+      ds,
+      varMeta,
+      calibSpecs,
+      conditions,
+      outcome,
+      freqCut,
+      consCut,
+    });
+  }, [ds, varMeta, calibSpecs, conditions, outcome, freqCut, consCut]);
   const robustnessScenarios: RobustnessScenario[] = useMemo(() => {
-    if (
-      !ds ||
-      conditions.length > 12 ||
-      conditions.length < 1 ||
-      !outcome ||
-      conditions.includes(outcome)
-    ) {
-      return [];
-    }
+    if (!ds || conditions.length > 12 || conditions.length < 1 || !outcome) return [];
     try {
       const scenarios = buildRobustnessScenarios({
         ds,
@@ -535,66 +705,41 @@ export default function Home() {
       return scenarios[0]?.cases.length
         ? scenarios
         : cases.length
-          ? [{
-              id: "base",
-              label: "Basis-Kalibrierung",
-              cases,
-            }]
+          ? [{ id: "base", label: "Basis-Kalibrierung", cases }]
           : [];
     } catch {
-      return cases.length
-        ? [{ id: "base", label: "Basis-Kalibrierung", cases }]
-        : [];
+      return cases.length ? [{ id: "base", label: "Basis-Kalibrierung", cases }] : [];
     }
-  }, [ds, varMeta, calibSpecs, conditions, outcome, cases]);
+  }, [ds, conditions, outcome, varMeta, calibSpecs, cases]);
   const robustnessResult: CombinedRobustnessResult | null = useMemo(() => {
     if (!robustnessScenarios.length || conditions.length < 1 || !outcome) return null;
-    const robustnessFreqCuts = [
-      ...new Set([Math.max(1, freqCut - 1), freqCut, freqCut + 1]),
-    ].sort((a, b) => a - b);
-    const robustnessConsCuts = [
-      ...new Set([0.7, 0.8, 0.9, 0.95, consCut]),
-    ]
-      .filter((cut) => cut >= 0 && cut <= 1)
-      .sort((a, b) => a - b);
     try {
       return runCombinedRobustnessGrid({
         scenarios: robustnessScenarios,
         conditions,
         outcome,
-        freqCuts: robustnessFreqCuts,
-        consCuts: robustnessConsCuts,
+        freqCuts: [...new Set([Math.max(1, freqCut - 1), freqCut, freqCut + 1])].sort((a, b) => a - b),
+        consCuts: [...new Set([0.7, 0.8, 0.9, 0.95, consCut])]
+          .filter((cut) => cut >= 0 && cut <= 1)
+          .sort((a, b) => a - b),
         priCuts: [null, 0.5, 0.75],
         baseline: { scenarioId: "base", freqCut, consCut, priCut: null },
-        expectations: Object.fromEntries(
-          conditions.map((condition) => [condition, expectations[condition] ?? "present"]),
-        ),
+        expectations: normalizeExpectations(conditions, expectations),
       });
     } catch {
       return null;
     }
   }, [conditions, consCut, expectations, freqCut, outcome, robustnessScenarios]);
-
-  // Notwendigkeitsanalyse hängt methodisch NUR von conditions/outcome/cases ab
-  // (nicht von der Truth Table) — sie gehört vor die Suffizienzanalyse.
   const necessity: ReturnType<typeof necessityAnalysis> | null = useMemo(() => {
-    if (!(conditions.length > 0 && outcome && !conditions.includes(outcome))) return null;
+    if (cases.length === 0 || conditions.length === 0 || !outcome) return null;
     try {
       return necessityAnalysis(conditions, outcome, cases);
     } catch {
       return null;
     }
   }, [conditions, outcome, cases]);
-
-  /**
-   * Notwendige Kombinationen (SUIN-Disjunktionen und Konjunktionen). Die
-   * Schwellen entsprechen der gängigen Konvention (Konsistenz ≥ 0,9) plus einer
-   * Coverage-Untergrenze, die triviale Obermengen fernhält. Die Ordnung ist auf
-   * 3 begrenzt: darüber wird die Kombinatorik teuer und die Ausdrücke sind kaum
-   * noch interpretierbar.
-   */
   const suin: NecessityExpressionEntry[] | null = useMemo(() => {
-    if (!(conditions.length > 0 && outcome && !conditions.includes(outcome))) return null;
+    if (cases.length === 0 || conditions.length === 0 || !outcome) return null;
     try {
       return necessarySupersets(conditions, outcome, cases, {
         inclCut: 0.9,
@@ -605,534 +750,1643 @@ export default function Home() {
       return null;
     }
   }, [conditions, outcome, cases]);
-
   const sol: SolBundle | null = useMemo(() => {
     if (!tt) return null;
-    const exp: Record<string, Expectation> = Object.fromEntries(
-      conditions.map((c) => [c, expectations[c] ?? "present"]),
-    );
+    const currentExpectations = normalizeExpectations(conditions, expectations);
     return {
       complex: complexSolution(tt, cases),
-      intermediate: intermediateSolution(tt, cases, exp),
+      intermediate: intermediateSolution(tt, cases, currentExpectations),
       parsimonious: parsimoniousSolution(tt, cases),
     };
   }, [tt, cases, conditions, expectations]);
 
-  // -- Geführter 6-Schritte-Stepper: Status je Schritt aus dem State ableiten. --
-  const activeAnalysisCols = useMemo(
-    () =>
-      ds
-        ? numericColumns(ds).filter((c) => {
-            const m = varMeta[c];
-            return m && m.role !== "ignore";
-          })
-        : [],
-    [ds, varMeta],
-  );
-
-  const step1Done = !!ds;
-  const step2Done =
-    activeAnalysisCols.some((c) => varMeta[c]?.role === "condition") &&
-    activeAnalysisCols.some((c) => varMeta[c]?.role === "outcome");
-  /**
-   * Rechnen darf, was rechenbar ist. Der Schritt gilt als erledigt, sobald jede
-   * aktive Spalte eine berechenbare Kalibrierung hat (Anker gültig, Methode
-   * gewählt) — NICHT erst, wenn sie vollständig dokumentiert ist. Die
-   * Dokumentation ist ein sichtbarer Fortschritt (Meter) und Voraussetzung für
-   * das Replikationsartefakt, nie fürs Sehen der Ergebnisse.
-   */
-  const step3Done =
-    step2Done &&
-    (demoMode ||
-      activeAnalysisCols.every((column) =>
-        specIsComputable(calibSpecs[column], varMeta[column].type),
-      ));
   const documentedCols = activeAnalysisCols.filter((column) =>
-    specIsProtocolReady(calibSpecs[column], varMeta[column].type),
+    specIsProtocolReady(calibSpecs[column], varMeta[column]?.type ?? "raw"),
   );
-  const calibrationResearchReady =
-    !demoMode &&
-    step2Done &&
+  const computableCalibration =
+    activeAnalysisCols.length > 0 &&
     activeAnalysisCols.every((column) =>
-      specIsProtocolReady(calibSpecs[column], varMeta[column].type),
+      specIsComputable(calibSpecs[column], varMeta[column]?.type ?? "raw"),
     );
-  const step4Done = step3Done && !!necessity; // Analyse-Schritt: bereit = Ergebnis liegt vor
-  const step5Done = step3Done && !!(tt && sol);
-  /**
-   * Der Bericht ist da, sobald Lösungen da sind — für Demo-Daten wie für eigene.
-   * Ist die Kalibrierung noch nicht vollständig dokumentiert, trägt er das
-   * Kennzeichen „vorläufig" (`provisional`); der synthetische Demo-Datensatz
-   * trägt weiterhin sein eigenes „nicht zitierfähig"-Banner. Der Protokoll-/
-   * R-Export bleibt gesperrt: Er ist das Replikationsartefakt und behauptet
-   * Provenienz, die undokumentierte oder synthetische Daten nicht haben.
-   */
-  const reportAvailable = step5Done && !!necessity;
-  const reportProvisional = !demoMode && !calibrationResearchReady;
-  /**
-   * Ergebnisse sind erzeugt, aber die Kalibrierung ist nicht dokumentiert.
-   * Beim synthetischen Demo-Datensatz trägt bereits ein eigener Hinweis; dort
-   * wäre die Marke doppelt.
-   */
-  const showProvisionalMark = step3Done && reportProvisional;
-  const step6Done = false; // Terminal-Schritt: bleibt „aktiv", solange man hier arbeitet
-
-  const s1 = statusOf(true, step1Done);
-  const s2 = statusOf(step1Done, step2Done);
-  // Step 3 is the editing workspace; do not lock it behind its own checklist.
-  const s3: StepStatus = step2Done ? (step3Done ? "done" : "active") : "locked";
-  const s4 = statusOf(step3Done, step4Done);
-  const s5 = statusOf(step3Done, step5Done);
-  const s6 = statusOf(step5Done, step6Done);
-  const statuses: StepStatus[] = [s1, s2, s3, s4, s5, s6];
-
-  // Anzahl der von vorne lückenlos erledigten Schritte → aktiver Schritt = k+1.
-  let doneRun = 0;
-  for (const st of statuses) {
-    if (st === "done") doneRun++;
-    else break;
-  }
-  const activeStepNum = doneRun < 6 ? doneRun + 1 : 0;
-
-  const stepMeta: { id: string; titleKey: DictKey; navKey: DictKey }[] = [
-    { id: "daten", titleKey: "step.title.1", navKey: "nav.step1" },
-    { id: "variablen", titleKey: "step.title.2", navKey: "nav.step2" },
-    { id: "kalibrierung", titleKey: "step.title.3", navKey: "nav.step3" },
-    { id: "notwendigkeit", titleKey: "step.title.4", navKey: "nav.step4" },
-    { id: "truthtable", titleKey: "step.title.5", navKey: "nav.step5" },
-    { id: "robustheit", titleKey: "step.title.6", navKey: "nav.step6" },
+  const briefReadiness = researchBriefReadiness(
+    researchBrief,
+    selectedConditions,
+    selectedOutcome,
+  );
+  const decisionReadiness = analysisDecisionReadiness(analysisDecisions);
+  const calibrationReadiness = calibrationDefenseReadiness(
+    activeAnalysisCols,
+    varMeta,
+    calibSpecs,
+  );
+  const decisionIssues = deriveDecisionIssues({
+    researchBrief,
+    analysisDecisions,
+    conditions: selectedConditions,
+    outcome: selectedOutcome,
+    activeColumns: activeAnalysisCols,
+    varMeta,
+    calibSpecs,
+  });
+  const resultsReady = tt !== null && sol !== null && necessity !== null;
+  const defenseResultsReady = resultsReady && computedRoleContractReady;
+  const defenseReady =
+    !demoMode &&
+    cases.length > 0 &&
+    briefReadiness.ready &&
+    decisionReadiness.ready &&
+    calibrationReadiness.ready &&
+    defenseResultsReady;
+  const reportAvailable = cases.length > 0 && resultsReady;
+  const reportProvisional = !defenseReady;
+  const checklist = [
+    { key: "workspace.defense.check.demo" as DictKey, ready: !demoMode },
+    { key: "workspace.defense.check.cases" as DictKey, ready: cases.length > 0 },
+    { key: "workspace.defense.check.brief" as DictKey, ready: briefReadiness.ready },
+    { key: "workspace.defense.check.analysis" as DictKey, ready: decisionReadiness.ready },
+    { key: "workspace.defense.check.calibration" as DictKey, ready: calibrationReadiness.ready },
+    { key: "workspace.defense.check.results" as DictKey, ready: defenseResultsReady },
   ];
-  const lockedReasonKeys: (DictKey | null)[] = [
-    null,
-    "step.locked.2",
-    "step.locked.3",
-    "step.locked.4",
-    "step.locked.5",
-    "step.locked.6",
-  ];
-  const navSteps = stepMeta.map((m, i) => ({
-    n: i + 1,
-    id: m.id,
-    label: t(locale, m.navKey),
-    status: statuses[i],
-    // Schritte 3–5 rechnen, sobald die Kalibrierung berechenbar ist — „erledigt"
-    // sind sie erst, wenn sie auch begründet ist.
-    provisional: showProvisionalMark && i >= 2 && i <= 4,
-  }));
-  const activeStepId = activeStepNum > 0 ? stepMeta[activeStepNum - 1].id : stepMeta[0].id;
-
-  // „Weiter"-Button unter dem zuletzt erledigten Schritt (= aktiver − 1),
-  // zeigt auf den nun aktiven Schritt. Nicht unter Schritt 6.
-  const continueUnder = doneRun >= 1 && doneRun < 6 ? doneRun : 0;
-  const renderContinue = (afterStep: number) =>
-    continueUnder === afterStep ? (
-      <ContinueButton
-        targetN={afterStep + 1}
-        targetTitle={t(locale, stepMeta[afterStep].titleKey)}
-        targetId={stepMeta[afterStep].id}
-      />
-    ) : null;
+  const missingDefenseGroups = checklist
+    .filter((item) => !item.ready)
+    .map((item) => t(locale, item.key));
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px clamp(12px, 4vw, 26px) 90px" }}>
+    <div className="oq-workspace-shell">
       <input
         ref={fileRef}
         type="file"
+        aria-label={locale === "de" ? "Datei auswählen" : "Choose file"}
         accept=".csv,.txt,.tsv,.xlsx,.xls"
         style={{ display: "none" }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) importFile(f);
-          e.target.value = "";
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) importFile(file);
+          event.target.value = "";
         }}
       />
       <Header />
-      <SectionNav steps={navSteps} activeStepId={activeStepId} />
-      {ds && <Glossary />}
-      {/* Die App ist kein zweiter Verkaufsraum: Wer hier ist, hat sich entschieden.
-          Zwei Zeilen statt einer Hero-Wiederholung der Startseite — Schritt 1 muss
-          in die erste Bildschirmhöhe passen. Die Tour-Empfehlung steht dort, wo
-          die Buttons stehen, nicht 600px darüber. */}
-      {!ds && (
-        <div style={{ padding: "10px 2px 16px" }}>
-          <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.01em", margin: "0 0 4px", maxWidth: "40ch" }}>
-            {t(locale, "hero.title")}
-          </h1>
-          <p style={{ color: "var(--ink-2)", maxWidth: "70ch", margin: 0, fontSize: 13.5 }}>
-            {t(locale, "hero.desc")}
-          </p>
-        </div>
-      )}
-
-      {/* Schritt 1 — Daten laden */}
-      <Step n={1} id={stepMeta[0].id} title={t(locale, stepMeta[0].titleKey)} status={s1} intro={t(locale, "step.intro.1")}>
-        {!ds ? (
-          <>
-            <Card>
-              {/* Titel liefert der Step-Wrapper — hier nicht doppeln. */}
-              <p style={{ color: "var(--ink-2)", maxWidth: "60ch", marginTop: 0 }}>
-                {t(locale, "load.desc")}
-              </p>
-              <p style={{ color: "var(--ink-2)", maxWidth: "60ch", margin: "8px 0 0", fontSize: 13.5 }}>
-                {t(locale, "hero.tourHint")}
-              </p>
-              <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <Button primary onClick={loadDemo}>{t(locale, "load.demoBtn")}</Button>
-                <Button onClick={() => fileRef.current?.click()}>{t(locale, "load.importBtn")}</Button>
-                <Button onClick={startTour}>{t(locale, "tour.start")}</Button>
-              </div>
-              <p className="hint" style={hintStyle}>
-                {t(locale, "load.hint")}
-              </p>
-            </Card>
-            <Card>
-              <H2>{t(locale, "examples.title")}</H2>
-              <ExampleDatasets onSelect={applyDataset} />
-            </Card>
-          </>
-        ) : (
-          <>
-            <DataSection ds={ds} />
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, margin: "-8px 0 18px" }}>
-              <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
-              <Button disabled={!ds} onClick={saveLocalProject}>{t(locale, "data.saveLocal")}</Button>
-              <Button onClick={restoreLocalProject}>{t(locale, "data.loadLocal")}</Button>
-              <CloudSaveLoad getState={currentState} onLoad={loadState} />
-              {localProjectStatus && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{localProjectStatus}</span>}
-            </div>
-          </>
-        )}
-      </Step>
-      {renderContinue(1)}
-
-      {/* Schritt 2 — Variablen & Rollen */}
-      <Step n={2} id={stepMeta[1].id} title={t(locale, stepMeta[1].titleKey)} status={s2} lockedReason={t(locale, lockedReasonKeys[1]!)} intro={t(locale, "step.intro.2")}>
-        {ds && (
-          <VariablesSection
-            ds={ds}
-            varMeta={varMeta}
-            setVarMeta={setVarMeta}
-            calibSpecs={calibSpecs}
-            conditionCount={conditions.length}
-            caseCount={cases.length}
+      <div className="oq-workspace-frame">
+        {pendingImport && (
+          <ImportPreflightPanel
+            preflight={pendingImport}
+            onCommit={commitImport}
+            onCancel={() => setPendingImport(null)}
           />
         )}
-      </Step>
-      <Step n={3} id={stepMeta[2].id} title={t(locale, stepMeta[2].titleKey)} status={s3} lockedReason={t(locale, lockedReasonKeys[2]!)} intro={t(locale, "step.intro.3")} provisional={showProvisionalMark}>
-        {ds && (
-          <>
-            {demoMode && <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>}
-            {calibMigrateBanner && (
-              <Diag kind="warn">{t(locale, "calib.migrate.banner")}</Diag>
-            )}
-            <Card>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <span
-                  role="group"
-                  aria-label={t(locale, "calib.view.aria")}
-                  style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}
-                >
-                  {(["quick", "doc"] as const).map((view) => {
-                    const active = calibView === view;
-                    return (
-                      <button
-                        key={view}
-                        type="button"
-                        aria-pressed={active}
-                        data-testid={`calibration-view-${view}`}
-                        onClick={() => chooseCalibView(view)}
-                        style={{
-                          font: "inherit",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          padding: "4px 12px",
-                          border: "none",
-                          cursor: "pointer",
-                          lineHeight: 1.4,
-                          background: active ? "var(--brand)" : "var(--panel)",
-                          color: active ? "#fff" : "var(--ink-2)",
-                        }}
-                      >
-                        {t(locale, view === "quick" ? "calib.view.quick" : "calib.view.doc")}
-                      </button>
-                    );
-                  })}
-                </span>
-              </div>
-              <DocumentationMeter
-                columns={activeAnalysisCols}
-                doneCount={documentedCols.length}
-                documented={(column) => documentedCols.includes(column)}
-                onDocument={documentVariable}
-              />
-            </Card>
-            {calibView === "quick" ? (
-              <CalibrationQuick
-                ds={ds}
-                varMeta={varMeta}
-                calibSpecs={calibSpecs}
-                setCalibSpecs={setCalibSpecs}
-                anchors={anchors}
-                setAnchors={setAnchors}
-                evaluation={evaluation}
-                onDocument={documentVariable}
+        <aside className="oq-workspace-sidebar">
+          <WorkspaceNav destination={destination} onSelect={selectDestination} />
+          {ds && <Glossary />}
+        </aside>
+        <main className="oq-workspace-main">
+        {destination === "answer" && (
+          <section className="oq-destination oq-destination--answer" aria-labelledby="workspace-answer-heading">
+            <DestinationHeading destination="answer" />
+            {!ds ? (
+              <EntryWorkspace
+                resumeCandidate={resumeCandidate}
+                onLearn={() => applyDataset(DEMO, { demo: true, destination: "answer" })}
+                onImport={() => fileRef.current?.click()}
+                onResume={restoreLocalProject}
+                importError={importError}
               />
             ) : (
-              <CalibrationWorkbench
-                ds={ds}
-                varMeta={varMeta}
-                setVarMeta={setVarMeta}
+              <AnswerWorkspace
+                locale={locale}
+                brief={researchBrief}
+                conditions={conditions}
+                outcome={outcome}
                 calibSpecs={calibSpecs}
-                setCalibSpecs={setCalibSpecs}
-                anchors={anchors}
-                setAnchors={setAnchors}
-                focusVar={focusVar}
-                setFocusVar={setFocusVar}
-                evaluation={evaluation}
-                sensitivity={sensitivity}
-                conditions={conditions}
-                outcome={outcome}
-                excludedMissingCount={excludedMissingCount}
-                freqCut={freqCut}
-                consCut={consCut}
-              />
-            )}
-            {/* Die Kennzahlen beschreiben die KALIBRIERTEN Sets — sie folgen aus den
-                Ankern und standen deshalb vor ihrer eigenen Ursache. Eingeklappt,
-                weil sie zur Kontrolle dienen, nicht zur Eingabe. */}
-            {setCols.length > 0 && (
-              <Card id="deskriptiv">
-                <details>
-                  <summary style={{ fontSize: 16.5, fontWeight: 600, cursor: "pointer" }}>
-                    {t(locale, "descriptives.title")}
-                  </summary>
-                  <div style={{ marginTop: 12 }}>
-                    <Descriptives columns={setCols} cases={cases} />
-                  </div>
-                </details>
-              </Card>
-            )}
-          </>
-        )}
-      </Step>
-      {renderContinue(3)}
-
-      {/* Schritt 4 — Notwendigkeit */}
-      <Step n={4} id={stepMeta[3].id} title={t(locale, stepMeta[3].titleKey)} status={s4} lockedReason={t(locale, lockedReasonKeys[3]!)} intro={t(locale, "step.intro.4")} provisional={showProvisionalMark}>
-        {showProvisionalMark && <ProvisionalMark />}
-        {necessity ? <NecessitySection necessity={necessity} suin={suin} /> : <p className="hint" style={hintStyle}>{t(locale, "step.pending")}</p>}
-      </Step>
-      {renderContinue(4)}
-
-      {/* Schritt 5 — Truth Table & Lösungen */}
-      <Step n={5} id={stepMeta[4].id} title={t(locale, stepMeta[4].titleKey)} status={s5} lockedReason={t(locale, lockedReasonKeys[4]!)} intro={t(locale, "step.intro.5")} provisional={showProvisionalMark}>
-        {showProvisionalMark && <ProvisionalMark />}
-        <TruthTableSection
-          freqCut={freqCut}
-          setFreqCut={setFreqCut}
-          consCut={consCut}
-          setConsCut={setConsCut}
-          tt={tt}
-          conditionCount={conditions.length}
-        />
-        {sol && tt && (
-          <SolutionSection
-            tt={tt}
-            sol={sol}
-            expectations={expectations}
-            setExpectations={setExpectations}
-            conditions={conditions}
-            cases={cases}
-          />
-        )}
-      </Step>
-      {renderContinue(5)}
-
-      {/* Schritt 6 — Robustheit, Bericht & Export */}
-      <Step n={6} id={stepMeta[5].id} title={t(locale, stepMeta[5].titleKey)} status={s6} lockedReason={t(locale, lockedReasonKeys[5]!)} intro={t(locale, "step.intro.6")}>
-        {showProvisionalMark && <ProvisionalMark />}
-        {sol && tt && ds && (
-          <>
-            <Card>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{t(locale, "robustness.title")}</h2>
-                <InfoHint
-                  title={t(locale, "info.robustness.title")}
-                  body={t(locale, "info.robustness.body")}
-                />
-              </div>
-              <RobustnessPanel
                 cases={cases}
+                excludedMissingCount={excludedMissingCount}
+                tt={tt}
+                sol={sol}
+                demoMode={demoMode}
+                defenseReady={defenseReady}
+                issues={decisionIssues}
                 robustness={robustnessResult}
-                scenarios={robustnessScenarios}
-                conditions={conditions}
-                outcome={outcome}
-                freqCut={freqCut}
-                currentConsCut={consCut}
-                expectations={Object.fromEntries(
-                  conditions.map((condition) => [condition, expectations[condition] ?? "present"]),
-                )}
+                onSelectDestination={selectDestination}
+                onJumpIssue={jumpToDecisionIssue}
               />
-            </Card>
-            {/* Panel bringt eigene Karte + Überschrift mit — nicht doppelt verpacken. */}
-            <div id="negiert" style={{ scrollMarginTop: 56 }}>
-              <NegatedOutcomePanel cases={cases} conditions={conditions} outcome={outcome} freqCut={freqCut} consCut={consCut} />
-            </div>
-            {conditions.length > 0 && outcome && (() => {
-              /**
-               * Der in Aufsätzen abgebildete Suffizienz-Plot zeigt nicht eine
-               * Einzelbedingung, sondern den **Lösungsterm**: X ist die
-               * Zugehörigkeit zum Pfad (Minimum über seine Literale), die
-               * Gesamtlösung das Maximum über alle Pfade. Beides steht hier zur
-               * Wahl; gerechnet wird mit `termMembership` aus der Engine, damit
-               * es keine zweite, driftende Implementierung gibt.
-               */
-              const paths = sol.intermediate.models[0]?.paths ?? [];
-              const options: { value: string; label: string; group: "condition" | "path" | "solution" }[] = [
-                ...conditions.map((c) => ({ value: `cond:${c}`, label: c.replace(/^fs_/, ""), group: "condition" as const })),
-                ...paths.map((p) => ({
-                  value: `path:${p.term}`,
-                  label: p.expression.replace(/fs_/g, "").toUpperCase(),
-                  group: "path" as const,
-                })),
-                ...(paths.length > 1
-                  ? [{
-                      value: "solution",
-                      label: paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join(" + "),
-                      group: "solution" as const,
-                    }]
-                  : []),
-              ];
-              const selection = options.some((o) => o.value === xySource)
-                ? xySource
-                : `cond:${conditions[0]}`;
-              const selected = options.find((o) => o.value === selection)!;
-              const xOf = (c: QcaCase): number => {
-                if (selection === "solution") {
-                  return paths.length
-                    ? Math.max(...paths.map((p) => termMembership(p.term, conditions, c.values)))
-                    : 0;
-                }
-                if (selection.startsWith("path:")) {
-                  return termMembership(selection.slice(5), conditions, c.values);
-                }
-                return c.values[selection.slice(5)];
-              };
-              const points = cases.map((c) => ({ label: c.label, x: xOf(c), y: c.values[outcome] }));
-              const isTerm = !selection.startsWith("cond:");
-              return (
-                <Card id="xyplot">
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <h2 style={{ fontSize: 16.5, fontWeight: 600, margin: 0 }}>{t(locale, "xy.title")}</h2>
-                      <InfoHint title={t(locale, "info.xyPlot.title")} body={t(locale, "info.xyPlot.body")} />
-                    </div>
-                    <select
-                      value={selection}
-                      onChange={(e) => setXySource(e.target.value)}
-                      aria-label={t(locale, "xy.source.label")}
-                      data-testid="xy-source"
-                      style={{ ...inputStyle, marginLeft: "auto", maxWidth: "100%" }}
-                    >
-                      <optgroup label={t(locale, "xy.source.conditions")}>
-                        {options.filter((o) => o.group === "condition").map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </optgroup>
-                      {paths.length > 0 && (
-                        <optgroup label={t(locale, "xy.source.paths")}>
-                          {options.filter((o) => o.group === "path").map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {options.some((o) => o.group === "solution") && (
-                        <optgroup label={t(locale, "xy.source.solution")}>
-                          {options.filter((o) => o.group === "solution").map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-                  </div>
-                  <XyPlot xLabel={selected.label} yLabel={outcome} points={points} />
-                  <p className="hint" style={hintStyle}>{t(locale, "xy.hint")}</p>
-                  {isTerm && (
-                    <p className="hint" style={hintStyle} data-testid="xy-path-hint">{t(locale, "xy.pathHint")}</p>
-                  )}
-                </Card>
-              );
-            })()}
-            <ProtocolSection
-              ds={ds}
-              calibSpecs={calibSpecs}
-              varMeta={varMeta}
-              conditions={conditions}
-              outcome={outcome}
-              freqCut={freqCut}
-              consCut={consCut}
-              evaluation={evaluation}
-              sensitivity={sensitivity}
-              robustness={robustnessResult}
-              researchReady={calibrationResearchReady}
-            />
-            <Card>
-              <H2>{t(locale, "report.title")}</H2>
-              <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
-              {demoMode ? (
-                <Diag kind="warn">{t(locale, "report.demoNotice")}</Diag>
-              ) : (
-                reportProvisional && (
-                  <p className="hint" style={hintStyle}>{t(locale, "report.provisionalNotice")}</p>
-                )
-              )}
-              <ReportButton
-                disabled={!reportAvailable}
-                getInput={(): ReportInput | null => {
-                  if (!reportAvailable || !ds || !tt || !sol || !necessity) return null;
-                  return {
-                    demo: demoMode,
-                    provisional: reportProvisional,
-                    datasetName: ds.name,
-                    caseCount: ds.rows.length,
-                    anchors: rawAnchorsOf(ds, varMeta, calibSpecs),
-                    calibSpecs,
-                    varMeta,
-                    conditions,
-                    outcome,
-                    freqCut,
-                    consCut,
-                    tt,
-                    complex: sol.complex,
-                    intermediate: sol.intermediate,
-                    parsimonious: sol.parsimonious,
-                    necessity,
-                    expectations: Object.fromEntries(conditions.map((c) => [c, expectations[c] ?? "present"])),
-                    rScript: buildRScript({
-                      ds,
-                      calibSpecs,
-                      varMeta,
-                      conditions,
-                      outcome,
-                      freqCut,
-                      consCut,
-                      sensitivity,
-                    }),
-                  };
-                }}
-              />
-            </Card>
-            <CitationCard />
-          </>
+            )}
+          </section>
         )}
-      </Step>
-      <GuidedTour
-        active={tourStep !== null}
-        stepIndex={tourStep ?? 0}
-        onNext={nextTourStep}
-        onEnd={endTour}
-        steps={tourSteps}
-      />
+
+        {destination === "research" && (
+          <section className="oq-destination oq-destination--research" aria-labelledby="workspace-research-heading">
+            <DestinationHeading destination="research" />
+                {importReceipt && (
+                  <ImportReceipt
+                    receipt={importReceipt}
+                    onAnswer={() => selectDestination("answer")}
+                  />
+                )}
+            {!ds ? (
+              <p className="hint">{t(locale, "workspace.noData")}</p>
+            ) : (
+              <>
+                <ResearchBriefEditor
+                  brief={researchBrief}
+                  readiness={briefReadiness}
+                  onChange={changeResearchBrief}
+                  onConfirm={() => setResearchBrief((current) => ({ ...current, confirmed: true }))}
+                />
+                <AiAssist
+                  label={locale === "en" ? "Clarify research brief" : "Forschungsdesign klären"}
+                  request={() => ({
+                    version: "v1",
+                    task: "brief_clarify",
+                    locale,
+                    payload: {
+                      question: researchBrief.question,
+                      caseUniverse: researchBrief.caseUniverse,
+                      timePeriod: researchBrief.timePeriod,
+                      outcomeConcept: researchBrief.outcomeConcept,
+                      conditionSelectionRationale: researchBrief.conditionSelectionRationale,
+                    },
+                  })}
+                  onAdopt={(draft) => changeResearchBrief("question", draft)}
+                />
+                <div className="oq-research-layout">
+                  <div className="oq-research-primary">
+                    <h2 id="workspace-variable-roles" className="oq-workspace-subheading" tabIndex={-1}>{t(locale, "workspace.roles.title")}</h2>
+                    {!researchBrief.confirmed && (
+                      <p className="hint">{t(locale, "workspace.roles.suggested")}</p>
+                    )}
+                    <VariablesSection
+                      ds={ds}
+                      varMeta={varMeta}
+                      setVarMeta={changeVarMeta}
+                      calibSpecs={calibSpecs}
+                      conditionCount={conditions.length}
+                      caseCount={cases.length}
+                    />
+                  </div>
+                  <div className="oq-research-support">
+                    <Card className="oq-plane--compact oq-research-project">
+                      <H2>{t(locale, "workspace.data.actions")}</H2>
+                      <p style={{ color: "var(--ink-2)", marginTop: 0 }}>
+                        {t(locale, "workspace.dataset.summary", {
+                          dataset: ds.name,
+                          rows: ds.rows.length,
+                          cases: cases.length,
+                          excluded: excludedMissingCount,
+                        })}
+                      </p>
+                      <div className="oq-action-row">
+                        <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
+                        <Button onClick={saveLocalProject}>{t(locale, "data.saveLocal")}</Button>
+                        <Button onClick={restoreLocalProject}>{t(locale, "data.loadLocal")}</Button>
+                        <CloudSaveLoad getState={currentState} onLoad={loadState} />
+                      </div>
+                      {localProjectStatus && <p className="hint">{localProjectStatus}</p>}
+                      {importError && <Diag kind="bad">{importError}</Diag>}
+                    </Card>
+                    <Card className="oq-plane--disclosure oq-research-examples">
+                      <details>
+                        <summary>{t(locale, "workspace.examples.summary")}</summary>
+                        <div style={{ marginTop: 12 }}>
+                          <ExampleDatasets
+                            onSelect={(dataset) => applyDataset(dataset, { demo: true })}
+                          />
+                        </div>
+                      </details>
+                    </Card>
+                  </div>
+                </div>
+                <div className="oq-research-disclosures">
+                  {setCols.length > 0 && (
+                    <Card className="oq-plane--disclosure">
+                      <details>
+                        <summary>{t(locale, "workspace.descriptives.summary")}</summary>
+                        <div style={{ marginTop: 12 }}>
+                          <Descriptives columns={setCols} cases={cases} />
+                        </div>
+                      </details>
+                    </Card>
+                  )}
+                  <Card className="oq-plane--disclosure">
+                    <details>
+                      <summary>{t(locale, "workspace.rawData.summary")}</summary>
+                      <div style={{ marginTop: 12 }}>
+                        <DataSection ds={ds} />
+                      </div>
+                    </details>
+                  </Card>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {destination === "decisions" && (
+          <section className="oq-destination oq-destination--decisions" aria-labelledby="workspace-decisions-heading">
+            <DestinationHeading destination="decisions" />
+            {!ds ? (
+              <p className="hint">{t(locale, "workspace.noData")}</p>
+            ) : (
+              <>
+                <DecisionLedger
+                  issues={decisionIssues}
+                  activeColumns={activeAnalysisCols}
+                  varMeta={varMeta}
+                  calibSpecs={calibSpecs}
+                  freqCut={freqCut}
+                  consCut={consCut}
+                  conditions={selectedConditions}
+                  expectations={expectations}
+                  decisions={analysisDecisions}
+                  onJump={jumpToDecisionIssue}
+                />
+                <div id="decision-calibration" style={{ scrollMarginTop: 96 }}>
+                  <h2 className="oq-workspace-subheading">{t(locale, "workspace.calibration.title")}</h2>
+                  {demoMode && <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>}
+                  {calibMigrateBanner && <Diag kind="warn">{t(locale, "calib.migrate.banner")}</Diag>}
+                  <Card className="oq-plane--compact oq-calibration-switcher">
+                    <div className="oq-action-row">
+                      <button
+                        type="button"
+                        className="oq-btn"
+                        aria-pressed={calibView === "quick"}
+                        data-testid="calibration-view-quick"
+                        onClick={() => chooseCalibView("quick")}
+                      >
+                        {t(locale, "workspace.calibration.quick")}
+                      </button>
+                      <button
+                        type="button"
+                        className="oq-btn"
+                        aria-pressed={calibView === "doc"}
+                        data-testid="calibration-view-doc"
+                        onClick={() => chooseCalibView("doc")}
+                      >
+                        {t(locale, "workspace.calibration.documentation")}
+                      </button>
+                    </div>
+                    <DocumentationMeter
+                      columns={activeAnalysisCols}
+                      doneCount={documentedCols.length}
+                      documented={(column) => documentedCols.includes(column)}
+                      onDocument={documentVariable}
+                    />
+                  </Card>
+                  {calibView === "quick" ? (
+                    <CalibrationQuick
+                      ds={ds}
+                      varMeta={varMeta}
+                      calibSpecs={calibSpecs}
+                      setCalibSpecs={setCalibSpecs}
+                      anchors={anchors}
+                      setAnchors={setAnchors}
+                      evaluation={evaluation}
+                      onDocument={documentVariable}
+                    />
+                  ) : (
+                    <CalibrationWorkbench
+                      ds={ds}
+                      varMeta={varMeta}
+                      setVarMeta={changeVarMeta}
+                      calibSpecs={calibSpecs}
+                      setCalibSpecs={setCalibSpecs}
+                      anchors={anchors}
+                      setAnchors={setAnchors}
+                      focusVar={focusVar}
+                      setFocusVar={setFocusVar}
+                      evaluation={evaluation}
+                      sensitivity={sensitivity}
+                      conditions={conditions}
+                      outcome={outcome}
+                      excludedMissingCount={excludedMissingCount}
+                      freqCut={freqCut}
+                      consCut={consCut}
+                    />
+                  )}
+                </div>
+                <AnalysisDecisionEditor
+                  freqCut={freqCut}
+                  consCut={consCut}
+                  expectations={expectations}
+                  conditions={selectedConditions}
+                  decisions={analysisDecisions}
+                  tt={tt}
+                  sol={sol}
+                  onFreqCut={changeFreqCut}
+                  onConsCut={changeConsCut}
+                  onExpectations={changeExpectations}
+                  onDecisions={setAnalysisDecisions}
+                />
+                {!computableCalibration && (
+                  <Diag kind="warn">{t(locale, "workspace.decisions.notComputable")}</Diag>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {destination === "evidence" && (
+          <section className="oq-destination oq-destination--evidence" aria-labelledby="workspace-evidence-heading">
+            <DestinationHeading destination="evidence" />
+            {!ds ? (
+              <p className="hint">{t(locale, "workspace.noData")}</p>
+            ) : (
+              <>
+                <EvidenceChain
+                  briefReady={briefReadiness.ready}
+                  activeColumns={activeAnalysisCols}
+                  calibration={calibrationReadiness}
+                  excluded={excludedMissingCount}
+                  analysisReady={decisionReadiness.ready}
+                  onResearch={() => selectDestination("research")}
+                  onDecisions={() => selectDestination("decisions")}
+                />
+                {!defenseReady && !demoMode && <ProvisionalMark />}
+                {necessity && <NecessitySection necessity={necessity} suin={suin} />}
+                <Card className="oq-plane--disclosure">
+                  <details>
+                    <summary>{t(locale, "workspace.evidence.truthTable")}</summary>
+                    <div style={{ marginTop: 12 }}>
+                      <TruthTableSection tt={tt} conditionCount={conditions.length} />
+                    </div>
+                  </details>
+                </Card>
+                {sol && tt && (
+                  <Card className="oq-plane--disclosure">
+                    <details>
+                      <summary>{t(locale, "workspace.evidence.solutions")}</summary>
+                      <div style={{ marginTop: 12 }}>
+                        <SolutionSection tt={tt} sol={sol} cases={cases} />
+                      </div>
+                    </details>
+                  </Card>
+                )}
+                <div>
+                  <h2 className="oq-workspace-subheading">{t(locale, "workspace.evidence.diagnostics")}</h2>
+                  <XyEvidence
+                    cases={cases}
+                    conditions={conditions}
+                    outcome={outcome}
+                    sol={sol}
+                    xySource={xySource}
+                    onXySource={setXySource}
+                  />
+                </div>
+                <Card className="oq-plane--disclosure">
+                  <details>
+                    <summary>{t(locale, "workspace.evidence.robustness")}</summary>
+                    <div style={{ marginTop: 12 }}>
+                      <RobustnessPanel
+                        cases={cases}
+                        robustness={robustnessResult}
+                        scenarios={robustnessScenarios}
+                        conditions={conditions}
+                        outcome={outcome}
+                        freqCut={freqCut}
+                        currentConsCut={consCut}
+                        expectations={normalizeExpectations(conditions, expectations)}
+                      />
+                      <NegatedOutcomePanel
+                        cases={cases}
+                        conditions={conditions}
+                        outcome={outcome}
+                        freqCut={freqCut}
+                        consCut={consCut}
+                      />
+                    </div>
+                  </details>
+                </Card>
+              </>
+            )}
+          </section>
+        )}
+
+        {destination === "defense" && (
+          <section className="oq-destination oq-destination--defense" aria-labelledby="workspace-defense-heading">
+            <DestinationHeading destination="defense" />
+            {!ds ? (
+              <p className="hint">{t(locale, "workspace.noData")}</p>
+            ) : (
+              <>
+                <DefenseChecklist ready={defenseReady} items={checklist} />
+                <Card className="oq-plane--report">
+                  <H2>{t(locale, "report.title")}</H2>
+                  <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "report.desc")}</p>
+                  {demoMode ? (
+                    <Diag kind="warn">{t(locale, "report.demoNotice")}</Diag>
+                  ) : (
+                    reportProvisional && (
+                      <p className="hint">
+                        {t(locale, "workspace.defense.reportMissing", {
+                          groups: missingDefenseGroups.join(", "),
+                        })}
+                      </p>
+                    )
+                  )}
+                  <ReportButton
+                    disabled={!reportAvailable}
+                    getInput={(): ReportInput | null => {
+                      if (!reportAvailable || !ds || !tt || !sol || !necessity) return null;
+                      return {
+                        demo: demoMode,
+                        provisional: reportProvisional,
+                        provisionalReasons: missingDefenseGroups,
+                        datasetName: ds.name,
+                        caseCount: cases.length,
+                        anchors: rawAnchorsOf(ds, varMeta, calibSpecs),
+                        calibSpecs,
+                        varMeta,
+                        conditions,
+                        outcome,
+                        freqCut,
+                        consCut,
+                        tt,
+                        complex: sol.complex,
+                        intermediate: sol.intermediate,
+                        parsimonious: sol.parsimonious,
+                        necessity,
+                        expectations: normalizeExpectations(conditions, expectations),
+                        researchBrief,
+                        analysisDecisions,
+                        rScript: defenseReady
+                          ? buildRScript({
+                              ds,
+                              calibSpecs,
+                              varMeta,
+                              conditions,
+                              outcome,
+                              freqCut,
+                              consCut,
+                              sensitivity,
+                              robustness: robustnessResult,
+                              researchBrief,
+                              analysisDecisions,
+                              expectations: normalizeExpectations(conditions, expectations),
+                            })
+                          : "",
+                      };
+                    }}
+                  />
+                </Card>
+                <ProtocolSection
+                  ds={ds}
+                  calibSpecs={calibSpecs}
+                  varMeta={varMeta}
+                  conditions={conditions}
+                  outcome={outcome}
+                  freqCut={freqCut}
+                  consCut={consCut}
+                  evaluation={evaluation}
+                  sensitivity={sensitivity}
+                  robustness={robustnessResult}
+                  defenseReady={defenseReady}
+                  researchBrief={researchBrief}
+                  analysisDecisions={analysisDecisions}
+                  expectations={normalizeExpectations(conditions, expectations)}
+                  checklist={checklist}
+                />
+                <CitationCard />
+                <Card className="oq-plane--reference">
+                  <H2>{t(locale, "workspace.defense.references")}</H2>
+                  <ul className="oq-reference-list">
+                    {METHODOLOGY_REFERENCES.map((reference) => (
+                      <li key={reference.id}>
+                        <a href={reference.url} target="_blank" rel="noreferrer">
+                          {reference.citation}
+                        </a>
+                        <span>{reference.scope}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+                <Card className="oq-plane--reference">
+                  <H2>{t(locale, "workspace.defense.limitations")}</H2>
+                  <p style={{ color: "var(--ink-2)" }}>
+                    {t(locale, "workspace.defense.limitations.body")}
+                  </p>
+                </Card>
+              </>
+            )}
+          </section>
+        )}
+        </main>
+      </div>
     </div>
+  );
+}
+
+const WORKSPACE_DESTINATIONS: Array<{ id: WorkspaceDestination; key: DictKey }> = [
+  { id: "answer", key: "workspace.nav.answer" },
+  { id: "research", key: "workspace.nav.research" },
+  { id: "decisions", key: "workspace.nav.decisions" },
+  { id: "evidence", key: "workspace.nav.evidence" },
+  { id: "defense", key: "workspace.nav.defense" },
+];
+
+function WorkspaceNav({
+  destination,
+  onSelect,
+}: {
+  destination: WorkspaceDestination;
+  onSelect: (destination: WorkspaceDestination) => void;
+}) {
+  const [locale] = useLocale();
+  return (
+    <nav className="oq-workspace-nav" aria-label={t(locale, "workspace.nav.aria")}>
+      <div className="oq-workspace-nav__track">
+        {WORKSPACE_DESTINATIONS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="oq-btn oq-workspace-nav__item"
+            aria-current={destination === item.id ? "page" : undefined}
+            onClick={() => onSelect(item.id)}
+          >
+            {t(locale, item.key)}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function DestinationHeading({ destination }: { destination: WorkspaceDestination }) {
+  const [locale] = useLocale();
+  const keyByDestination: Record<WorkspaceDestination, DictKey> = {
+    answer: "workspace.answer.title",
+    research: "workspace.research.title",
+    decisions: "workspace.decisions.title",
+    evidence: "workspace.evidence.title",
+    defense: "workspace.defense.title",
+  };
+  return (
+    <h1
+      id={`workspace-${destination}-heading`}
+      className="oq-workspace-title"
+      tabIndex={-1}
+    >
+      {t(locale, keyByDestination[destination])}
+    </h1>
+  );
+}
+
+function ImportPreflightPanel({
+  preflight,
+  onCommit,
+  onCancel,
+}: {
+  preflight: ImportPreflight;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  const [locale] = useLocale();
+  const de = locale === "de";
+  return (
+    <section className="oq-import-preflight" aria-labelledby="import-preflight-title" role="region">
+      <h2 id="import-preflight-title">{de ? "Import vor dem Ersetzen prüfen" : "Review import before replacing the project"}</h2>
+      <p>{de ? "Die aktive Analyse bleibt unverändert, bis Sie diesen Import übernehmen." : "Your active analysis remains unchanged until you commit this import."}</p>
+      <dl>
+        <div><dt>{de ? "Datei" : "File"}</dt><dd>{preflight.filename}</dd></div>
+        <div><dt>{de ? "Zeilen" : "Rows"}</dt><dd>{new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-GB").format(preflight.rowCount)}</dd></div>
+        <div><dt>{de ? "Numerische Spalten" : "Numeric columns"}</dt><dd>{preflight.numericColumns.join(", ") || "—"}</dd></div>
+        <div><dt>{de ? "Vorgeschlagene Bedingungen" : "Proposed conditions"}</dt><dd>{preflight.proposedConditions.join(", ") || "—"}</dd></div>
+        <div><dt>{de ? "Vorgeschlagenes Outcome" : "Proposed outcome"}</dt><dd>{preflight.proposedOutcome ?? "—"}</dd></div>
+      </dl>
+      <p className="hint">{de ? "Vorlage: eine Fall-ID-Spalte und eine Zeile pro Fall; numerische Bedingungen und ein Outcome anschließend im Forschungsdesign prüfen." : "Template: one case-ID column and one row per case; then review numeric conditions and one outcome in Research design."}</p>
+      {Object.entries(preflight.detectedTypes).map(([column, type]) => <span className="oq-status-chip" key={column}>{column}: {type}</span>)}
+      {preflight.warnings.map((warning) => <Diag key={warning} kind="warn">{de ? ({ "No case identifier column was detected.": "Keine Fall-ID-Spalte erkannt.", "No numeric columns were detected.": "Keine numerischen Spalten erkannt.", "The file contains no data rows.": "Die Datei enthält keine Datenzeilen." }[warning] ?? warning) : warning}</Diag>)}
+      <div className="oq-action-row"><button type="button" className="oq-btn oq-btn--primary" onClick={onCommit}>{de ? "Import übernehmen" : "Commit import"}</button><button type="button" className="oq-btn" onClick={onCancel}>{de ? "Abbrechen" : "Cancel"}</button></div>
+    </section>
+  );
+}
+
+function ImportReceipt({ receipt, onAnswer }: { receipt: ImportPreflight; onAnswer: () => void }) {
+  const [locale] = useLocale();
+  return <div className="oq-import-receipt" role="status"><strong>{locale === "de" ? "Import übernommen" : "Import committed"}</strong><span>{receipt.filename} · {new Intl.NumberFormat(locale === "de" ? "de-DE" : "en-GB").format(receipt.rowCount)} {locale === "de" ? "Zeilen" : "rows"}</span><button type="button" className="oq-btn" onClick={onAnswer}>{locale === "de" ? "Vorläufige Antwort öffnen" : "Open provisional Answer"}</button></div>;
+}
+
+function EntryWorkspace({
+  resumeCandidate,
+  onLearn,
+  onImport,
+  onResume,
+  importError,
+}: {
+  resumeCandidate: LocalProjectEnvelope | null;
+  onLearn: () => void;
+  onImport: () => void;
+  onResume: () => void;
+  importError: string;
+}) {
+  const [locale] = useLocale();
+  const resumedState = resumeCandidate ? normalizeSavedState(resumeCandidate.state) : null;
+  const savedAt = resumeCandidate?.savedAt
+    ? new Intl.DateTimeFormat(locale === "de" ? "de-DE" : "en-GB", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(resumeCandidate.savedAt))
+    : "";
+  return (
+    <div className="oq-entry">
+      <div className="oq-entry__intro">
+        <h2>{t(locale, "workspace.start.title")}</h2>
+        <p>{t(locale, "workspace.start.desc")}</p>
+      </div>
+      <div className="oq-entry__choices">
+        <article className="oq-entry-choice">
+          <div>
+            <h3>{t(locale, "workspace.start.import.title")}</h3>
+            <p>{t(locale, "workspace.start.import.desc")}</p>
+            <p className="hint">{t(locale, "workspace.start.import.schema")}</p>
+          </div>
+          <button type="button" className="oq-btn oq-btn--primary" onClick={onImport}>
+            {t(locale, "workspace.start.import.action")}
+          </button>
+        </article>
+        <article className="oq-entry-choice">
+          <div>
+            <h3>{t(locale, "workspace.start.learn.title")}</h3>
+            <p>{t(locale, "workspace.start.learn.desc")}</p>
+          </div>
+          <button type="button" className="oq-btn" onClick={onLearn}>
+            {t(locale, "workspace.start.learn.action")}
+          </button>
+        </article>
+        <article className="oq-entry-choice">
+          <div>
+            <h3>{t(locale, "workspace.start.resume.title")}</h3>
+            <p>
+              {resumeCandidate && resumedState
+                ? t(locale, "workspace.start.resume.meta", {
+                    dataset: resumedState.dataset.name,
+                    savedAt,
+                  })
+                : t(locale, "workspace.start.resume.none")}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="oq-btn"
+            disabled={!resumeCandidate || !resumedState}
+            onClick={onResume}
+          >
+            {t(locale, "workspace.start.resume.action")}
+          </button>
+        </article>
+      </div>
+      {importError && <Diag kind="bad">{importError}</Diag>}
+    </div>
+  );
+}
+
+function ResearchBriefEditor({
+  brief,
+  readiness,
+  onChange,
+  onConfirm,
+}: {
+  brief: ResearchBrief;
+  readiness: ReadinessResult;
+  onChange: (field: keyof Omit<ResearchBrief, "confirmed">, value: string) => void;
+  onConfirm: () => void;
+}) {
+  const [locale] = useLocale();
+  const fields: Array<{
+    id: keyof Omit<ResearchBrief, "confirmed">;
+    label: DictKey;
+    help: DictKey;
+  }> = [
+    { id: "question", label: "workspace.brief.question", help: "workspace.brief.question.help" },
+    { id: "caseUniverse", label: "workspace.brief.caseUniverse", help: "workspace.brief.caseUniverse.help" },
+    { id: "timePeriod", label: "workspace.brief.timePeriod", help: "workspace.brief.timePeriod.help" },
+    { id: "outcomeConcept", label: "workspace.brief.outcomeConcept", help: "workspace.brief.outcomeConcept.help" },
+    {
+      id: "conditionSelectionRationale",
+      label: "workspace.brief.conditionRationale",
+      help: "workspace.brief.conditionRationale.help",
+    },
+  ];
+  const incomplete = readiness.missing.some((item) => item !== "confirmation");
+  const rolesIncomplete = readiness.missing.includes("conditions") || readiness.missing.includes("outcome");
+  return (
+    <Card className="oq-research-brief" data-testid="research-brief-editor">
+      <H2>{t(locale, "workspace.brief.title")}</H2>
+      <p style={{ color: "var(--ink-2)", marginTop: 0, maxWidth: "70ch" }}>
+        {t(locale, "workspace.brief.desc")}
+      </p>
+      <div className="oq-brief-grid">
+        {fields.map((field) => (
+          <label key={field.id} className="oq-field" htmlFor={`brief-${field.id}`}>
+            <span className="oq-field__label">{t(locale, field.label)}</span>
+            <span id={`brief-${field.id}-help`} className="oq-field__help">
+              {t(locale, field.help)}
+            </span>
+            <textarea
+              id={`brief-${field.id}`}
+              data-testid={`brief-${field.id}`}
+              value={brief[field.id]}
+              aria-describedby={`brief-${field.id}-help`}
+              required
+              aria-required="true"
+              onChange={(event) => onChange(field.id, event.target.value)}
+              rows={field.id === "question" || field.id === "conditionSelectionRationale" ? 3 : 2}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="oq-action-row">
+        <button
+          type="button"
+          className="oq-btn oq-btn--primary"
+          disabled={incomplete || brief.confirmed}
+          onClick={onConfirm}
+        >
+          {brief.confirmed
+            ? t(locale, "workspace.brief.confirmed")
+            : t(locale, "workspace.brief.confirm")}
+        </button>
+        {!brief.confirmed && rolesIncomplete ? (
+          <>
+            <span className="hint">{t(locale, "workspace.brief.rolesRequired")}</span>
+            <button
+              type="button"
+              className="oq-btn"
+              onClick={() => {
+                const roles = document.getElementById("workspace-variable-roles");
+                roles?.scrollIntoView({ behavior: "smooth", block: "start" });
+                roles?.focus({ preventScroll: true });
+              }}
+            >
+              {t(locale, "workspace.brief.rolesAction")}
+            </button>
+          </>
+        ) : !brief.confirmed ? (
+          <span className="hint">{t(locale, "workspace.brief.invalidated")}</span>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function decisionIssueLabel(locale: Locale, issue: DecisionIssue): string {
+  if (issue.kind === "researchBrief") return t(locale, "workspace.decisions.brief");
+  if (issue.kind === "calibration") {
+    return t(locale, "workspace.decisions.calibration", { column: issue.column ?? "" });
+  }
+  if (issue.kind === "frequencyCutoff") return t(locale, "workspace.decisions.frequency");
+  if (issue.kind === "consistencyCutoff") return t(locale, "workspace.decisions.consistency");
+  return t(locale, "workspace.decisions.expectations");
+}
+
+const DECISION_MISSING_LABELS: Record<string, DictKey> = {
+  question: "workspace.brief.question",
+  caseUniverse: "workspace.brief.caseUniverse",
+  timePeriod: "workspace.brief.timePeriod",
+  outcomeConcept: "workspace.brief.outcomeConcept",
+  conditionSelectionRationale: "workspace.brief.conditionRationale",
+  spec: "calib.set.title",
+  setLabel: "calib.set.label",
+  definition: "calib.set.definition",
+  missingPolicy: "calib.missing.policy",
+  directAnchors: "calib.anchors.title",
+  crispThreshold: "calib.crisp.threshold",
+  method: "calib.method.title",
+  alreadyCalibratedProvenance: "calib.method.provenance",
+  unit: "calib.set.unit",
+  scopePopulation: "calib.set.scope",
+  meaningFullOut: "calib.evidence.target.fullOut",
+  meaningCrossover: "calib.evidence.target.crossover",
+  meaningFullIn: "calib.evidence.target.fullIn",
+  meaningInclusion: "calib.crisp.meaning",
+  methodConfirmed: "calib.method.confirm",
+  caseReviewConfirmed: "workspace.decision.missing.caseReview",
+  provisionalDefaults: "workspace.decision.missing.provisionalDefaults",
+  sensitivityReview: "workspace.decision.missing.sensitivityReview",
+  rationale: "workspace.decision.rationale",
+  confirmation: "workspace.decision.confirm",
+  set: "calib.evidence.target.set",
+  fullOut: "calib.evidence.target.fullOut",
+  crossover: "calib.evidence.target.crossover",
+  fullIn: "calib.evidence.target.fullIn",
+  threshold: "calib.evidence.target.threshold",
+};
+
+function decisionMissingLabel(locale: Locale, item: string): string {
+  return t(
+    locale,
+    DECISION_MISSING_LABELS[item] ?? "workspace.decision.missing.other",
+  );
+}
+
+function DecisionLedger({
+  issues,
+  activeColumns,
+  varMeta,
+  calibSpecs,
+  freqCut,
+  consCut,
+  conditions,
+  expectations,
+  decisions,
+  onJump,
+}: {
+  issues: DecisionIssue[];
+  activeColumns: string[];
+  varMeta: Record<string, VarMeta>;
+  calibSpecs: CalibSpecs;
+  freqCut: number;
+  consCut: number;
+  conditions: string[];
+  expectations: Record<string, Expectation>;
+  decisions: AnalysisDecisionState;
+  onJump: (issue: DecisionIssue) => void;
+}) {
+  const [locale] = useLocale();
+  type LedgerEntry = {
+    target: DecisionIssue;
+    value: string;
+    rationale: string;
+    status: string;
+  };
+  const issueById = new Map(issues.map((issue) => [issue.id, issue]));
+  const target = (
+    id: string,
+    kind: DecisionIssue["kind"],
+    column?: string,
+  ): DecisionIssue =>
+    issueById.get(id) ?? {
+      id,
+      kind,
+      ...(column ? { column } : {}),
+      status: "unconfirmed",
+      protocolReady: true,
+      missingFields: [],
+      missingEvidence: [],
+    };
+  const expectationLabel = (value: Expectation) =>
+    t(
+      locale,
+      value === "absent"
+        ? "sol.exp.absent"
+        : value === "either"
+          ? "sol.exp.either"
+          : "sol.exp.present",
+    );
+  const configuredEntries: LedgerEntry[] = [
+    ...activeColumns.map((column): LedgerEntry => {
+      const spec = calibSpecs[column];
+      const issue = issueById.get(`calibration-${column}`);
+      return {
+        target: target(`calibration-${column}`, "calibration", column),
+        value: spec
+          ? [spec.set.setLabel.trim() || column, spec.method].filter(Boolean).join(" · ")
+          : column,
+        rationale: spec?.set.definition ?? "",
+        status: issue?.status ?? (spec ? effectiveStatus(spec, varMeta[column]?.type ?? "raw") : "unresolved"),
+      };
+    }),
+    {
+      target: target("frequencyCutoff", "frequencyCutoff"),
+      value: String(freqCut),
+      rationale: decisions.frequencyCutoff.rationale,
+      status: issueById.get("frequencyCutoff")?.status ?? t(locale, "workspace.decision.confirmed"),
+    },
+    {
+      target: target("consistencyCutoff", "consistencyCutoff"),
+      value: fmt(consCut),
+      rationale: decisions.consistencyCutoff.rationale,
+      status: issueById.get("consistencyCutoff")?.status ?? t(locale, "workspace.decision.confirmed"),
+    },
+    {
+      target: target("directionalExpectations", "directionalExpectations"),
+      value: conditions
+        .map((condition) => `${condition}: ${expectationLabel(expectations[condition] ?? "present")}`)
+        .join(" · "),
+      rationale: decisions.directionalExpectations.rationale,
+      status:
+        issueById.get("directionalExpectations")?.status ??
+        t(locale, "workspace.decision.confirmed"),
+    },
+  ];
+  const configuredById = new Map(configuredEntries.map((entry) => [entry.target.id, entry]));
+  const openEntries = issues.map(
+    (issue): LedgerEntry =>
+      configuredById.get(issue.id) ?? {
+        target: issue,
+        value: "",
+        rationale: "",
+        status: issue.status,
+      },
+  );
+  const entries = [
+    ...openEntries,
+    ...configuredEntries.filter((entry) => !issueById.has(entry.target.id)),
+  ];
+
+  return (
+    <Card className="oq-decision-ledger" data-testid="decision-ledger">
+      <div className="oq-ledger-heading">
+        <div>
+          <H2>{t(locale, "workspace.decisions.ledgerTitle")}</H2>
+          <p className="hint">{t(locale, "workspace.decisions.priority")}</p>
+        </div>
+        <strong className={issues.length ? "oq-status oq-status--warn" : "oq-status oq-status--ok"}>
+          {issues.length
+            ? t(locale, "workspace.decisions.open", { n: issues.length })
+            : t(locale, "workspace.decisions.ready")}
+        </strong>
+      </div>
+      {issues[0] && (
+        <p className="oq-ledger-strongest">
+          {t(locale, "workspace.decisions.strongest")}: {decisionIssueLabel(locale, issues[0])}
+        </p>
+      )}
+      <ol className="oq-ledger-list">
+        {entries.map((entry) => {
+          const missing = [
+            ...new Set(
+              [...entry.target.missingFields, ...entry.target.missingEvidence].map((item) =>
+                decisionMissingLabel(locale, item),
+              ),
+            ),
+          ];
+          const visibleMissing = missing.slice(0, 3).join(", ");
+          const remainingMissing = missing.length - 3;
+          return (
+            <li
+              key={entry.target.id}
+              className="oq-ledger-item"
+              data-testid={`decision-ledger-${entry.target.id}`}
+            >
+              <div>
+                <strong>{decisionIssueLabel(locale, entry.target)}</strong>
+                <span>{entry.status}</span>
+                {entry.value && (
+                  <small>
+                    {t(locale, "workspace.decisions.currentValue")}: {entry.value}
+                  </small>
+                )}
+                {entry.rationale && (
+                  <small>
+                    {t(locale, "workspace.decision.rationale")}: {entry.rationale}
+                  </small>
+                )}
+                {missing.length > 0 && (
+                  <small>
+                    {t(locale, "workspace.decisions.missing", { items: visibleMissing })}
+                    {remainingMissing > 0 &&
+                      ` ${t(locale, "workspace.decision.missing.more", {
+                        n: remainingMissing,
+                      })}`}
+                  </small>
+                )}
+              </div>
+              <button type="button" className="oq-btn" onClick={() => onJump(entry.target)}>
+                {t(locale, "workspace.decisions.jump")}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
+
+function AnalysisDecisionEditor({
+  freqCut,
+  consCut,
+  expectations,
+  conditions,
+  decisions,
+  tt,
+  sol,
+  onFreqCut,
+  onConsCut,
+  onExpectations,
+  onDecisions,
+}: {
+  freqCut: number;
+  consCut: number;
+  expectations: Record<string, Expectation>;
+  conditions: string[];
+  decisions: AnalysisDecisionState;
+  tt: TruthTableResult | null;
+  sol: SolBundle | null;
+  onFreqCut: (value: number) => void;
+  onConsCut: (value: number) => void;
+  onExpectations: (value: Record<string, Expectation>) => void;
+  onDecisions: (value: AnalysisDecisionState) => void;
+}) {
+  const [locale] = useLocale();
+  const positiveRows = tt?.rows.filter((row) => row.output === 1).length ?? 0;
+  const unassigned = tt ? tt.totalCaseCount - tt.assignedCaseCount : 0;
+
+  function updateDecision(
+    key: keyof AnalysisDecisionState,
+    patch: Partial<AnalysisDecisionState[typeof key]>,
+  ) {
+    onDecisions({ ...decisions, [key]: { ...decisions[key], ...patch } });
+  }
+
+  return (
+    <div className="oq-decision-blocks">
+      <Card id="decision-frequencyCutoff" data-testid="decision-frequency-cutoff">
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <H2>{t(locale, "workspace.decisions.frequency")}</H2>
+          <InfoHint title={t(locale, "info.freqCutoff.title")} body={t(locale, "info.freqCutoff.body")} />
+        </div>
+        <Field label={t(locale, "tt.freqCut")}>
+          <input
+            data-testid="truth-table-frequency-cut"
+            type="number"
+            min={1}
+            value={freqCut}
+            onChange={(event) => onFreqCut(Math.max(1, Number(event.target.value) || 1))}
+            style={{ ...inputStyle, width: 110 }}
+          />
+        </Field>
+        <DecisionRationale
+          value={decisions.frequencyCutoff.rationale}
+          confirmed={decisions.frequencyCutoff.confirmed}
+          onRationale={(rationale) => updateDecision("frequencyCutoff", { rationale, confirmed: false })}
+          onConfirm={() => updateDecision("frequencyCutoff", { confirmed: true })}
+        />
+        <AiAssist
+          label={locale === "en" ? "Review rationale" : "Begründung prüfen"}
+          request={() => ({ version: "v1", task: "decision_rationale_review", locale, payload: { decision: "frequencyCutoff", rationale: decisions.frequencyCutoff.rationale } })}
+          onAdopt={(rationale) => updateDecision("frequencyCutoff", { rationale, confirmed: false })}
+        />
+        <p className="hint">
+          {t(locale, "workspace.decision.frequency.effect", {
+            positive: positiveRows,
+            unassigned,
+            value: freqCut,
+          })}
+        </p>
+        <p className="hint">{t(locale, "workspace.decision.effect.note")}</p>
+      </Card>
+
+      <Card id="decision-consistencyCutoff" data-testid="decision-consistency-cutoff">
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <H2>{t(locale, "workspace.decisions.consistency")}</H2>
+          <InfoHint title={t(locale, "info.consCutoff.title")} body={t(locale, "info.consCutoff.body")} />
+        </div>
+        <Field label={t(locale, "tt.consCut")}>
+          <div className="oq-cutoff-control">
+            <input
+              data-testid="truth-table-consistency-cut"
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              value={consCut}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                if (Number.isFinite(value)) onConsCut(Math.min(1, Math.max(0.5, value)));
+              }}
+              style={{ ...inputStyle, width: 110 }}
+            />
+            <input
+              type="range"
+              min={0.5}
+              max={1}
+              step={0.01}
+              value={consCut}
+              aria-label={t(locale, "tt.consCut")}
+              onChange={(event) => onConsCut(Number(event.target.value))}
+            />
+          </div>
+        </Field>
+        <DecisionRationale
+          value={decisions.consistencyCutoff.rationale}
+          confirmed={decisions.consistencyCutoff.confirmed}
+          onRationale={(rationale) => updateDecision("consistencyCutoff", { rationale, confirmed: false })}
+          onConfirm={() => updateDecision("consistencyCutoff", { confirmed: true })}
+        />
+        <AiAssist
+          label={locale === "en" ? "Review rationale" : "Begründung prüfen"}
+          request={() => ({ version: "v1", task: "decision_rationale_review", locale, payload: { decision: "consistencyCutoff", rationale: decisions.consistencyCutoff.rationale } })}
+          onAdopt={(rationale) => updateDecision("consistencyCutoff", { rationale, confirmed: false })}
+        />
+        <p className="hint">
+          {t(locale, "workspace.decision.consistency.effect", {
+            positive: positiveRows,
+            unassigned,
+            value: consCut,
+          })}
+        </p>
+        <p className="hint">{t(locale, "workspace.decision.effect.note")}</p>
+      </Card>
+
+      <Card id="decision-directionalExpectations" data-testid="decision-directional-expectations">
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <H2>{t(locale, "workspace.decisions.expectations")}</H2>
+          <InfoHint title={t(locale, "sol.exp.label")} body={t(locale, "sol.exp.hint")} />
+        </div>
+        <div className="oq-expectations">
+          {conditions.map((condition) => (
+            <label key={condition} className="oq-field">
+              <span className="oq-field__label">{condition.replace(/^fs_/, "")}</span>
+              <select
+                value={expectations[condition] ?? "present"}
+                onChange={(event) =>
+                  onExpectations({
+                    ...expectations,
+                    [condition]: event.target.value as Expectation,
+                  })
+                }
+              >
+                <option value="present">{t(locale, "sol.exp.present")}</option>
+                <option value="absent">{t(locale, "sol.exp.absent")}</option>
+                <option value="either">{t(locale, "sol.exp.either")}</option>
+              </select>
+            </label>
+          ))}
+        </div>
+        <DecisionRationale
+          value={decisions.directionalExpectations.rationale}
+          confirmed={decisions.directionalExpectations.confirmed}
+          onRationale={(rationale) =>
+            updateDecision("directionalExpectations", { rationale, confirmed: false })
+          }
+          onConfirm={() => updateDecision("directionalExpectations", { confirmed: true })}
+        />
+        <AiAssist
+          label={locale === "en" ? "Review rationale" : "Begründung prüfen"}
+          request={() => ({ version: "v1", task: "decision_rationale_review", locale, payload: { decision: "directionalExpectations", rationale: decisions.directionalExpectations.rationale } })}
+          onAdopt={(rationale) => updateDecision("directionalExpectations", { rationale, confirmed: false })}
+        />
+        <p className="hint">
+          {t(locale, "workspace.decision.expectations.effect", {
+            models: sol?.intermediate.models.length ?? 0,
+          })}
+        </p>
+        <p className="hint">{t(locale, "workspace.decision.effect.note")}</p>
+      </Card>
+    </div>
+  );
+}
+
+function DecisionRationale({
+  value,
+  confirmed,
+  onRationale,
+  onConfirm,
+}: {
+  value: string;
+  confirmed: boolean;
+  onRationale: (value: string) => void;
+  onConfirm: () => void;
+}) {
+  const [locale] = useLocale();
+  return (
+    <div className="oq-decision-rationale">
+      <label className="oq-field">
+        <span className="oq-field__label">{t(locale, "workspace.decision.rationale")}</span>
+        <textarea
+          rows={3}
+          value={value}
+          onChange={(event) => onRationale(event.target.value)}
+        />
+      </label>
+      <button
+        type="button"
+        className="oq-btn"
+        disabled={!value.trim() || confirmed}
+        onClick={onConfirm}
+      >
+        {confirmed
+          ? t(locale, "workspace.decision.confirmed")
+          : t(locale, "workspace.decision.confirm")}
+      </button>
+    </div>
+  );
+}
+
+function AnswerWorkspace({
+  locale,
+  brief,
+  conditions,
+  outcome,
+  calibSpecs,
+  cases,
+  excludedMissingCount,
+  tt,
+  sol,
+  demoMode,
+  defenseReady,
+  issues,
+  robustness,
+  onSelectDestination,
+  onJumpIssue,
+}: {
+  locale: Locale;
+  brief: ResearchBrief;
+  conditions: string[];
+  outcome: string;
+  calibSpecs: CalibSpecs;
+  cases: QcaCase[];
+  excludedMissingCount: number;
+  tt: TruthTableResult | null;
+  sol: SolBundle | null;
+  demoMode: boolean;
+  defenseReady: boolean;
+  issues: DecisionIssue[];
+  robustness: CombinedRobustnessResult | null;
+  onSelectDestination: (destination: WorkspaceDestination) => void;
+  onJumpIssue: (issue: DecisionIssue) => void;
+}) {
+  const model = sol?.intermediate.models[0] ?? null;
+  const positiveRows = tt?.rows.filter((row) => row.output === 1).length ?? 0;
+  const analysisStatus =
+    !conditions.length || !outcome || cases.length === 0 || conditions.length > 12 || !tt
+      ? "notComputable"
+      : model
+        ? "solution"
+        : "noSolution";
+  const maturity = demoMode ? "synthetic" : defenseReady ? "ready" : "provisional";
+  const setLabel = (column: string) => calibSpecs[column]?.set.setLabel.trim() || column.replace(/^fs_/, "");
+  const pathText = model?.paths.map((path) => {
+    const terms = [...path.term].flatMap((bit, index) => {
+      if (bit === "-") return [];
+      const label = setLabel(conditions[index]);
+      return [
+        bit === "0"
+          ? t(locale, "workspace.answer.absence", { set: label })
+          : label,
+      ];
+    });
+    return terms.join(t(locale, "workspace.answer.and"));
+  }) ?? [];
+  const statedOutcome = brief.outcomeConcept.trim();
+  const outcomeText =
+    statedOutcome
+      .replace(/^zugehörigkeit\s+zum\s+/i, "dem ")
+      .replace(/^zugehörigkeit\s+zur\s+/i, "der ")
+      .replace(/^zugehörigkeit\s+zu\s+/i, "")
+      .replace(/^membership\s+(?:in|of)\s+/i, "") ||
+    calibSpecs[outcome]?.set.setLabel.trim() ||
+    outcome.replace(/^fs_/, "");
+  const formula = model
+    ? `${model.paths.map((path) => path.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → ${outcome.replace(/^fs_/, "").toUpperCase()}`
+    : "";
+  const diagnostics = model
+    ? aggregateCaseDiagnostics(model, conditions, outcome, cases)
+    : null;
+  const diagnosticGroups = diagnostics
+    ? [
+        { label: t(locale, "workspace.answer.cases.typical"), names: diagnostics.typical },
+        { label: t(locale, "workspace.answer.cases.kind"), names: diagnostics.deviantConsistencyKind },
+        { label: t(locale, "workspace.answer.cases.degree"), names: diagnostics.deviantConsistencyDegree },
+        { label: t(locale, "workspace.answer.cases.uncovered"), names: diagnostics.deviantCoverage },
+        { label: t(locale, "workspace.answer.cases.crossover"), names: diagnostics.atCrossover },
+      ]
+    : [];
+  const nonEmptyDiagnostics = diagnosticGroups.filter((group) => group.names.length > 0);
+  const emptyDiagnostics = diagnosticGroups.filter((group) => group.names.length === 0);
+  const stability = robustness?.solutionStability.find(
+    (item) => item.type === "intermediate" && item.expression === model?.paths.map((path) => path.expression).join("+"),
+  ) ?? robustness?.solutionStability.find((item) => item.type === "intermediate");
+  let limitation = "";
+  if (!conditions.length || !outcome) limitation = t(locale, "workspace.answer.noRoles");
+  else if (cases.length === 0) limitation = t(locale, "workspace.answer.noCases");
+  else if (conditions.length > 12) {
+    limitation = t(locale, "workspace.answer.tooMany", { n: conditions.length });
+  } else if (tt && positiveRows === 0) limitation = t(locale, "workspace.answer.noPositive");
+  else if (tt && !model) limitation = t(locale, "workspace.answer.noModel");
+
+  return (
+    <div className="oq-answer">
+      <section className="oq-answer-instrument">
+        <div className="oq-answer-instrument__header">
+          <div className="oq-answer__question">
+            {brief.confirmed ? (
+              <>
+                <p>{brief.question}</p>
+                {(brief.caseUniverse || brief.timePeriod) && (
+                  <small>
+                    {[brief.caseUniverse, brief.timePeriod].filter(Boolean).join(" · ")}
+                  </small>
+                )}
+              </>
+            ) : (
+              <div className="oq-inline-cta">
+                <p>{t(locale, "workspace.answer.question.pending")}</p>
+                <button type="button" className="oq-btn oq-btn--secondary" onClick={() => onSelectDestination("research")}>
+                  {t(locale, "workspace.answer.question.action")}
+                </button>
+              </div>
+            )}
+          </div>
+          <strong className={`oq-maturity oq-maturity--${maturity}`}>
+            {t(locale, `workspace.answer.maturity.${maturity}` as DictKey)}
+          </strong>
+        </div>
+
+        <div className="oq-answer__analysis-state oq-status-axes">
+          <strong>{t(locale, `workspace.answer.analysis.${analysisStatus}` as DictKey)}</strong>
+          {model && (
+            <span>
+              {demoMode
+                ? t(locale, "workspace.answer.syntheticReason")
+                : defenseReady
+                  ? t(locale, "workspace.defense.ready")
+                  : `${issues.length} ${t(locale, "workspace.decisions.title").toLocaleLowerCase(locale)}`}
+            </span>
+          )}
+        </div>
+
+        {model ? (
+          <>
+            <div className="oq-answer-model">
+              <div className="oq-answer__result">
+                <p className="oq-answer__statement">
+                  {t(locale, "workspace.answer.statement", {
+                    paths: pathText.join(t(locale, "workspace.answer.or")),
+                    cases: cases.length,
+                    outcome: outcomeText,
+                  })}
+                </p>
+                {sol && sol.intermediate.models.length > 1 && (
+                  <Diag kind="warn">
+                    {t(locale, "workspace.answer.ambiguous", { n: sol.intermediate.models.length })}
+                  </Diag>
+                )}
+                <div
+                  className="oq-formula oq-answer__formula"
+                  data-testid="solution-formula-intermediate"
+                >
+                  {formula}
+                </div>
+                <p className="oq-answer__noncausal">{t(locale, "workspace.answer.noncausal")}</p>
+              </div>
+
+              <div className="oq-answer__fit" data-testid="solution-kpis-intermediate">
+                <div className="oq-answer__kpis">
+                  <div className="oq-answer-kpi">
+                    <Kpi v={fmt(model.solutionConsistency)} l={t(locale, "sol.kpi.consistency")} />
+                    <small>{t(locale, "gloss.consistency.def")}</small>
+                  </div>
+                  <div className="oq-answer-kpi">
+                    <Kpi v={fmt(model.solutionCoverage)} l={t(locale, "sol.kpi.coverage")} />
+                    <small>{t(locale, "gloss.coverage.def")}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="oq-answer__evidence-row">
+              {diagnostics && (
+                <div className="oq-answer__diagnostics" data-testid="answer-case-summary">
+                  <div className="oq-case-summary">
+                    {nonEmptyDiagnostics.map((group) => (
+                      <DiagGroup key={group.label} label={group.label} names={group.names} />
+                    ))}
+                    {emptyDiagnostics.length > 0 && (
+                      <p className="oq-case-summary__empty">
+                        <strong>{emptyDiagnostics.map((group) => group.label).join(" · ")}</strong>
+                        <span>{t(locale, "diag.none")}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <aside className="oq-answer__next-action">
+                {issues[0] ? (
+                  <>
+                    <span>{t(locale, "workspace.decisions.strongest")}</span>
+                    <strong>{decisionIssueLabel(locale, issues[0])}</strong>
+                    <button
+                      type="button"
+                      className="oq-btn oq-btn--primary"
+                      onClick={() => onJumpIssue(issues[0])}
+                    >
+                      {t(locale, "workspace.decisions.jump")}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span>{t(locale, "workspace.answer.maturity.ready")}</span>
+                    <strong>{t(locale, "workspace.defense.ready")}</strong>
+                  </>
+                )}
+              </aside>
+            </div>
+
+            {(excludedMissingCount > 0 || (stability && robustness)) && (
+              <div className="oq-answer__instrument-footer">
+                {excludedMissingCount > 0 && (
+                  <Diag kind="warn">{t(locale, "calib.missing.excluded", { n: excludedMissingCount })}</Diag>
+                )}
+                {stability && robustness && (
+                  <p className="oq-robustness-line">
+                    {t(locale, "workspace.answer.robustness", {
+                      stable: stability.cells,
+                      total: robustness.totalCells,
+                    })}{" "}
+                    <button type="button" className="oq-link-button" onClick={() => onSelectDestination("evidence")}>
+                      {t(locale, "workspace.answer.evidence")}
+                    </button>
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="oq-answer__limited">
+            <p>{limitation}</p>
+            {issues[0] && (
+              <button type="button" className="oq-btn oq-btn--primary" onClick={() => onJumpIssue(issues[0])}>
+                {t(locale, "workspace.decisions.jump")}
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function EvidenceChain({
+  briefReady,
+  activeColumns,
+  calibration,
+  excluded,
+  analysisReady,
+  onResearch,
+  onDecisions,
+}: {
+  briefReady: boolean;
+  activeColumns: string[];
+  calibration: CalibrationDefenseResult;
+  excluded: number;
+  analysisReady: boolean;
+  onResearch: () => void;
+  onDecisions: () => void;
+}) {
+  const [locale] = useLocale();
+  const sourced = calibration.columns.filter(
+    (column) =>
+      column.protocolReady &&
+      (column.effectiveStatus === "sourced" || column.effectiveStatus === "externally_checked"),
+  ).length;
+  const rows = [
+    { label: t(locale, "workspace.evidence.brief"), value: briefReady ? "✓" : "○", action: onResearch },
+    {
+      label: t(locale, "workspace.evidence.sets"),
+      value: `${activeColumns.length}`,
+      action: onDecisions,
+    },
+    {
+      label: t(locale, "workspace.evidence.sources"),
+      value: `${sourced}/${activeColumns.length}`,
+      action: onDecisions,
+    },
+    { label: t(locale, "workspace.evidence.cases"), value: `${excluded}`, action: onDecisions },
+    {
+      label: t(locale, "workspace.evidence.analysis"),
+      value: analysisReady ? "✓" : "○",
+      action: onDecisions,
+    },
+  ];
+  return (
+    <Card className="oq-evidence-chain-panel">
+      <H2>{t(locale, "workspace.evidence.chain")}</H2>
+      <dl className="oq-evidence-chain">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+            <button type="button" className="oq-link-button" onClick={row.action}>
+              {row.action === onResearch
+                ? t(locale, "workspace.evidence.editResearch")
+                : t(locale, "workspace.evidence.editDecisions")}
+            </button>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
+function XyEvidence({
+  cases,
+  conditions,
+  outcome,
+  sol,
+  xySource,
+  onXySource,
+}: {
+  cases: QcaCase[];
+  conditions: string[];
+  outcome: string;
+  sol: SolBundle | null;
+  xySource: string;
+  onXySource: (value: string) => void;
+}) {
+  const [locale] = useLocale();
+  const paths = sol?.intermediate.models[0]?.paths ?? [];
+  if (!conditions.length || !outcome) {
+    return <p className="hint">{t(locale, "workspace.answer.noRoles")}</p>;
+  }
+  const options: Array<{
+    value: string;
+    label: string;
+    group: "condition" | "path" | "solution";
+  }> = [
+    ...conditions.map((condition) => ({
+      value: `cond:${condition}`,
+      label: condition.replace(/^fs_/, ""),
+      group: "condition" as const,
+    })),
+    ...paths.map((path) => ({
+      value: `path:${path.term}`,
+      label: path.expression.replace(/fs_/g, "").toUpperCase(),
+      group: "path" as const,
+    })),
+    ...(paths.length > 1
+      ? [{
+          value: "solution",
+          label: paths.map((path) => path.expression.replace(/fs_/g, "").toUpperCase()).join(" + "),
+          group: "solution" as const,
+        }]
+      : []),
+  ];
+  const selection = options.some((option) => option.value === xySource)
+    ? xySource
+    : `cond:${conditions[0]}`;
+  const selected = options.find((option) => option.value === selection) ?? options[0];
+  const points = cases.map((item) => {
+    let x = item.values[conditions[0]];
+    if (selection === "solution") {
+      x = paths.length
+        ? Math.max(...paths.map((path) => termMembership(path.term, conditions, item.values)))
+        : 0;
+    } else if (selection.startsWith("path:")) {
+      x = termMembership(selection.slice(5), conditions, item.values);
+    } else if (selection.startsWith("cond:")) {
+      x = item.values[selection.slice(5)];
+    }
+    return { label: item.label, x, y: item.values[outcome] };
+  });
+  return (
+    <Card id="xyplot" className="oq-xy-evidence">
+      <div className="oq-xy-heading">
+        <H2>{t(locale, "xy.title")}</H2>
+        <select
+          value={selection}
+          onChange={(event) => onXySource(event.target.value)}
+          aria-label={t(locale, "xy.source.label")}
+          data-testid="xy-source"
+        >
+          <optgroup label={t(locale, "xy.source.conditions")}>
+            {options.filter((option) => option.group === "condition").map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </optgroup>
+          {paths.length > 0 && (
+            <optgroup label={t(locale, "xy.source.paths")}>
+              {options.filter((option) => option.group === "path").map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </optgroup>
+          )}
+          {options.some((option) => option.group === "solution") && (
+            <optgroup label={t(locale, "xy.source.solution")}>
+              {options.filter((option) => option.group === "solution").map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+      </div>
+      <XyPlot xLabel={selected.label} yLabel={outcome} points={points} />
+      <p className="hint">{t(locale, "xy.hint")}</p>
+    </Card>
+  );
+}
+
+function DefenseChecklist({
+  ready,
+  items,
+}: {
+  ready: boolean;
+  items: Array<{ key: DictKey; ready: boolean }>;
+}) {
+  const [locale] = useLocale();
+  return (
+    <Card className="oq-defense-readiness" data-testid="defense-checklist">
+      <H2>
+        {ready ? t(locale, "workspace.defense.ready") : t(locale, "workspace.defense.blocked")}
+      </H2>
+      <ul className="oq-defense-checklist">
+        {items.map((item) => (
+          <li key={item.key} data-ready={item.ready}>
+            <span aria-hidden>{item.ready ? "✓" : "○"}</span>
+            {t(locale, item.key)}
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -1160,7 +2414,7 @@ function CitationCard() {
   }
 
   return (
-    <Card id="zitation">
+    <Card id="zitation" className="oq-defense-citation">
       <H2>{t(locale, "cite.title")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: 0, fontSize: 13.5 }}>{t(locale, "cite.desc")}</p>
       <p
@@ -1194,113 +2448,6 @@ function CitationCard() {
   );
 }
 
-/* ---------- Stepper-Bausteine ---------- */
-
-function Step({
-  n,
-  title,
-  status,
-  lockedReason,
-  id,
-  intro,
-  provisional,
-  children,
-}: {
-  n: number;
-  title: string;
-  status: StepStatus;
-  lockedReason?: string;
-  id: string;
-  intro?: string;
-  /** Rechnet, aber noch nicht begründet — dann kein Häkchen. */
-  provisional?: boolean;
-  children: React.ReactNode;
-}) {
-  const [locale] = useLocale();
-  const done = status === "done" && !provisional;
-  const locked = status === "locked";
-  const chip = done
-    ? { label: t(locale, "step.status.done"), color: "var(--good-text)", bg: "rgba(12,163,12,0.10)" }
-    : status === "done" && provisional
-      ? { label: t(locale, "step.status.provisional"), color: "var(--warn-text)", bg: "var(--warn-wash)" }
-      : status === "active"
-        ? { label: t(locale, "step.status.active"), color: "var(--accent-deep)", bg: "var(--accent-wash)" }
-        : { label: t(locale, "step.status.locked"), color: "var(--muted)", bg: "var(--line-soft)" };
-  return (
-    // Rhythmus: Karten innerhalb eines Schritts bleiben eng (18px), die Schritte
-    // selbst stehen weit auseinander (44px). Der Kontrast der Abstände gruppiert —
-    // nicht mehr Weißraum überall, der die ohnehin lange Seite nur streckt.
-    <section id={id} style={{ scrollMarginTop: 56, marginBottom: 44 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: locked ? 6 : 14 }}>
-        <span
-          aria-hidden
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            flex: "none",
-            display: "grid",
-            placeItems: "center",
-            fontSize: 15,
-            fontWeight: 700,
-            color: "#fff",
-            background: locked ? "var(--muted)" : "var(--brand)",
-          }}
-        >
-          {done ? "✓" : n}
-        </span>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, flex: 1, color: locked ? "var(--muted)" : "var(--ink)" }}>
-          {title}
-        </h2>
-        {/* Bei „erledigt" reicht das ✓ im Nummern-Kreis — kein doppeltes Signal. */}
-        {!done && (
-          <span style={{ fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap", color: chip.color, background: chip.bg }}>
-            {chip.label}
-          </span>
-        )}
-      </div>
-      {intro && (
-        <p
-          style={{
-            color: "var(--ink-2)",
-            fontSize: 13.5,
-            lineHeight: 1.5,
-            margin: locked ? "0 0 4px" : "0 0 14px",
-            paddingLeft: 40,
-            maxWidth: "70ch",
-          }}
-        >
-          {intro}
-        </p>
-      )}
-      {locked ? (
-        <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "0 0 4px", paddingLeft: 40 }}>{lockedReason}</p>
-      ) : (
-        children
-      )}
-    </section>
-  );
-}
-
-function ContinueButton({ targetN, targetTitle, targetId }: { targetN: number; targetTitle: string; targetId: string }) {
-  const [locale] = useLocale();
-  return (
-    <div style={{ margin: "-4px 0 22px", paddingLeft: 40 }}>
-      <button
-        className="oq-btn"
-        onClick={() => document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-        style={{
-          fontSize: 13.5,
-          color: "var(--accent-deep)",
-          background: "var(--accent-wash)",
-          borderColor: "var(--accent)",
-        }}
-      >
-        {t(locale, "step.next", { n: targetN, title: targetTitle })}
-      </button>
-    </div>
-  );
-}
 
 /* ---------- Dokumentations-Meter ---------- */
 
@@ -1467,13 +2614,26 @@ function VariablesSection({
 
   return (
     <Card>
-      {/* Titel + Intro liefert der Step-Wrapper (step.intro.2) — hier nicht doppeln. */}
       <p
-        data-testid="variables-role-explainer"
         style={{ color: "var(--ink-2)", maxWidth: "70ch", margin: "0 0 14px", fontSize: 13.5, lineHeight: 1.55 }}
       >
         {t(locale, "vars.role.help")}
       </p>
+      <div
+        data-testid="variables-import-heuristic"
+        style={{
+          margin: "0 0 14px",
+          padding: "9px 12px",
+          background: "var(--accent-wash)",
+          border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)",
+          borderRadius: 8,
+          fontSize: 13,
+          lineHeight: 1.5,
+          color: "var(--ink-2)",
+        }}
+      >
+        {t(locale, "vars.import.heuristic")}
+      </div>
       {limitedDiversity && (
         <div data-testid="variables-limited-diversity" style={{ margin: "0 0 14px" }}>
           <Diag kind="warn">
@@ -1489,9 +2649,9 @@ function VariablesSection({
         <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
           <thead>
             <tr>
-              <th style={thStyle()}>{t(locale, "vars.col.name")}</th>
-              <th style={thStyle()}>{t(locale, "vars.col.type")}</th>
-              <th style={thStyle()}>{t(locale, "vars.col.role")}</th>
+              <th scope="col" style={thStyle()}>{t(locale, "vars.col.name")}</th>
+              <th scope="col" style={thStyle()}>{t(locale, "vars.col.type")}</th>
+              <th scope="col" style={thStyle()}>{t(locale, "vars.col.role")}</th>
             </tr>
           </thead>
           <tbody>
@@ -1515,6 +2675,7 @@ function VariablesSection({
                       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
                         <select
                           value={meta.type}
+                          aria-label={`${col}: ${t(locale, "vars.col.type")}`}
                           onChange={(e) => setType(col, e.target.value as VarType)}
                           style={{ ...inputStyle, padding: "4px 7px", fontSize: 13.5 }}
                         >
@@ -1541,6 +2702,7 @@ function VariablesSection({
                     <td style={{ ...tdStyle(false, false), verticalAlign: "top" }}>
                       <select
                         value={meta.role}
+                        aria-label={`${col}: ${t(locale, "vars.col.role")}`}
                         onChange={(e) => setRole(col, e.target.value as VarRole)}
                         style={{ ...inputStyle, padding: "4px 7px", fontSize: 13.5 }}
                       >
@@ -1595,71 +2757,43 @@ function typeBadgeStyle(type: VarType): React.CSSProperties {
 
 /* ---------- Truth Table ---------- */
 
-function TruthTableSection(props: {
-  freqCut: number;
-  setFreqCut: (n: number) => void;
-  consCut: number;
-  setConsCut: (n: number) => void;
+function TruthTableSection({
+  tt,
+  conditionCount,
+}: {
   tt: TruthTableResult | null;
   conditionCount: number;
 }) {
   const [locale] = useLocale();
-  const { freqCut, setFreqCut, consCut, setConsCut, tt, conditionCount } = props;
   const observed = tt
     ? tt.rows
-        .filter((r) => r.n > 0)
-        .sort((x, y) => Number(y.output === 1) - Number(x.output === 1) || y.consistency - x.consistency)
+        .filter((row) => row.n > 0)
+        .sort(
+          (left, right) =>
+            Number(right.output === 1) - Number(left.output === 1) ||
+            right.consistency - left.consistency,
+        )
     : [];
   const remainders = tt ? tt.rows.length - observed.length : 0;
 
   return (
     <Card>
       <H2>{t(locale, "tt.title")}</H2>
-      <p className="hint" style={{ ...hintStyle, marginTop: 0, marginBottom: 12 }}>
-        {t(locale, "tt.rolesHint")}{" "}
-        <a href="#variablen" style={{ color: "var(--accent-deep)", textDecoration: "none", fontWeight: 600 }}>
-          {t(locale, "tt.rolesLink")}
-        </a>
-      </p>
+      {tt && (
+        <p className="hint" style={{ ...hintStyle, marginTop: 0, marginBottom: 12 }}>
+          {t(locale, "tt.hint", {
+            observed: observed.length,
+            remainders,
+            freqCut: tt.freqCut,
+            consCut: tt.consCut,
+          })}
+        </p>
+      )}
       {conditionCount > 12 && (
         <p className="hint" style={{ ...hintStyle, color: "var(--bad)", marginTop: 0 }}>
           {t(locale, "tt.limitWarn", { n: conditionCount })}
         </p>
       )}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "end" }}>
-        <Field
-          label={
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              {t(locale, "tt.freqCut")}
-              <InfoHint title={t(locale, "info.freqCutoff.title")} body={t(locale, "info.freqCutoff.body")} />
-            </span>
-          }
-        >
-          <input data-testid="truth-table-frequency-cut" type="number" min={1} value={freqCut} onChange={(e) => setFreqCut(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, width: 90 }} />
-        </Field>
-        <Field
-          label={
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              {t(locale, "tt.consCut")}
-              <InfoHint title={t(locale, "info.consCutoff.title")} body={t(locale, "info.consCutoff.body")} />
-            </span>
-          }
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input data-testid="truth-table-consistency-cut" type="number" min={0} max={1} step={0.01} value={consCut} onChange={(e) => setConsCut(Number(e.target.value) || 0.8)} style={{ ...inputStyle, width: 90 }} />
-            <input
-              type="range"
-              min={0.5}
-              max={1}
-              step={0.01}
-              value={consCut}
-              onChange={(e) => setConsCut(Number(e.target.value))}
-              aria-label={t(locale, "tt.consCut")}
-              style={{ width: 140, accentColor: "var(--accent)" }}
-            />
-          </div>
-        </Field>
-      </div>
 
       {tt && (
         <>
@@ -1700,7 +2834,7 @@ function TruthTableSection(props: {
                   <tr key={r.index}>
                     {[...r.bits].map((b, i) => (<td key={i} style={tdStyle(true, false)} className="mono">{b}</td>))}
                     <td style={tdStyle(true, false)}>{r.n}</td>
-                    <td style={{ ...tdStyle(true, false), color: r.consistency >= consCut ? "var(--good-text)" : undefined, fontWeight: r.consistency >= consCut ? 600 : 400 }}>{fmt(r.consistency)}</td>
+                    <td style={{ ...tdStyle(true, false), color: r.consistency >= tt.consCut ? "var(--good-text)" : undefined, fontWeight: r.consistency >= tt.consCut ? 600 : 400 }}>{fmt(r.consistency)}</td>
                     <td style={tdStyle(true, false)}>{fmt(r.pri)}</td>
                     <td style={tdStyle(false, false)}>{chip(r.output)}</td>
                     <td style={{ ...tdStyle(false, false), whiteSpace: "normal", maxWidth: 260, color: "var(--ink-2)", fontSize: 13.5 }}>{r.cases.join(", ")}</td>
@@ -1710,7 +2844,12 @@ function TruthTableSection(props: {
             </table>
           </div>
           <p className="hint" style={hintStyle}>
-            {t(locale, "tt.hint", { observed: observed.length, remainders, freqCut, consCut })}
+            {t(locale, "tt.hint", {
+              observed: observed.length,
+              remainders,
+              freqCut: tt.freqCut,
+              consCut: tt.consCut,
+            })}
           </p>
         </>
       )}
@@ -1723,16 +2862,10 @@ function TruthTableSection(props: {
 function SolutionSection({
   tt,
   sol,
-  expectations,
-  setExpectations,
-  conditions,
   cases,
 }: {
   tt: TruthTableResult;
   sol: SolBundle;
-  expectations: Record<string, Expectation>;
-  setExpectations: (e: Record<string, Expectation>) => void;
-  conditions: string[];
   cases: QcaCase[];
 }) {
   const [locale] = useLocale();
@@ -1751,7 +2884,7 @@ function SolutionSection({
     sol.intermediate.models.length > 0 &&
     formulaSet(sol.intermediate) === formulaSet(sol.complex);
   return (
-    <div id="loesungen" style={{ scrollMarginTop: 56 }}>
+    <div>
       {/* Drei Lösungen, gleich aufgebaut — ohne diese Zeile weiß niemand,
           welche in ein Paper gehört. */}
       <p
@@ -1855,12 +2988,24 @@ function SolutionSection({
                   </summary>
                   <div
                     className="oq-formula"
-                    data-testid={mi === 0 ? `solution-formula-${kind}` : undefined}
+                    data-testid={
+                      mi === 0
+                        ? kind === "intermediate"
+                          ? "evidence-solution-formula-intermediate"
+                          : `solution-formula-${kind}`
+                        : undefined
+                    }
                   >
                     {m.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → {outLabel}
                   </div>
                   <div
-                    data-testid={mi === 0 ? `solution-kpis-${kind}` : undefined}
+                    data-testid={
+                      mi === 0
+                        ? kind === "intermediate"
+                          ? "evidence-solution-kpis-intermediate"
+                          : `solution-kpis-${kind}`
+                        : undefined
+                    }
                     style={{ display: "flex", gap: 26, margin: "12px 0" }}
                   >
                     <Kpi
@@ -1936,30 +3081,6 @@ function SolutionSection({
                   />
                 </details>
               ))
-            )}
-            {kind === "intermediate" && (
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--line-soft)" }}>
-                <Label>{t(locale, "sol.exp.label")}</Label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 6 }}>
-                  {conditions.map((c) => (
-                    <label key={c} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13.5 }}>
-                      <span className="mono" style={{ color: "var(--ink-2)" }}>{c.replace(/^fs_/, "")}</span>
-                      <select
-                        value={expectations[c] ?? "present"}
-                        onChange={(e) => setExpectations({ ...expectations, [c]: e.target.value as Expectation })}
-                        style={{ ...inputStyle, padding: "3px 6px", fontSize: 13.5 }}
-                      >
-                        <option value="present">{t(locale, "sol.exp.present")}</option>
-                        <option value="absent">{t(locale, "sol.exp.absent")}</option>
-                        <option value="either">{t(locale, "sol.exp.either")}</option>
-                      </select>
-                    </label>
-                  ))}
-                </div>
-                <p className="hint" style={hintStyle}>
-                  {t(locale, "sol.exp.hint")}
-                </p>
-              </div>
             )}
             {kind === "parsimonious" && (
               <p className="hint" style={hintStyle}>{t(locale, "sol.pars.hint")}</p>
@@ -2268,6 +3389,9 @@ function SuinSection({ entries }: { entries: NecessityExpressionEntry[] }) {
 
 /* ---------- Protokoll ---------- */
 
+
+
+
 function ProtocolSection({
   ds,
   calibSpecs,
@@ -2279,7 +3403,11 @@ function ProtocolSection({
   evaluation,
   sensitivity,
   robustness,
-  researchReady,
+  defenseReady,
+  researchBrief,
+  analysisDecisions,
+  expectations,
+  checklist,
 }: {
   ds: RawDataset;
   calibSpecs: CalibSpecs;
@@ -2291,26 +3419,50 @@ function ProtocolSection({
   evaluation: CalibrationEvaluation;
   sensitivity: SensitivityBundle;
   robustness: CombinedRobustnessResult | null;
-  researchReady: boolean;
+  defenseReady: boolean;
+  researchBrief: ResearchBrief;
+  analysisDecisions: AnalysisDecisionState;
+  expectations: Record<string, Expectation>;
+  checklist: Array<{ key: DictKey; ready: boolean }>;
 }) {
   const [locale] = useLocale();
   const r = useMemo(
     () =>
-      buildRScript({
-        ds,
-        calibSpecs,
-        varMeta,
-        conditions,
-        outcome,
-        freqCut,
-        consCut,
-        sensitivity,
-        robustness,
-      }),
-    [ds, calibSpecs, varMeta, conditions, outcome, freqCut, consCut, sensitivity, robustness],
+      defenseReady
+        ? buildRScript({
+            ds,
+            calibSpecs,
+            varMeta,
+            conditions,
+            outcome,
+            freqCut,
+            consCut,
+            sensitivity,
+            robustness,
+            researchBrief,
+            analysisDecisions,
+            expectations,
+          })
+        : "",
+    [
+      analysisDecisions,
+      calibSpecs,
+      conditions,
+      consCut,
+      defenseReady,
+      ds,
+      expectations,
+      freqCut,
+      outcome,
+      researchBrief,
+      robustness,
+      sensitivity,
+      varMeta,
+    ],
   );
 
   function downloadJson() {
+    if (!defenseReady) return;
     const payload = buildCalibrationProtocolJson({
       ds,
       calibSpecs,
@@ -2322,6 +3474,9 @@ function ProtocolSection({
       evaluation,
       sensitivity,
       robustness,
+      researchBrief,
+      analysisDecisions,
+      expectations,
     });
     downloadText(
       "openqca-calibration-protocol.json",
@@ -2329,7 +3484,9 @@ function ProtocolSection({
       "application/json",
     );
   }
+
   function downloadRawData() {
+    if (!defenseReady) return;
     downloadText(
       RAW_DATA_FILENAME,
       buildRawCsv(ds),
@@ -2338,6 +3495,7 @@ function ProtocolSection({
   }
 
   function downloadMd() {
+    if (!defenseReady) return;
     const md = buildCalibrationNarrative({
       ds,
       calibSpecs,
@@ -2350,34 +3508,64 @@ function ProtocolSection({
       freqCut,
       consCut,
       locale,
+      researchBrief,
+      analysisDecisions,
+      expectations,
     });
     downloadText("openqca-calibration-protocol.md", md, "text/markdown;charset=utf-8");
   }
 
   async function copyR() {
+    if (!defenseReady || !r) return;
     try {
       await navigator.clipboard.writeText(r);
     } catch {
-      /* ignore */
+      // The source is visible after readiness, so clipboard access is optional.
     }
+  }
+  function downloadR() {
+    if (!defenseReady || !r) return;
+    downloadText("openqca-replication.R", r, "text/plain;charset=utf-8");
   }
 
   return (
-    <Card id="protokoll">
-      <H2>{t(locale, "proto.title")}</H2>
+    <Card className="oq-defense-artifacts" data-testid="defense-artifacts">
+      <H2>{t(locale, "workspace.defense.artifacts")}</H2>
       <p style={{ color: "var(--ink-2)", marginTop: 0 }}>{t(locale, "proto.desc")}</p>
-      {!researchReady && (
-        <p className="hint" style={hintStyle}>{t(locale, "proto.notReady")}</p>
+      {!defenseReady && (
+        <ul className="oq-defense-checklist oq-defense-checklist--compact">
+          {checklist.filter((item) => !item.ready).map((item) => (
+            <li key={item.key}>
+              <span aria-hidden>○</span>
+              {t(locale, item.key)}
+            </li>
+          ))}
+        </ul>
       )}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <Button primary disabled={!researchReady} onClick={downloadJson}>{t(locale, "proto.downloadBtn")}</Button>
-        <Button disabled={!researchReady} onClick={downloadRawData}>{t(locale, "proto.downloadData")}</Button>
-        <Button disabled={!researchReady} onClick={downloadMd}>{t(locale, "proto.downloadMd")}</Button>
-        <Button disabled={!researchReady} onClick={() => void copyR()}>{t(locale, "proto.copyR")}</Button>
+      <div className="oq-action-row">
+        <Button primary disabled={!defenseReady} onClick={downloadJson}>{t(locale, "proto.downloadBtn")}</Button>
+        <Button disabled={!defenseReady} onClick={downloadRawData}>{t(locale, "proto.downloadData")}</Button>
+        <Button disabled={!defenseReady} onClick={downloadMd}>{t(locale, "proto.downloadMd")}</Button>
+        <Button disabled={!defenseReady} onClick={() => void copyR()}>{t(locale, "proto.copyR")}</Button>
+        <Button disabled={!defenseReady} onClick={downloadR}>{t(locale, "proto.downloadR")}</Button>
       </div>
-      <pre className="mono" style={{ fontSize: 13.5, lineHeight: 1.6, background: "var(--panel-2)", borderRadius: 8, padding: "12px 14px", overflowX: "auto", marginTop: 14 }}>
-        {r}
-      </pre>
+      {defenseReady && (
+        <pre
+          className="mono"
+          data-testid="defense-r-preview"
+          style={{
+            fontSize: 13.5,
+            lineHeight: 1.6,
+            background: "var(--panel-2)",
+            borderRadius: 8,
+            padding: "12px 14px",
+            overflowX: "auto",
+            marginTop: 14,
+          }}
+        >
+          {r}
+        </pre>
+      )}
     </Card>
   );
 }
@@ -2387,21 +3575,17 @@ function ProtocolSection({
 function Header() {
   const [locale] = useLocale();
   return (
-    <header style={{ display: "flex", alignItems: "baseline", gap: 13, flexWrap: "wrap", paddingBottom: 16, borderBottom: "1px solid var(--line)", marginBottom: 22 }}>
-      <Link href="/" style={{ fontWeight: 600, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
-        open<span style={{ color: "var(--brand)" }}>QCA</span>
-      </Link>
-      <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{t(locale, "header.tagline")}</span>
-      {/* Die Gruppe muss selbst umbrechen dürfen: Bei 390px blieben zuvor nur ~7px
-          Reserve, sodass sie auf Linux-Schriftmetrik (CI) um 9px überlief. Wrap +
-          justify-end hält sie unabhängig von der Schriftbreite im Viewport. */}
-      <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: 12, minWidth: 0 }}>
-        <a href="/methodik" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.methodik")}</a>
-        <a href="/preise" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.tarife")}</a>
-        <a href="/download" style={{ fontSize: 13.5, color: "var(--accent-deep)", textDecoration: "none" }}>{t(locale, "header.download")}</a>
+    <header className="oq-app-header">
+      <div className="oq-app-header__identity">
+        <Link href="/" className="oq-app-header__brand">
+          open<span>QCA</span>
+        </Link>
+        <span className="oq-app-header__tagline">{t(locale, "header.tagline")}</span>
+      </div>
+      <div className="oq-app-header__global">
         <LanguageToggle />
         <AccountButton />
-      </span>
+      </div>
     </header>
   );
 }
@@ -2410,183 +3594,25 @@ function Card({
   children,
   id,
   className,
+  "data-testid": dataTestId,
 }: {
   children: React.ReactNode;
   id?: string;
   /** Für Sonderflächen wie `oq-card--primary-result` (hervorgehobenes Ergebnis). */
   className?: string;
+  "data-testid"?: string;
 }) {
   return (
     <div
       id={id}
-      className={className}
-      style={{
-        background: "var(--panel)",
-        border: "1px solid var(--line)",
-        borderRadius: 12,
-        padding: "18px 20px",
-        marginBottom: 18,
-        scrollMarginTop: id ? 56 : undefined,
-      }}
+      className={["oq-plane", className].filter(Boolean).join(" ")}
+      data-testid={dataTestId}
     >
       {children}
     </div>
   );
 }
 
-/* ---------- Sektions-Navigation (Scroll-Spy) ---------- */
-
-function SectionNav({
-  steps,
-  activeStepId,
-}: {
-  steps: { n: number; id: string; label: string; status: StepStatus; provisional?: boolean }[];
-  activeStepId: string;
-}) {
-  const [locale] = useLocale();
-  const [activeId, setActiveId] = useState<string>(activeStepId);
-  // Scroll-Spy nur für freigeschaltete (nicht gesperrte) Schritte.
-  const idsKey = steps
-    .filter((s) => s.status !== "locked")
-    .map((s) => s.id)
-    .join("|");
-
-  // Fortschritt springt weiter → aktiven Schritt hervorheben, bis der Nutzer scrollt.
-  useEffect(() => {
-    const timer = window.setTimeout(() => setActiveId(activeStepId), 0);
-    return () => window.clearTimeout(timer);
-  }, [activeStepId]);
-
-  useEffect(() => {
-    if (!idsKey) return;
-    const ids = idsKey.split("|");
-    const entryMap = new Map<string, IntersectionObserverEntry>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => entryMap.set(entry.target.id, entry));
-        const visible = ids
-          .map((id) => entryMap.get(id))
-          .filter((e): e is IntersectionObserverEntry => !!e && e.isIntersecting);
-        if (visible.length > 0) {
-          visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-          setActiveId(visible[0].target.id);
-        }
-      },
-      { rootMargin: "-56px 0px -65% 0px", threshold: 0 },
-    );
-    ids.forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [idsKey]);
-
-  function go(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  return (
-    <nav
-      aria-label={t(locale, "nav.ariaLabel")}
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 30,
-        background: "var(--bg)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        borderBottom: "1px solid var(--line)",
-        marginBottom: 18,
-      }}
-    >
-      <style>{`
-        .oq-section-nav { scrollbar-width: thin; }
-        .oq-section-nav::-webkit-scrollbar { height: 4px; }
-        .oq-section-nav::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
-      `}</style>
-      <div
-        className="oq-section-nav"
-        style={{
-          display: "flex",
-          gap: 2,
-          overflowX: "auto",
-          padding: "8px 2px",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {steps.map((s) => {
-          const locked = s.status === "locked";
-          // Das Häkchen ist die stärkste Zusage der App. Solange die Kalibrierung
-          // nicht begründet ist, rechnet der Schritt zwar, ist aber nicht fertig —
-          // dann bleibt die Ziffer stehen.
-          const done = s.status === "done" && !s.provisional;
-          const isActive = !locked && activeId === s.id;
-          const prefix = done ? "✓" : `${s.n}`;
-          const baseStyle: React.CSSProperties = {
-            flex: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            fontSize: 13.5,
-            padding: "5px 10px",
-            borderRadius: 8,
-            textDecoration: "none",
-            whiteSpace: "nowrap",
-          };
-          const badge = (color: string) => (
-            <span
-              aria-hidden
-              style={{
-                width: 16,
-                height: 16,
-                borderRadius: "50%",
-                display: "grid",
-                placeItems: "center",
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#fff",
-                background: color,
-              }}
-            >
-              {prefix}
-            </span>
-          );
-          if (locked) {
-            return (
-              <span
-                key={s.id}
-                aria-disabled
-                style={{ ...baseStyle, color: "var(--muted)", opacity: 0.55, cursor: "default" }}
-              >
-                {badge("var(--muted)")}
-                {s.label}
-              </span>
-            );
-          }
-          return (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              onClick={(e) => {
-                e.preventDefault();
-                go(s.id);
-              }}
-              style={{
-                ...baseStyle,
-                color: isActive ? "var(--accent-deep)" : done ? "var(--good-text)" : "var(--ink-2)",
-                fontWeight: isActive ? 600 : 400,
-                background: isActive ? "var(--panel-2)" : "transparent",
-              }}
-            >
-              {badge(done ? "var(--good-text)" : "var(--brand)")}
-              {s.label}
-            </a>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
 // Dünner Wrapper — EINE Definition lebt in components/ui.tsx (SectionHeading).
 function H2({ children }: { children: React.ReactNode }) {
   return <SectionHeading>{children}</SectionHeading>;
@@ -2655,7 +3681,7 @@ function ProvisionalMark() {
       </span>
       <span style={{ fontSize: 12, color: "var(--ink-2)" }}>
         {t(locale, "result.provisional.reason")}{" "}
-        <a href="#kalibrierung" style={{ color: "var(--accent-deep)" }}>
+        <a href="#decisions" style={{ color: "var(--accent-deep)" }}>
           {t(locale, "result.provisional.link")}
         </a>
       </span>
@@ -2664,11 +3690,11 @@ function ProvisionalMark() {
 }
 
 function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React.ReactNode }) {
-  const map = { ok: ["var(--good)", "rgba(12,163,12,0.09)"], warn: ["#b26a00", "var(--warn-wash)"], bad: ["var(--bad)", "var(--bad-wash)"] } as const;
+  const map = { ok: ["var(--good)", "var(--good-wash)"], warn: ["var(--warn-text)", "var(--warn-wash)"], bad: ["var(--bad)", "var(--bad-wash)"] } as const;
   const [icon, wash] = map[kind];
   return (
-    <div style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13.5, padding: "9px 11px", borderRadius: 9, border: `1px solid ${wash}`, background: wash }}>
-      <span style={{ width: 17, height: 17, borderRadius: "50%", flex: "none", marginTop: 1, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#fff", background: icon }}>
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13.5, padding: "8px 10px", borderRadius: "var(--radius-surface)", border: `1px solid ${wash}`, background: wash }}>
+      <span style={{ width: 17, height: 17, borderRadius: "50%", flex: "none", marginTop: 1, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "var(--accent-contrast)", background: icon }}>
         {kind === "ok" ? "✓" : "!"}
       </span>
       <div>{children}</div>

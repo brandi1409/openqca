@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loadDemo } from "./helpers";
+import { loadDemo, openDestination } from "./helpers";
 
 /**
  * A2.8–A2.10 — Interaktionen: Grafik-Export (SVG/PNG), ⓘ-Popover im Viewport,
@@ -8,6 +8,7 @@ import { loadDemo } from "./helpers";
 
 test("A2.8 Grafik-Export SVG — echter Download endet auf .svg", async ({ page }) => {
   await loadDemo(page);
+  await openDestination(page, "evidence");
 
   const svgBtn = page.getByRole("button", { name: /Grafik exportieren als SVG/ }).first();
   await svgBtn.scrollIntoViewIfNeeded();
@@ -21,6 +22,7 @@ test("A2.8 Grafik-Export SVG — echter Download endet auf .svg", async ({ page 
 
 test("A2.8 Grafik-Export PNG — echter Download endet auf .png", async ({ page }) => {
   await loadDemo(page);
+  await openDestination(page, "evidence");
 
   const pngBtn = page.getByRole("button", { name: /Grafik exportieren als PNG/ }).first();
   await pngBtn.scrollIntoViewIfNeeded();
@@ -34,10 +36,9 @@ test("A2.8 Grafik-Export PNG — echter Download endet auf .png", async ({ page 
 
 test("A2.9 ⓘ-Popover — vollständig im Viewport, Escape schließt", async ({ page }) => {
   await loadDemo(page);
+  await openDestination(page, "evidence");
 
-  // ⓘ in der kürzesten Tabelle: den Spaltenkopf-InfoHints der Lösungs-Pfad-Tabelle.
-  const infoBtn = page.locator("#loesungen table th button[aria-label]").first();
-  // Button zentrieren, damit unter ihm genug Platz für das Popover bleibt.
+  const infoBtn = page.locator("main button[aria-label]").first();
   await infoBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
   await infoBtn.click();
 
@@ -61,6 +62,7 @@ test("A2.9 ⓘ-Popover — vollständig im Viewport, Escape schließt", async ({
 
 test("A2.10 Anker per Tastatur — ArrowRight erhöht das Zahlenfeld synchron", async ({ page }) => {
   await loadDemo(page);
+  await openDestination(page, "decisions");
 
   // Kurve und Griffe gibt es seit dem Flow-Umbau an ZWEI Orten (Schnell-Karte
   // und Werkbank). Geprüft wird der Startzustand: die Schnell-Ansicht. Ohne

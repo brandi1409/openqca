@@ -1,4 +1,5 @@
 "use client";
+import { usePathname } from "next/navigation";
 
 import type { CSSProperties } from "react";
 import { useLocale } from "@/i18n/locale";
@@ -33,10 +34,11 @@ const GITHUB_URL = "https://github.com/brandi1409/openqca";
  */
 export function SiteFooter() {
   const [locale] = useLocale();
+  const pathname = usePathname();
   const year = new Date().getFullYear();
 
   return (
-    <footer style={footerStyle}>
+    <footer className="oq-site-footer" style={footerStyle}>
       <div style={innerStyle}>
         <nav aria-label={t(locale, "footer.navAria")} style={navStyle}>
           {LINKS.map((link) => (
@@ -50,7 +52,7 @@ export function SiteFooter() {
         </nav>
         <div style={rightStyle}>
           <p style={noteStyle}>{t(locale, "footer.note", { year })}</p>
-          <LanguageToggle />
+          {pathname !== "/app" && <LanguageToggle />}
         </div>
       </div>
     </footer>

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:ai-gold": "playwright test e2e/ai-gold.spec.ts",
+    "test:ai-gold:live": "playwright test e2e/ai-gold-live.spec.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

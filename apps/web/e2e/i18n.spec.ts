@@ -1,39 +1,30 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { dismissConsent } from "./helpers";
 
-/**
- * A2.6 — Sprachumschalter: DE→EN stellt die Kern-Überschriften um, die Wahl
- * übersteht einen Reload, und DE lässt sich zurückschalten.
- *
- * Geprüfte Überschriften (immer gerendert, auch ohne Datensatz):
- *   Kalibrierung: „Kalibrieren" (DE) / „Calibrate" (EN)
- *   Truth Table:  „Truth Table & Lösungen" (DE) / „Truth table & solutions" (EN)
- */
-test("A2.6 DE/EN — Umschalten, Persistenz über Reload, Rückschalten", async ({ page }) => {
-  await page.goto("/app");
+test("A2.6 DE/EN workspace labels persist across reload", async ({ page }) => {
+  await page.goto("/app#answer");
+  await dismissConsent(page);
+  await expect(page.getByRole("heading", { name: "Aktuelle Antwort", level: 1 })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Analysebereiche" }).getByRole("button")).toHaveText([
+    "Antwort",
+    "Forschungsdesign",
+    "Entscheidungen",
+    "Evidenz",
+    "Prüfpaket",
+  ]);
 
-  const ttHeadingDe = page.getByRole("heading", { name: /Truth Table & Lösungen/ });
-  const ttHeadingEn = page.getByRole("heading", { name: /Truth table & solutions/ });
-  const calibHeadingDe = page.getByRole("heading", { name: "Kalibrieren", exact: true });
-  const calibHeadingEn = page.getByRole("heading", { name: "Calibrate", exact: true });
+  await page.getByRole("banner").getByRole("button", { name: "EN", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Current answer", level: 1 })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Analysis destinations" }).getByRole("button")).toHaveText([
+    "Answer",
+    "Research design",
+    "Decisions",
+    "Evidence",
+    "Defense pack",
+  ]);
 
-  // Ausgangszustand ist Deutsch.
-  await expect(ttHeadingDe).toBeVisible();
-  await expect(calibHeadingDe).toBeVisible();
-
-  // Auf Englisch umschalten. Der Umschalter existiert doppelt (Header + Footer);
-  // beide steuern denselben globalen Locale → der erste (Header) genügt.
-  await page.getByRole("button", { name: "EN", exact: true }).first().click();
-  await expect(ttHeadingEn).toBeVisible();
-  await expect(calibHeadingEn).toBeVisible();
-  await expect(calibHeadingDe).toHaveCount(0);
-
-  // Wahl übersteht Reload (localStorage openqca_locale).
   await page.reload();
-  await expect(ttHeadingEn).toBeVisible();
-  await expect(calibHeadingEn).toBeVisible();
-
-  // Zurück auf Deutsch.
-  await page.getByRole("button", { name: "DE", exact: true }).first().click();
-  await expect(ttHeadingDe).toBeVisible();
-  await expect(calibHeadingDe).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Current answer", level: 1 })).toBeVisible();
+  await page.getByRole("banner").getByRole("button", { name: "DE", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Aktuelle Antwort", level: 1 })).toBeVisible();
 });

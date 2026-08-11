@@ -116,14 +116,9 @@ function substepDotColor(status: SubstepStatus): string {
   return "var(--warn-text)";
 }
 
-/**
- * Höhe der klebenden Schritt-Navigation (`SectionNav`, position: sticky,
- * top: 0, z-index 30) auf /app — gemessen, nicht geraten. Die Teilschritt-
- * Leiste klebt exakt darunter; ihr z-index liegt darüber, aber unter dem
- * InfoHint-Popover (z-index 70).
- */
-const CALIBRATION_STICKY_TOP = 48;
-const CALIBRATION_STICKY_Z = 20;
+/** The nested orientation bar sits below the horizontal workspace navigation
+ * on narrow screens and at the viewport edge beside the desktop rail. */
+const CALIBRATION_STICKY_Z = 19;
 
 /** Nur die bewusste Nutzerentscheidung wird gemerkt, nie eine Vorbelegung. */
 const COLLAPSE_STORAGE_KEY = "openqca_calibration_collapse_done";
@@ -148,7 +143,7 @@ const anchorText = (value: number) =>
 /** Teilschritt-Abschnitt: Sprungziel unterhalb der klebenden Leiste. */
 const substepSectionStyle: React.CSSProperties = {
   marginBottom: 18,
-  scrollMarginTop: CALIBRATION_STICKY_TOP + 110,
+  scrollMarginTop: "calc(var(--oq-workspace-nav-height, 0px) + 110px)",
 };
 
 function hasImportPlaceholder(spec: CalibrationSpec, varType?: VarType): boolean {
@@ -195,17 +190,7 @@ function hasImportPlaceholder(spec: CalibrationSpec, varType?: VarType): boolean
 
 function Card({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
-    <div
-      id={id}
-      style={{
-        background: "var(--panel)",
-        border: "1px solid var(--line)",
-        borderRadius: 12,
-        padding: "18px 20px",
-        marginBottom: 18,
-        scrollMarginTop: id ? 56 : undefined,
-      }}
-    >
+    <div id={id} className="oq-calibration-workbench">
       {children}
     </div>
   );
@@ -213,8 +198,8 @@ function Card({ children, id }: { children: React.ReactNode; id?: string }) {
 
 function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React.ReactNode }) {
   const map = {
-    ok: ["var(--good)", "rgba(12,163,12,0.09)"],
-    warn: ["#b26a00", "var(--warn-wash)"],
+    ok: ["var(--good)", "var(--good-wash)"],
+    warn: ["var(--warn-text)", "var(--warn-wash)"],
     bad: ["var(--bad)", "var(--bad-wash)"],
   } as const;
   const [icon, wash] = map[kind];
@@ -222,12 +207,12 @@ function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React
     <div
       style={{
         display: "flex",
-        gap: 9,
+        gap: 8,
         alignItems: "flex-start",
         fontSize: 13.5,
-        padding: "9px 11px",
-        borderRadius: 9,
+        padding: "8px 10px",
         border: `1px solid ${wash}`,
+        borderRadius: "var(--radius-surface)",
         background: wash,
       }}
     >
@@ -242,7 +227,7 @@ function Diag({ kind, children }: { kind: "ok" | "warn" | "bad"; children: React
           placeItems: "center",
           fontSize: 11,
           fontWeight: 700,
-          color: "#fff",
+          color: "var(--accent-contrast)",
           background: icon,
         }}
       >
@@ -719,10 +704,14 @@ export function CalibrationWorkbench({
     // Die klebende Leiste verdeckt sonst genau die Überschrift, zu der wir
     // springen: Sprungziel um Leistenhöhe + Schritt-Navigation versetzen.
     const barHeight = substepperRef.current?.getBoundingClientRect().height ?? 0;
+    const workspaceShell = section.closest<HTMLElement>(".oq-workspace-shell");
+    const workspaceNavHeight = workspaceShell
+      ? Number.parseFloat(getComputedStyle(workspaceShell).getPropertyValue("--oq-workspace-nav-height")) || 0
+      : 0;
     const top =
       window.scrollY +
       section.getBoundingClientRect().top -
-      (CALIBRATION_STICKY_TOP + barHeight + 10);
+      (workspaceNavHeight + barHeight + 10);
     window.scrollTo({ top: Math.max(top, 0), behavior: "smooth" });
     const heading = section.querySelector<HTMLElement>("h2, h3");
     if (heading) {
@@ -834,9 +823,8 @@ export function CalibrationWorkbench({
       </div>
 
       {/*
-        Orientierungsleiste: klebt unter der Schritt-Navigation (48px, z 30)
-        und bleibt damit während der gesamten Teilschritt-Arbeit sichtbar.
-        z-index bleibt unter dem InfoHint-Popover (70).
+        The substep orientation bar remains visible below the workspace
+        navigation and below its stacking layer.
       */}
       <nav
         ref={substepperRef}
@@ -844,12 +832,12 @@ export function CalibrationWorkbench({
         data-testid="calibration-substepper"
         style={{
           position: "sticky",
-          top: CALIBRATION_STICKY_TOP,
+          top: "var(--oq-workspace-nav-height, 61px)",
           zIndex: CALIBRATION_STICKY_Z,
           background: "var(--panel)",
           borderBottom: "1px solid var(--line)",
-          padding: "10px 20px 9px",
-          margin: "0 -20px 14px",
+          padding: "10px 0 9px",
+          margin: "0 0 14px",
         }}
       >
         {/*
@@ -1013,12 +1001,12 @@ export function CalibrationWorkbench({
               ? "var(--bad-wash)"
               : badge.kind === "warn"
                 ? "var(--warn-wash)"
-                : "rgba(12,163,12,0.09)",
+                : "var(--good-wash)",
           color:
             badge.kind === "bad"
               ? "var(--bad)"
               : badge.kind === "warn"
-                ? "#b26a00"
+                ? "var(--warn-text)"
                 : "var(--good-text)",
         }}
       >
@@ -1615,7 +1603,7 @@ export function CalibrationWorkbench({
               </Field>
             </div>
             {(ev.type === "empirical_diagnostic" || !ev.isSubstantive) && (
-              <p style={{ fontSize: 13.5, color: "#b26a00", margin: "6px 0" }}>
+              <p style={{ fontSize: 13.5, color: "var(--warn-text)", margin: "6px 0" }}>
                 {t(locale, "calib.evidence.diagnosticNote")}
               </p>
             )}
@@ -1706,11 +1694,14 @@ export function CalibrationWorkbench({
           <Field label={t(locale, "calib.status.label")}>
             <select
               style={inputStyle}
+              data-testid="calibration-status"
               value={spec.status}
               onChange={(event) =>
-                patchSpec(v, {
-                  status: event.target.value as CalibrationSpec["status"],
-                })
+                patchSpec(
+                  v,
+                  { status: event.target.value as CalibrationSpec["status"] },
+                  true,
+                )
               }
             >
               <option value="unresolved">{t(locale, "calib.status.unresolved")}</option>
@@ -1982,32 +1973,19 @@ export function CalibrationWorkbench({
         </div>
         <div style={{ display: "grid", gap: 8 }}>
           <AiAssist
-            task="anchors"
-            label={t(locale, "calib.ai.anchors")}
-            needsContext
-            getData={() => {
-              const sorted = [...rawValues].filter(Number.isFinite).sort((a, b) => a - b);
-              return {
+            label={locale === "en" ? "Review evidence gaps" : "Evidenzlücken prüfen"}
+            request={() => ({
+              version: "v1",
+              task: "calibration_evidence_gaps",
+              locale,
+              payload: {
                 variable: v,
-                min: sorted[0],
-                median: sorted[Math.floor(sorted.length / 2)],
-                max: sorted[sorted.length - 1],
-              };
-            }}
-          />
-          <AiAssist
-            task="methods"
-            label={t(locale, "calib.ai.methods")}
-            needsContext
-            getData={() => ({
-              variable: v,
-              anchors:
-                fuzzyAnchors
-                  ? `${fuzzyAnchors.fullOut} / ${fuzzyAnchors.crossover} / ${fuzzyAnchors.fullIn}`
-                  : String(spec.crisp?.threshold ?? ""),
-              total: caseRows.length,
-              inside: caseRows.filter((r) => (r.m as number) > 0.5).length,
+                setLabel: spec.set.setLabel,
+                definition: spec.set.definition,
+                rationale: [spec.set.unit, spec.set.scopePopulation, spec.set.timePeriod].filter(Boolean).join("; ") || (locale === "en" ? "No rationale supplied." : "Keine Begründung angegeben."),
+              },
             })}
+            onAdopt={(draft) => patchSpec(v, { set: { ...spec.set, definition: draft } })}
           />
         </div>
       </div>

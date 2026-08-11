@@ -1,110 +1,90 @@
-import { test, expect } from "@playwright/test";
-import { DEMO_SOLUTION, dismissConsent } from "./helpers";
-
-/**
- * A4 — Konsistenz des Design-Systems, geprüft in 4 Matrizen: Light/Dark ×
- * Desktop(1280)/Mobile(390). Alle Kriterien sind scharf; die strenge Skala
- * gilt bewusst nur für die Tool-Seiten in A4_ROUTES — Landing, Methodik und
- * Rechtstexte nutzen ihre eigene Dokument-Typografie (QUALITY-SPEC A4.4).
- */
+import { expect, test, type Page } from "@playwright/test";
+import { dismissConsent, loadDemo, openDestination, type DestinationName } from "./helpers";
 
 const SCHEMES = ["light", "dark"] as const;
 const VIEWPORTS = [
   { label: "desktop", width: 1280, height: 900 },
   { label: "mobile", width: 390, height: 844 },
 ] as const;
+const TOOL_ROUTES = ["/preise", "/download", "/konto"] as const;
+const DESTINATIONS: DestinationName[] = ["answer", "research", "decisions", "evidence", "defense"];
 
-/** /app mit Demo befüllen, damit ALLE Buttons/Flächen (Kalibrierung, Lösungen, Export) im DOM sind. */
-async function primeApp(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Demo-Datensatz laden" }).click();
-  await expect(page.getByText(DEMO_SOLUTION).first()).toBeVisible({ timeout: 15_000 });
+async function buttonOffenders(page: Page) {
+  return page.evaluate(() => {
+    const exceptions = [
+      "button[aria-label]",
+      '[role="slider"]',
+      '[role="group"] button',
+      ".oq-example-card",
+      '[role="dialog"][aria-labelledby="cookie-consent-title"] button',
+    ];
+    return Array.from(document.querySelectorAll("button"))
+      .filter((button) => {
+        if (button.classList.contains("oq-link-button")) {
+          return button.getBoundingClientRect().height < 43.5;
+        }
+        return (
+          !button.classList.contains("oq-btn") &&
+          !exceptions.some((selector) => button.matches(selector))
+        );
+      })
+      .map((button) => button.outerHTML.replace(/\s+/g, " ").slice(0, 140));
+  });
 }
 
-const A4_ROUTES = ["/app", "/preise", "/download", "/konto"] as const;
+async function typographyOffenders(page: Page) {
+  return page.evaluate(() => {
+    const sizes = [10.5, 11, 11.5, 12, 13, 13.5, 15, 15.5, 16, 16.5, 18, 20, 21, 24, 28];
+    const weights = [400, 600, 650, 680, 700, 720];
+    const near = (value: number) => sizes.some((size) => Math.abs(size - value) <= 0.1);
+    const offenders: { tag: string; fontSize?: number; fontWeight?: number; text: string }[] = [];
+    for (const element of Array.from(document.querySelectorAll("h1,h2,h3,button,p,th,td,span")).slice(0, 500)) {
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0 || element.closest("svg")) continue;
+      const style = getComputedStyle(element);
+      const fontSize = Number.parseFloat(style.fontSize);
+      const fontWeight = Number.parseInt(style.fontWeight, 10);
+      const text = (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 30);
+      if (!near(fontSize)) offenders.push({ tag: element.tagName, fontSize, text });
+      else if (!weights.includes(fontWeight)) offenders.push({ tag: element.tagName, fontWeight, text });
+    }
+    return offenders;
+  });
+}
 
 for (const colorScheme of SCHEMES) {
-  for (const vp of VIEWPORTS) {
-    test.describe(`A4 ${colorScheme} @ ${vp.label} (${vp.width}×${vp.height})`, () => {
-      test.use({ colorScheme, viewport: { width: vp.width, height: vp.height } });
+  for (const viewport of VIEWPORTS) {
+    test.describe(`A4 ${colorScheme} @ ${viewport.label} (${viewport.width}×${viewport.height})`, () => {
+      test.use({ colorScheme, viewport: { width: viewport.width, height: viewport.height } });
 
-      test("A4.1 jeder <button> nutzt .oq-btn oder ist dokumentierte Ausnahme", async ({ page }) => {
-
-        const offenders: { route: string; html: string }[] = [];
-        for (const route of A4_ROUTES) {
+      test("A4.1 every workspace button uses the control vocabulary", async ({ page }) => {
+        const offenders: { surface: string; html: string }[] = [];
+        await loadDemo(page);
+        for (const destination of DESTINATIONS) {
+          await openDestination(page, destination);
+          for (const html of await buttonOffenders(page)) offenders.push({ surface: destination, html });
+        }
+        for (const route of TOOL_ROUTES) {
           await page.goto(route);
           await dismissConsent(page);
-          if (route === "/app") await primeApp(page);
-
-          const bad = await page.evaluate(() => {
-            // Dokumentierte Ausnahmen (Selektor-Liste, QUALITY-SPEC A4.1):
-            const EXCEPTIONS = [
-              "button[aria-label]", // ⓘ-InfoHints (tragen aria-label)
-              '[role="slider"]', // Kurven-Anker-Griffe
-              '[role="group"] button', // Segment-Gruppen: LanguageToggle, XY-Label-Toggle
-              '[role="dialog"][aria-labelledby="cookie-consent-title"] button', // Consent-Dialog
-            ];
-            const isException = (el: Element) => EXCEPTIONS.some((sel) => el.matches(sel));
-            const out: string[] = [];
-            document.querySelectorAll("button").forEach((b) => {
-              if (b.classList.contains("oq-btn")) return;
-              if (isException(b)) return;
-              out.push(b.outerHTML.replace(/\s+/g, " ").slice(0, 140));
-            });
-            return out;
-          });
-          bad.forEach((html) => offenders.push({ route, html }));
+          for (const html of await buttonOffenders(page)) offenders.push({ surface: route, html });
         }
-
-        expect(
-          offenders,
-          `Buttons ohne .oq-btn (und keine Ausnahme):\n${JSON.stringify(offenders, null, 2)}`,
-        ).toEqual([]);
+        expect(offenders).toEqual([]);
       });
 
-      test("A4.2 Schriftgrößen aus der Skala, Gewichte ∈ {400,600,700}", async ({ page }) => {
-
-        const SIZES = [11, 12, 13.5, 15, 16.5, 20, 28];
-        const WEIGHTS = [400, 600, 700];
-        const violations: unknown[] = [];
-
-        for (const route of A4_ROUTES) {
+      test("A4.2 workspace typography stays on the fixed product scale", async ({ page }) => {
+        const offenders: { surface: string; issue: unknown }[] = [];
+        await loadDemo(page);
+        for (const destination of DESTINATIONS) {
+          await openDestination(page, destination);
+          for (const issue of await typographyOffenders(page)) offenders.push({ surface: destination, issue });
+        }
+        for (const route of TOOL_ROUTES) {
           await page.goto(route);
           await dismissConsent(page);
-          if (route === "/app") await primeApp(page);
-
-          const bad = await page.evaluate(
-            ({ SIZES, WEIGHTS }) => {
-              const near = (v: number, arr: number[]) => arr.some((a) => Math.abs(a - v) <= 0.1);
-              const els = Array.from(
-                document.querySelectorAll("h1,h2,h3,button,p,th,td,span"),
-              ).slice(0, 400);
-              const out: { tag: string; fontSize?: number; fontWeight?: number; text: string }[] = [];
-              for (const el of els) {
-                const rect = el.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) continue; // unsichtbar
-                if (el.closest("svg")) continue; // SVG-interne Größen ausgenommen
-                const cs = getComputedStyle(el);
-                const fs = parseFloat(cs.fontSize);
-                const fw = parseInt(cs.fontWeight, 10);
-                const text = (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 30);
-                if (!near(fs, SIZES)) out.push({ tag: el.tagName, fontSize: fs, text });
-                else if (!WEIGHTS.includes(fw)) out.push({ tag: el.tagName, fontWeight: fw, text });
-              }
-              return out;
-            },
-            { SIZES, WEIGHTS },
-          );
-          bad.forEach((v) => violations.push({ route, ...(v as object) }));
+          for (const issue of await typographyOffenders(page)) offenders.push({ surface: route, issue });
         }
-
-        expect(
-          violations,
-          `Skala-Verstöße (Größe ∉ {11,12,13.5,15,16.5,20,28} oder Gewicht ∉ {400,600,700}):\n${JSON.stringify(
-            violations,
-            null,
-            2,
-          )}`,
-        ).toEqual([]);
+        expect(offenders).toEqual([]);
       });
     });
   }

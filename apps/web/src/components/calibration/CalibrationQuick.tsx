@@ -194,15 +194,7 @@ export function CalibrationQuick({
 
   return (
     <div data-testid="calibration-quick">
-      <div
-        style={{
-          background: "var(--panel)",
-          border: "1px solid var(--line)",
-          borderRadius: 12,
-          padding: "18px 20px",
-          marginBottom: 18,
-        }}
-      >
+      <div className="oq-calibration-quick__intro">
         <SectionHeading>{t(locale, "calib.quick.title")}</SectionHeading>
         <p style={{ color: "var(--ink-2)", fontSize: 13.5, maxWidth: "70ch", margin: 0 }}>
           {t(locale, "calib.quick.desc")}
@@ -228,7 +220,7 @@ export function CalibrationQuick({
               maxWidth: "70ch",
             }}
           >
-            <span aria-hidden>⚠</span>
+            <span aria-hidden>!</span>
             <span>{t(locale, "calib.quick.anchorsFromData")}</span>
           </p>
         )}
@@ -283,13 +275,8 @@ export function CalibrationQuick({
               const nowOpen = (e.currentTarget as HTMLDetailsElement).open;
               setOpenColumn(nowOpen ? column : (prev) => (prev === column ? null : prev));
             }}
-            style={{
-              background: "var(--panel)",
-              border: `1px solid ${isOpen ? "var(--line)" : "var(--line-soft)"}`,
-              borderRadius: 12,
-              padding: isOpen ? "16px 18px" : "10px 18px",
-              marginBottom: isOpen ? 14 : 8,
-            }}
+            className="oq-calibration-quick__set"
+            data-open={isOpen ? "true" : "false"}
           >
             <summary
               style={{
@@ -558,7 +545,7 @@ const segmentBaseStyle: React.CSSProperties = {
 const segmentActiveStyle: React.CSSProperties = {
   ...segmentBaseStyle,
   background: "var(--brand)",
-  color: "#fff",
+  color: "var(--accent-contrast)",
 };
 
 const segmentInactiveStyle: React.CSSProperties = {

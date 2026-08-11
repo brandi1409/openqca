@@ -1,927 +1,142 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { calibrateDirect, buildTruthTable, intermediateSolution } from "@openqca/engine";
-import { DEMO } from "@/lib/demo";
-import { useLocale } from "@/i18n/locale";
-import { t, type DictKey } from "@/i18n/dict";
 import { LanguageToggle } from "@/components/LanguageToggle";
-
-/**
- * Öffentliche Landing-Page (Route „/"). Zweisprachig über `useLocale` + `t`.
- *
- * Designidee: Die Seite beweist statt zu behaupten. Der Hero zeigt die echte
- * Ableitung Rohdaten → Kalibrierung → Truth Table → Lösungsformel — und zwar
- * nicht als Dekoration, sondern LIVE mit der Engine gerechnet (Modul-Scope,
- * Demo-Datensatz).
- *
- * Übereinstimmung mit der App ist eine geprüfte Zusage, keine Behauptung: Der
- * Streifen rechnet mit demselben Modell wie der Startzustand von „/app?demo=1"
- * (alle numerischen Nicht-Outcome-Spalten als Bedingungen, freqCut 1,
- * consCut 0,8, Erwartungen „present", intermediäre Lösung) und schreibt die
- * Formel in derselben Notation. E2E-Test A2.20 vergleicht beide Strings bei
- * jedem Lauf — genau diese Zusage war schon einmal gebrochen (die Landing
- * rechnete mit vier, die App wegen einer stillen Rollen-Heuristik mit drei
- * Bedingungen).
- *
- * Typografie: Serif-Display (Journal-Anmutung, reiner System-Stack)
- * + Mono für Formeln/Zahlen; Farben bleiben die Tokens aus globals.css.
- *
- * Die Landing unterliegt bewusst NICHT der strengen A4-Skala (QUALITY-SPEC:
- * nur /app, /preise, /download, /konto) — sie nutzt eine eigene Display-Typo.
- */
+import { useLocale, type Locale } from "@/i18n/locale";
+import { t, type DictKey } from "@/i18n/dict";
+import { DEMO } from "@/lib/demo";
 
 const DISPLAY_FONT = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif';
 const MONO_FONT = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
-
-/* ---------- Hero-Daten: echte Zahlen, live aus der Engine ---------- */
-
 const HERO_CONDS = ["wohlstand", "urban", "bildung", "stabil"] as const;
 const HERO_OUTCOME = "demo_ueberleben";
 
 function computeHeroData() {
-  const cases = DEMO.rows.map((r) => {
+  const cases = DEMO.rows.map((row) => {
     const values: Record<string, number> = {};
-    for (const c of [...HERO_CONDS, HERO_OUTCOME]) {
-      const [fullOut, crossover, fullIn] = DEMO.anchors[c];
-      values[c] = calibrateDirect(Number(r[c]), fullOut, crossover, fullIn);
+    for (const column of [...HERO_CONDS, HERO_OUTCOME]) {
+      const [fullOut, crossover, fullIn] = DEMO.anchors[column];
+      values[column] = calibrateDirect(Number(row[column]), fullOut, crossover, fullIn);
     }
-    return { label: String(r[DEMO.caseCol]), values };
+    return { label: String(row[DEMO.caseCol]), values };
   });
-  const tt = buildTruthTable({
-    cases,
-    conditions: [...HERO_CONDS],
-    outcome: HERO_OUTCOME,
-    freqCut: 1,
-    consCut: 0.8,
-  });
-  const inter = intermediateSolution(tt, cases, {
-    wohlstand: "present",
-    urban: "present",
-    bildung: "present",
-    stabil: "present",
-  });
-  const model = inter.models[0] ?? null;
-  // Truth-Table-Ausschnitt: die beiden positiven Zeilen + eine widersprüchliche als Kontrast.
-  const shown = tt.rows
-    .filter((r) => r.n > 0)
-    .sort((a, b) => b.consistency - a.consistency)
-    .slice(0, 3);
-  const rawW = DEMO.rows.map((r) => Number(r.wohlstand));
-  const calW = cases.map((c) => c.values.wohlstand);
-  return { model, shown, rawW, calW, anchorsW: DEMO.anchors.wohlstand };
+  const truthTable = buildTruthTable({ cases, conditions: [...HERO_CONDS], outcome: HERO_OUTCOME, freqCut: 1, consCut: 0.8 });
+  const solution = intermediateSolution(truthTable, cases, { wohlstand: "present", urban: "present", bildung: "present", stabil: "present" });
+  return {
+    model: solution.models[0] ?? null,
+    shown: truthTable.rows.filter((row) => row.n > 0).sort((a, b) => b.consistency - a.consistency).slice(0, 3),
+    raw: DEMO.rows.map((row) => Number(row.wohlstand)),
+    calibrated: cases.map((item) => item.values.wohlstand),
+    anchors: DEMO.anchors.wohlstand,
+  };
 }
 
 const HERO = computeHeroData();
-
-/**
- * Lösungsformel in exakt der Notation der App (`SolutionSection`):
- * Pfad-Ausdrücke der Engine, Großschreibung, „  +  " zwischen den Pfaden,
- * „→ OUTCOME" am Ende. Keine eigene Übersetzung der Term-Bits mehr — die wäre
- * eine zweite Wahrheit neben der App.
- */
 const HERO_FORMULA = HERO.model
-  ? HERO.model.paths.map((p) => p.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ") +
-    " → " +
-    HERO_OUTCOME.replace(/^fs_/, "").toUpperCase()
+  ? `${HERO.model.paths.map((path) => path.expression.replace(/fs_/g, "").toUpperCase()).join("  +  ")} → ${HERO_OUTCOME.toUpperCase()}`
   : "";
 
-/** Zahl im deutschen Format mit 3 Dezimalen (0,972). */
-function fmt3(x: number): string {
-  return x.toFixed(3).replace(".", ",");
+function fmt3(locale: Locale, value: number) {
+  return value.toLocaleString(locale === "de" ? "de-DE" : "en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
 export function Landing() {
-  const [locale] = useLocale();
-  return (
-    <div className="oq-landing">
-      <LandingStyles />
-      <LandingNav />
-      <main>
-        <Hero />
-        <Reveal>
-          <Deliverables />
-        </Reveal>
-        <Reveal>
-          <Rigor />
-        </Reveal>
-        <Reveal>
-          <Compare />
-        </Reveal>
-        <Reveal>
-          <FeatureList />
-        </Reveal>
-        <Reveal>
-          <Steps />
-        </Reveal>
-        <Reveal>
-          <Privacy />
-        </Reveal>
-        <Reveal>
-          <PricingTeaser />
-        </Reveal>
-        <Reveal>
-          <DownloadTeaser />
-        </Reveal>
-        <CtaBand />
-      </main>
-      <span style={{ display: "none" }} aria-hidden>
-        {locale}
-      </span>
-    </div>
-  );
+  return <div className="oq-landing"><LandingStyles /><LandingNav /><main><Hero /><Reveal><LiveProof /></Reveal><Reveal><Workflow /></Reveal><Reveal><Validation /></Reveal><Reveal><Compare /></Reveal><Reveal><PricingBoundary /></Reveal><CtaBand /></main></div>;
 }
-
-/* ---------- Motion-System (Landing-weit) ----------
-
-   Kurven und Zeiten folgen einem festen Rahmen:
-   - Einblenden/Enter immer ease-out (sofortige Bewegung = reaktionsschnell),
-     mit einer starken Custom-Curve statt der zu schwachen eingebauten.
-   - UI-Animationen bleiben unter ~500ms; Hover-Feedback bei 140-220ms.
-   - Hover-Effekte nur auf Geräten mit echtem Hover (sonst feuert :hover
-     auf Touch beim Tippen falsch).
-   - :active skaliert auf 0.97 — jedes klickbare Element bestätigt den Druck.
-   - prefers-reduced-motion: keine Bewegung, Inhalte sofort sichtbar. */
 
 function LandingStyles() {
-  return (
-    <style>{`
-      .oq-landing {
-        --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-        --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-      }
-      @media (prefers-reduced-motion: no-preference) {
-        html { scroll-behavior: smooth; }
-      }
-
-      /* Enter-Animationen (Hero + Beweis-Streifen) */
-      @keyframes oq-draw { from { stroke-dashoffset: 240; } to { stroke-dashoffset: 0; } }
-      @keyframes oq-fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
-      @keyframes oq-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-      .oq-anim-curve { stroke-dasharray: 240; animation: oq-draw 900ms var(--ease-out) 250ms both; }
-      .oq-anim-dot { animation: oq-fade 400ms var(--ease-out) both; }
-      .oq-anim-late { animation: oq-fade 600ms var(--ease-out) 1000ms both; }
-      .oq-hero-in { animation: oq-rise 520ms var(--ease-out) both; }
-
-      /* Scroll-Reveal: Sektionen gleiten beim Erreichen des Viewports ein.
-         Interruptible Transition statt Keyframes. Der Startzustand wird erst
-         per JS gesetzt (.is-armed) — ohne JS oder mit reduzierter Bewegung
-         ist der Inhalt von Anfang an voll sichtbar. */
-      .oq-reveal.is-armed {
-        opacity: 0;
-        transform: translateY(14px);
-      }
-      .oq-reveal.is-armed.is-visible {
-        opacity: 1;
-        transform: none;
-        transition: opacity 500ms var(--ease-out), transform 500ms var(--ease-out);
-      }
-
-      /* Buttons: ein System für primary + ghost. */
-      .oq-btn {
-        display: inline-block;
-        font: inherit;
-        font-weight: 600;
-        text-decoration: none;
-        border-radius: 8px;
-        border: 1px solid transparent;
-        transition:
-          transform 160ms var(--ease-out),
-          background-color 160ms ease,
-          border-color 160ms ease,
-          box-shadow 200ms var(--ease-out);
-      }
-      .oq-btn--primary {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: #fff;
-      }
-      .oq-btn--ghost {
-        background: var(--panel);
-        border-color: var(--line);
-        color: var(--ink);
-      }
-      .oq-btn:active {
-        transform: scale(0.97);
-        transition-duration: 60ms;
-      }
-      @media (hover: hover) and (pointer: fine) {
-        .oq-btn--primary:hover {
-          background: var(--accent-deep);
-          border-color: var(--accent-deep);
-          transform: translateY(-1px);
-          box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 55%, transparent);
-        }
-        .oq-btn--ghost:hover {
-          background: var(--line-soft);
-          transform: translateY(-1px);
-        }
-      }
-
-      /* Nav-Links: Unterstrich wächst von links (ease-out). */
-      .oq-nav-link {
-        position: relative;
-        transition: color 160ms ease;
-      }
-      .oq-nav-link::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: -4px;
-        height: 1.5px;
-        background: currentColor;
-        transform: scaleX(0);
-        transform-origin: left center;
-        transition: transform 220ms var(--ease-out);
-      }
-      @media (hover: hover) and (pointer: fine) {
-        .oq-nav-link:hover { color: var(--ink); }
-        .oq-nav-link:hover::after { transform: scaleX(1); }
-      }
-
-      /* Karten: heben sich beim Hover leicht, Schatten aus der Textfarbe
-         gemischt (funktioniert in Light + Dark). */
-      .oq-card {
-        transition: transform 220ms var(--ease-out), box-shadow 260ms var(--ease-out);
-      }
-      @media (hover: hover) and (pointer: fine) {
-        .oq-card:hover {
-          transform: translateY(-2px);
-          box-shadow:
-            0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent),
-            0 14px 30px -10px color-mix(in srgb, var(--ink) 16%, transparent);
-        }
-      }
-
-      /* Vergleichstabelle: Zeilen-Feedback. */
-      @media (hover: hover) and (pointer: fine) {
-        .oq-compare tbody tr { transition: background-color 140ms ease; }
-        .oq-compare tbody tr:hover { background: var(--panel-2); }
-      }
-
-      /* Schritt-Zahlen: kleiner Impuls beim Hover über dem Schritt. */
-      .oq-step-num { transition: transform 200ms var(--ease-out); }
-      @media (hover: hover) and (pointer: fine) {
-        .oq-step:hover .oq-step-num { transform: scale(1.08); }
-      }
-
-      /* Beweis-Streifen Layout (unverändert): unterhalb Desktop umbrechen,
-         damit die Lösungsformel nie horizontales Scrollen erzwingt. */
-      .oq-strip { display: flex; align-items: stretch; gap: 0; }
-      .oq-strip-svg { display: block; width: 100%; max-width: 220px; height: auto; }
-      @media (max-width: 1020px) {
-        .oq-strip { flex-wrap: wrap; gap: 18px 26px; }
-        .oq-arrow { display: none; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .oq-anim-curve, .oq-anim-dot, .oq-anim-late, .oq-hero-in { animation: none; }
-        .oq-btn, .oq-card, .oq-nav-link, .oq-nav-link::after, .oq-step-num { transition: none; }
-      }
-    `}</style>
-  );
+  return <style>{`
+    .oq-landing { --land-max:1080px; --land-display:${DISPLAY_FONT}; --land-mono:${MONO_FONT}; --land-y:clamp(var(--space-6),7vw,calc(var(--space-6) * 2)); --land-ease:cubic-bezier(.16,1,.3,1); }
+    .oq-landing *, .oq-landing *::before, .oq-landing *::after { box-sizing:border-box; }
+    .oq-land-section { width:min(100%,var(--land-max)); margin-inline:auto; padding:var(--land-y) clamp(var(--space-4),4vw,var(--space-6)); }
+    .oq-land-kicker { margin:0 0 var(--space-3); color:var(--accent-deep); font-size:12px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+    .oq-land-heading { max-width:25ch; margin:0; font-family:var(--land-display); font-size:clamp(28px,4vw,40px); letter-spacing:-.015em; line-height:1.12; }
+    .oq-land-intro { max-width:68ch; margin:var(--space-3) 0 0; color:var(--ink-2); font-size:16px; line-height:1.65; }
+    .oq-land-link { color:var(--accent-deep); font-weight:650; text-underline-offset:.2em; }
+    .oq-land-actions { display:flex; flex-wrap:wrap; gap:var(--space-3); margin-top:var(--space-5); }
+    .oq-landing .oq-btn { text-decoration:none; } .oq-landing .oq-btn--large { min-height:48px; padding-inline:var(--space-5); }
+    .oq-land-nav { position:sticky; z-index:20; top:0; border-bottom:1px solid var(--line); background:color-mix(in oklch,var(--bg) 92%,transparent); backdrop-filter:saturate(150%) blur(12px); }
+    .oq-land-nav__inner { display:flex; width:min(100%,var(--land-max)); min-height:var(--header-height); align-items:center; gap:var(--space-4); margin-inline:auto; padding:var(--space-2) clamp(var(--space-4),4vw,var(--space-6)); }
+    .oq-land-logo { color:var(--ink); font-size:20px; font-weight:750; letter-spacing:-.02em; text-decoration:none; } .oq-land-logo span { color:var(--accent-deep); }
+    .oq-land-nav__links { display:flex; align-items:center; gap:var(--space-4); margin-left:auto; } .oq-land-nav__link { color:var(--ink-2); font-size:14px; font-weight:600; text-decoration:none; }
+    .oq-land-nav__link:hover { color:var(--ink); text-decoration:underline; text-underline-offset:var(--space-2); } .oq-land-nav__actions { display:flex; align-items:center; gap:var(--space-3); }
+    .oq-land-hero { padding-top:clamp(var(--space-6),6vw,calc(var(--space-6) * 2)); }
+    .oq-land-hero__grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr); gap:clamp(var(--space-5),5vw,calc(var(--space-6) * 2)); align-items:center; }
+    .oq-land-hero__title { max-width:18ch; margin:0; font-family:var(--land-display); font-size:clamp(38px,6vw,62px); letter-spacing:-.025em; line-height:1.02; }
+    .oq-land-hero__sub { max-width:62ch; margin:var(--space-4) 0 0; color:var(--ink-2); font-size:clamp(16px,2vw,18px); line-height:1.65; }
+    .oq-land-local { display:flex; gap:var(--space-2); margin:var(--space-4) 0 0; font-size:14px; font-weight:650; } .oq-land-check { flex:none; color:var(--good-text); font-weight:750; }
+    .oq-land-fit { padding-block:var(--space-5); border-block:1px solid var(--line); } .oq-land-fit h2 { margin:0 0 var(--space-4); font-size:15px; }
+    .oq-land-fit ul,.oq-land-pack { display:grid; gap:var(--space-3); margin:0; padding:0; list-style:none; } .oq-land-fit li,.oq-land-pack li { display:flex; gap:var(--space-2); color:var(--ink-2); font-size:14px; line-height:1.45; }
+    .oq-land-proof { margin:var(--space-5) 0 0; overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-surface); background:var(--panel); box-shadow:var(--shadow-raised); }
+    .oq-land-proof__grid { display:grid; grid-template-columns:.9fr 1.2fr .9fr; } .oq-land-stage { min-width:0; padding:var(--space-5); } .oq-land-stage + .oq-land-stage { border-left:1px solid var(--line); }
+    .oq-land-stage__head { display:flex; align-items:baseline; gap:var(--space-3); margin-bottom:var(--space-4); } .oq-land-stage__number { color:var(--accent-deep); font-family:var(--land-mono); font-size:12px; font-weight:750; }
+    .oq-land-stage h3 { margin:0; font-size:16px; } .oq-land-stage__body { margin:0 0 var(--space-4); color:var(--ink-2); font-size:13.5px; line-height:1.55; }
+    .oq-land-formats { margin-bottom:var(--space-3); font-family:var(--land-mono); font-size:12px; font-weight:700; } .oq-land-charts { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-3); }
+    .oq-land-chart-label { color:var(--muted); font-size:11px; } .oq-land-svg { display:block; width:100%; height:auto; }
+    .oq-land-result { display:grid; gap:var(--space-3); padding:var(--space-4); border:1px solid var(--line); border-radius:var(--radius-surface); background:var(--panel-2); }
+    .oq-land-formula { overflow-wrap:anywhere; font-family:var(--land-mono); font-size:clamp(14px,2vw,17px); font-weight:700; line-height:1.5; } .oq-land-kpis { color:var(--muted); font-family:var(--land-mono); font-size:12px; }
+    .oq-land-truth { width:100%; border-collapse:collapse; font-family:var(--land-mono); font-size:11px; } .oq-land-truth th,.oq-land-truth td { padding:var(--space-1); color:var(--ink-2); font-weight:400; text-align:right; }
+    .oq-land-truth th:first-child,.oq-land-truth td:first-child { text-align:left; } .oq-land-truth th:last-child,.oq-land-truth td:last-child { text-align:center; } .oq-land-truth thead th,.oq-land-cutoff { color:var(--muted); font-size:10px; } .oq-land-cutoff { margin-top:var(--space-1); }
+    .oq-land-workflow { margin:var(--space-5) 0 0; padding:0; border-top:1px solid var(--line); list-style:none; } .oq-land-workflow li { display:grid; grid-template-columns:56px minmax(180px,.55fr) minmax(0,1fr); gap:var(--space-4); align-items:baseline; padding:var(--space-4) 0; border-bottom:1px solid var(--line); }
+    .oq-land-workflow__num { color:var(--accent-deep); font-family:var(--land-mono); font-size:12px; font-weight:750; } .oq-land-workflow h3 { margin:0; font-size:15px; } .oq-land-workflow p { margin:0; color:var(--ink-2); font-size:14px; line-height:1.55; }
+    .oq-land-validation { border-block:1px solid var(--line); background:var(--panel-2); } .oq-land-record { margin-top:var(--space-5); border-top:1px solid var(--line); }
+    .oq-land-record__row { display:grid; grid-template-columns:minmax(120px,.24fr) minmax(180px,.45fr) minmax(0,1fr); gap:var(--space-4); align-items:baseline; padding:var(--space-4) 0; border-bottom:1px solid var(--line); }
+    .oq-land-record__value { color:var(--accent-deep); font-family:var(--land-mono); font-size:16px; font-weight:750; } .oq-land-record__title { font-size:14px; font-weight:750; }
+    .oq-land-record p,.oq-land-scope { margin:0; color:var(--ink-2); font-size:13.5px; line-height:1.6; } .oq-land-scope { max-width:68ch; margin-top:var(--space-4); } .oq-land-links { display:flex; flex-wrap:wrap; gap:var(--space-3) var(--space-5); margin-top:var(--space-4); }
+    .oq-land-table { margin-top:var(--space-5); overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius-surface); background:var(--panel); } .oq-land-table table { width:100%; min-width:720px; border-collapse:collapse; }
+    .oq-land-table th,.oq-land-table td { padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--line); color:var(--ink-2); font-size:13.5px; line-height:1.5; text-align:left; vertical-align:top; }
+    .oq-land-table thead th { color:var(--ink); background:var(--panel-2); } .oq-land-table tbody th,.oq-land-table td:nth-child(2) { color:var(--ink); font-weight:650; } .oq-land-note { max-width:68ch; margin:var(--space-4) 0 0; color:var(--muted); font-size:13.5px; line-height:1.6; }
+    .oq-land-pricing { display:grid; grid-template-columns:1fr 1fr; margin-top:var(--space-5); border-block:1px solid var(--line); } .oq-land-tier { padding:var(--space-5) 0; } .oq-land-tier + .oq-land-tier { margin-left:var(--space-6); padding-left:var(--space-6); border-left:1px solid var(--line); }
+    .oq-land-tier__label { margin:0 0 var(--space-2); color:var(--accent-deep); font-size:12px; font-weight:750; letter-spacing:.05em; text-transform:uppercase; } .oq-land-tier h3 { margin:0; font-size:18px; } .oq-land-tier__desc { max-width:48ch; margin:var(--space-2) 0 0; color:var(--ink-2); font-size:14px; line-height:1.6; }
+    .oq-land-final { margin-top:var(--space-6); border-block:1px solid var(--line); background:var(--accent-wash); } .oq-land-final h2 { max-width:24ch; margin:0; font-family:var(--land-display); font-size:clamp(30px,5vw,46px); letter-spacing:-.02em; line-height:1.08; }
+    @keyframes oq-land-rise { from { opacity:0; transform:translateY(var(--space-2)); } to { opacity:1; transform:none; } } .oq-land-hero__copy,.oq-land-fit { animation:oq-land-rise 520ms var(--land-ease) both; } .oq-land-fit { animation-delay:80ms; }
+    .oq-land-reveal.is-armed { opacity:0; transform:translateY(var(--space-3)); } .oq-land-reveal.is-armed.is-visible { opacity:1; transform:none; transition:opacity 480ms var(--land-ease),transform 480ms var(--land-ease); }
+    @media(max-width:860px){ .oq-land-nav__links{display:none}.oq-land-nav__actions{margin-left:auto}.oq-land-hero__grid,.oq-land-proof__grid{grid-template-columns:1fr}.oq-land-fit{display:grid;grid-template-columns:minmax(160px,.45fr) 1fr;gap:var(--space-5)}.oq-land-stage + .oq-land-stage{border-top:1px solid var(--line);border-left:0} }
+    @media(max-width:640px){ .oq-land-nav__cta .oq-btn{min-height:44px;padding-inline:12px;font-size:13px}.oq-land-hero__title{font-size:clamp(36px,11vw,48px)}.oq-land-actions{display:grid}.oq-land-actions .oq-btn{width:100%}.oq-land-fit{display:block}.oq-land-workflow li{grid-template-columns:40px 1fr}.oq-land-workflow p{grid-column:2}.oq-land-record__row{grid-template-columns:88px 1fr}.oq-land-record__row p{grid-column:2}.oq-land-table{box-shadow:none} }
+    @media(prefers-reduced-motion:reduce){ .oq-land-hero__copy,.oq-land-fit{animation:none}.oq-land-reveal.is-armed,.oq-land-reveal.is-armed.is-visible{opacity:1;transform:none;transition:none} }
+  `}</style>;
 }
 
-/** Blendet eine Sektion beim Hereinscrollen ein (einmalig, interruptionssicher). */
 function Reveal({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // Ohne Observer-Unterstützung (oder wenn der Konstruktor wirft) nie armen —
-    // sonst bliebe die Sektion dauerhaft unsichtbar.
-    if (typeof IntersectionObserver === "undefined") return;
-    el.classList.add("is-armed");
-    let io: IntersectionObserver;
-    try {
-      io = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting) {
-              el.classList.add("is-visible");
-              io.disconnect();
-            }
-          }
-        },
-        { threshold: 0.12, rootMargin: "0px 0px -40px 0px" },
-      );
-    } catch {
-      el.classList.remove("is-armed");
-      return;
-    }
-    io.observe(el);
-    return () => io.disconnect();
+    const element = ref.current;
+    if (!element || window.matchMedia("(prefers-reduced-motion: reduce)").matches || typeof IntersectionObserver === "undefined") return;
+    element.classList.add("is-armed");
+    let observer: IntersectionObserver;
+    try { observer = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { element.classList.add("is-visible"); observer.disconnect(); } }, { threshold: 0.12 }); }
+    catch { element.classList.remove("is-armed"); return; }
+    observer.observe(element); return () => observer.disconnect();
   }, []);
-
-  return (
-    <div ref={ref} className="oq-reveal">
-      {children}
-    </div>
-  );
+  return <div ref={ref} className="oq-land-reveal">{children}</div>;
 }
-
-/* ---------- Nav (sticky) ---------- */
 
 function LandingNav() {
   const [locale] = useLocale();
-  return (
-    <nav
-      aria-label={t(locale, "landing.nav.ariaPrimary")}
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 20,
-        background: "color-mix(in srgb, var(--bg) 82%, transparent)",
-        backdropFilter: "saturate(180%) blur(10px)",
-        WebkitBackdropFilter: "saturate(180%) blur(10px)",
-        borderBottom: "1px solid var(--line)",
-      }}
-    >
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "12px 26px", display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-        <Link href="/" style={{ fontWeight: 700, fontSize: 20, letterSpacing: "-0.01em", color: "var(--ink)", textDecoration: "none" }}>
-          open<span style={{ color: "var(--brand)" }}>QCA</span>
-        </Link>
-        <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <NavLink href="#funktionen">{t(locale, "landing.nav.funktionen")}</NavLink>
-          <NavLink href="/methodik">{t(locale, "landing.nav.methodik")}</NavLink>
-          <NavLink href="/preise">{t(locale, "landing.nav.tarife")}</NavLink>
-          <NavLink href="/download">{t(locale, "landing.nav.download")}</NavLink>
-          <LanguageToggle />
-          <CtaButton href="/app" primary>{t(locale, "landing.nav.startApp")}</CtaButton>
-        </div>
-      </div>
-    </nav>
-  );
+  return <nav className="oq-land-nav" aria-label={t(locale,"landing.nav.ariaPrimary")}><div className="oq-land-nav__inner"><Link href="/" className="oq-land-logo" aria-label="openQCA">open<span>QCA</span></Link><div className="oq-land-nav__links"><Link className="oq-land-nav__link" href="#proof">{t(locale,"landing.nav.proof")}</Link><Link className="oq-land-nav__link" href="#validation">{t(locale,"landing.nav.validation")}</Link><Link className="oq-land-nav__link" href="/methodik">{t(locale,"landing.nav.methodik")}</Link><Link className="oq-land-nav__link" href="/preise">{t(locale,"landing.nav.pricing")}</Link></div><div className="oq-land-nav__actions"><LanguageToggle /><span className="oq-land-nav__cta"><Cta href="/app" primary>{t(locale,"landing.hero.ctaOwn")}</Cta></span></div></div></nav>;
 }
-
-function NavLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <a href={href} className="oq-nav-link" style={{ fontSize: 14, color: "var(--ink-2)", textDecoration: "none", fontWeight: 500 }}>
-      {children}
-    </a>
-  );
-}
-
-/* ---------- Hero: These + Beweis-Streifen ---------- */
 
 function Hero() {
-  const [locale] = useLocale();
-  return (
-    <section style={{ ...sectionStyle, paddingTop: 58, paddingBottom: 28 }}>
-      <p
-        className="oq-hero-in"
-        style={{ fontFamily: MONO_FONT, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--brand)", fontWeight: 600, margin: 0, animationDelay: "0ms" }}
-      >
-        {t(locale, "landing.h.eyebrow")}
-      </p>
-      <h1
-        className="oq-hero-in"
-        style={{
-          fontFamily: DISPLAY_FONT,
-          fontSize: "clamp(34px, 5.4vw, 52px)",
-          lineHeight: 1.08,
-          fontWeight: 700,
-          letterSpacing: "-0.01em",
-          margin: "14px 0 0",
-          maxWidth: "22ch",
-          animationDelay: "70ms",
-        }}
-      >
-        {t(locale, "landing.h.title")}
-      </h1>
-      <p className="oq-hero-in" style={{ color: "var(--ink-2)", fontSize: 17, lineHeight: 1.6, maxWidth: "62ch", margin: "16px 0 0", animationDelay: "140ms" }}>
-        {t(locale, "landing.h.sub")}
-      </p>
-      <div className="oq-hero-in" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24, animationDelay: "210ms" }}>
-        <CtaButton href="/app?demo=1" primary large>{t(locale, "landing.h.ctaDemo")}</CtaButton>
-        <CtaButton href="/app" large>{t(locale, "landing.h.ctaOwn")}</CtaButton>
-      </div>
-
-      <ProofStrip />
-
-      <p className="oq-hero-in" style={{ fontFamily: MONO_FONT, fontSize: 12, lineHeight: 1.7, color: "var(--muted)", margin: "14px 0 0", animationDelay: "280ms" }}>
-        {t(locale, "landing.h.proof")}
-      </p>
-    </section>
-  );
+  const [locale] = useLocale(); const fit:DictKey[]=["landing.fit.i1","landing.fit.i2","landing.fit.i3","landing.fit.i4"];
+  return <section className="oq-land-section oq-land-hero"><div className="oq-land-hero__grid"><div className="oq-land-hero__copy"><p className="oq-land-kicker">{t(locale,"landing.hero.eyebrow")}</p><h1 className="oq-land-hero__title">{t(locale,"landing.hero.title")}</h1><p className="oq-land-hero__sub">{t(locale,"landing.hero.sub")}</p><p className="oq-land-local"><span className="oq-land-check" aria-hidden>✓</span>{t(locale,"landing.hero.local")}</p><div className="oq-land-actions"><Cta href="/app" primary large>{t(locale,"landing.hero.ctaOwn")}</Cta><Cta href="/app?demo=1" large>{t(locale,"landing.hero.ctaDemo")}</Cta></div></div><aside className="oq-land-fit" aria-label={t(locale,"landing.fit.aria")}><h2>{t(locale,"landing.fit.title")}</h2><ul>{fit.map((key)=><li key={key}><span className="oq-land-check" aria-hidden>✓</span>{t(locale,key)}</li>)}</ul></aside></div></section>;
 }
 
-/**
- * Der Beweis-Streifen: vier Stationen der echten Demo-Analyse. Alle Zahlen
- * stammen aus `computeHeroData()` (Engine, Modul-Scope) — nichts ist gemalt.
- */
-function ProofStrip() {
-  const [locale] = useLocale();
-  return (
-    <figure
-      aria-label={t(locale, "landing.h.stripAria")}
-      style={{
-        margin: "30px 0 0",
-        background: "var(--panel)",
-        border: "1px solid var(--line)",
-        borderRadius: 12,
-        boxShadow: "0 1px 2px rgba(0,0,0,0.05), 0 10px 28px rgba(0,0,0,0.06)",
-        padding: "16px 18px 12px",
-      }}
-    >
-      <div className="oq-strip">
-        <StripPanel label={t(locale, "landing.h.s1")}>
-          <RawDots />
-        </StripPanel>
-        <StripArrow />
-        <StripPanel label={t(locale, "landing.h.s2")}>
-          <CalibCurve />
-        </StripPanel>
-        <StripArrow />
-        <StripPanel label={t(locale, "landing.h.s3")}>
-          <TruthRows />
-        </StripPanel>
-        <StripArrow />
-        <StripPanel label={t(locale, "landing.h.s4")} grow>
-          <div className="oq-anim-late" style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: "100%", gap: 8 }}>
-            <div
-              data-testid="landing-hero-formula"
-              style={{ fontFamily: MONO_FONT, fontSize: "clamp(14px, 1.8vw, 17px)", fontWeight: 600, color: "var(--ink)", lineHeight: 1.5, overflowWrap: "anywhere" }}
-            >
-              {HERO_FORMULA}
-            </div>
-            {HERO.model && (
-              <div data-testid="landing-hero-kpis" style={{ fontFamily: MONO_FONT, fontSize: 12, color: "var(--muted)" }}>
-                {t(locale, "landing.h.consistency")} {fmt3(HERO.model.solutionConsistency)} · {t(locale, "landing.h.coverage")} {fmt3(HERO.model.solutionCoverage)}
-              </div>
-            )}
-          </div>
-        </StripPanel>
-      </div>
-      <figcaption style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.55, marginTop: 12, borderTop: "1px solid var(--line-soft)", paddingTop: 10 }}>
-        {t(locale, "landing.h.stripCaption")}
-      </figcaption>
-    </figure>
-  );
+function LiveProof() {
+  const [locale] = useLocale(); const items:DictKey[]=["landing.proof.defense.i1","landing.proof.defense.i2","landing.proof.defense.i3","landing.proof.defense.i4"];
+  return <section id="proof" className="oq-land-section" data-testid="landing-answer-preview"><p className="oq-land-kicker">{t(locale,"landing.proof.eyebrow")}</p><h2 className="oq-land-heading">{t(locale,"landing.proof.title")}</h2><p className="oq-land-intro">{t(locale,"landing.proof.intro")}</p><figure className="oq-land-proof" aria-label={t(locale,"landing.proof.aria")}><div className="oq-land-proof__grid"><Stage n="01" title={t(locale,"landing.proof.input.title")}><p className="oq-land-stage__body">{t(locale,"landing.proof.input.body")}</p><div className="oq-land-formats">CSV · XLSX · {t(locale,"landing.proof.input.cases")}</div><div className="oq-land-charts"><div><span className="oq-land-chart-label">{t(locale,"landing.proof.raw")}</span><RawDots /></div><div><span className="oq-land-chart-label">{t(locale,"landing.proof.calibrated")}</span><CalibCurve locale={locale} /></div></div></Stage><Stage n="02" title={t(locale,"landing.proof.result.title")}><p className="oq-land-stage__body">{t(locale,"landing.proof.result.body")}</p><div className="oq-land-result"><div data-testid="landing-hero-formula" className="oq-land-formula">{HERO_FORMULA}</div>{HERO.model&&<div data-testid="landing-hero-kpis" className="oq-land-kpis">{t(locale,"landing.proof.consistency")} {fmt3(locale,HERO.model.solutionConsistency)} · {t(locale,"landing.proof.coverage")} {fmt3(locale,HERO.model.solutionCoverage)}</div>}<TruthRows locale={locale}/></div></Stage><Stage n="03" title={t(locale,"landing.proof.defense.title")}><p className="oq-land-stage__body">{t(locale,"landing.proof.defense.body")}</p><ul className="oq-land-pack">{items.map((key)=><li key={key}><span className="oq-land-check" aria-hidden>→</span>{t(locale,key)}</li>)}</ul></Stage></div><figcaption>{t(locale,"landing.proof.caption")}</figcaption></figure></section>;
 }
 
-function StripPanel({ label, grow, children }: { label: string; grow?: boolean; children: ReactNode }) {
-  return (
-    <div style={{ flex: grow ? "2 1 250px" : "1 1 172px", minWidth: grow ? 240 : 150, display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={{ fontFamily: MONO_FONT, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>
-        {label}
-      </span>
-      <div style={{ flex: 1 }}>{children}</div>
-    </div>
-  );
-}
+function Stage({n,title,children}:{n:string;title:string;children:ReactNode}){return <div className="oq-land-stage"><div className="oq-land-stage__head"><span className="oq-land-stage__number" aria-hidden>{n}</span><h3>{title}</h3></div>{children}</div>}
+function RawDots(){return <svg viewBox="0 0 172 84" className="oq-land-svg" aria-hidden><line x1={6} y1={70} x2={166} y2={70} stroke="var(--line)"/>{HERO.raw.map((value,index)=><circle key={index} cx={6+((value-260)/900)*160} cy={62-(index%4)*11} r={3.4} fill="var(--ink-2)" opacity={.75}/>)}<text x={6} y={82} fontSize={9} fill="var(--muted)" fontFamily={MONO_FONT}>320</text><text x={166} y={82} fontSize={9} fill="var(--muted)" textAnchor="end" fontFamily={MONO_FONT}>1098</text></svg>}
+function CalibCurve({locale}:{locale:Locale}){const [a,b,c]=HERO.anchors;const px=(v:number)=>6+((v-260)/900)*160;const py=(m:number)=>70-m*60;let path="";for(let i=0;i<=60;i++){const v=260+(i/60)*900;path+=`${i?"L":"M"}${px(v).toFixed(1)} ${py(calibrateDirect(v,a,b,c)).toFixed(1)}`}return <svg viewBox="0 0 172 84" className="oq-land-svg" aria-hidden><line x1={6} y1={70} x2={166} y2={70} stroke="var(--line)"/><line x1={6} y1={py(.5)} x2={166} y2={py(.5)} stroke="var(--line-soft)" strokeDasharray="3 4"/><text x={166} y={py(.5)-3} fontSize={9} fill="var(--muted)" textAnchor="end" fontFamily={MONO_FONT}>{t(locale,"landing.proof.crossover")}</text><path d={path} fill="none" stroke="var(--accent)" strokeWidth={2.2}/>{HERO.raw.map((v,i)=><circle key={i} cx={px(v)} cy={py(HERO.calibrated[i])} r={3.2} fill={Math.abs(HERO.calibrated[i]-.5)<.1?"var(--warn-text)":"var(--accent)"}/>)}</svg>}
+function TruthRows({locale}:{locale:Locale}){return <><table className="oq-land-truth" aria-label={t(locale,"landing.proof.result.title")}><thead><tr><th scope="col">{HERO_CONDS.map((c)=>c[0].toUpperCase()).join(" ")}</th><th scope="col">n</th><th scope="col">incl.</th><th scope="col">{t(locale,"landing.proof.output")}</th></tr></thead><tbody>{HERO.shown.map((row)=><tr key={row.bits}><td>{row.bits}</td><td>{row.n}</td><td>{fmt3(locale,row.consistency)}</td><td><span className="oq-land-check" role="img" aria-label={t(locale,row.output===1?"landing.proof.output.yes":"landing.proof.output.no")}>{row.output===1?"✓":"×"}</span></td></tr>)}</tbody></table><div className="oq-land-cutoff">{t(locale,"landing.proof.cutoff")}</div></>}
 
-function StripArrow() {
-  return (
-    <span aria-hidden className="oq-arrow" style={{ alignSelf: "center", color: "var(--muted)", fontSize: 16, padding: "0 12px", flex: "none" }}>
-      →
-    </span>
-  );
-}
-
-/** Station 1 — die 18 rohen Wohlstandswerte auf einer Achse. */
-function RawDots() {
-  const min = 260;
-  const max = 1160;
-  return (
-    <svg viewBox="0 0 172 84" className="oq-strip-svg" aria-hidden>
-      <line x1={6} y1={70} x2={166} y2={70} stroke="var(--line)" />
-      {HERO.rawW.map((v, i) => (
-        <circle
-          key={i}
-          className="oq-anim-dot"
-          style={{ animationDelay: `${i * 30}ms` }}
-          cx={6 + ((v - min) / (max - min)) * 160}
-          cy={62 - (i % 4) * 11}
-          r={3.4}
-          fill="var(--ink-2)"
-          opacity={0.75}
-        />
-      ))}
-      <text x={6} y={82} fontSize={9} fill="var(--muted)" fontFamily={MONO_FONT}>320</text>
-      <text x={166} y={82} fontSize={9} fill="var(--muted)" textAnchor="end" fontFamily={MONO_FONT}>1098</text>
-    </svg>
-  );
-}
-
-/** Station 2 — die echte Kalibrierkurve (Anker 400/550/900) mit den 18 Fällen. */
-function CalibCurve() {
-  const [fullOut, crossover, fullIn] = HERO.anchorsW;
-  const xMin = 260;
-  const xMax = 1160;
-  const px = (v: number) => 6 + ((v - xMin) / (xMax - xMin)) * 160;
-  const py = (m: number) => 70 - m * 60;
-  let d = "";
-  for (let k = 0; k <= 60; k++) {
-    const v = xMin + (k / 60) * (xMax - xMin);
-    d += (k ? "L" : "M") + px(v).toFixed(1) + " " + py(calibrateDirect(v, fullOut, crossover, fullIn)).toFixed(1);
-  }
-  return (
-    <svg viewBox="0 0 172 84" className="oq-strip-svg" aria-hidden>
-      <line x1={6} y1={70} x2={166} y2={70} stroke="var(--line)" />
-      <line x1={6} y1={py(0.5)} x2={166} y2={py(0.5)} stroke="var(--line-soft)" strokeDasharray="3 4" />
-      <text x={166} y={py(0.5) - 3} fontSize={9} fill="var(--muted)" textAnchor="end" fontFamily={MONO_FONT}>0,5</text>
-      <path className="oq-anim-curve" d={d} pathLength={240} fill="none" stroke="var(--accent)" strokeWidth={2.2} />
-      {HERO.rawW.map((v, i) => {
-        const m = HERO.calW[i];
-        return (
-          <circle
-            key={i}
-            className="oq-anim-dot"
-            style={{ animationDelay: `${300 + i * 30}ms` }}
-            cx={px(v)}
-            cy={py(m)}
-            r={3.2}
-            fill={Math.abs(m - 0.5) < 0.1 ? "var(--warn-text)" : "var(--accent)"}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-/** Station 3 — echte Truth-Table-Zeilen (Konsistenz, Fallzahl, Cutoff-Entscheid). */
-function TruthRows() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5, justifyContent: "center", height: "100%" }} aria-hidden>
-      <div style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: "var(--muted)", display: "flex", gap: 10 }}>
-        <span style={{ width: 46 }}>{HERO_CONDS.map((c) => c[0].toUpperCase()).join(" ")}</span>
-        <span style={{ width: 14, textAlign: "right" }}>n</span>
-        <span style={{ width: 38, textAlign: "right" }}>incl.</span>
-      </div>
-      {HERO.shown.map((row) => {
-        const pass = row.output === 1;
-        return (
-          <div key={row.bits} style={{ fontFamily: MONO_FONT, fontSize: 12, display: "flex", gap: 10, color: "var(--ink-2)" }}>
-            <span style={{ width: 46, letterSpacing: "0.22em" }}>{row.bits}</span>
-            <span style={{ width: 14, textAlign: "right" }}>{row.n}</span>
-            <span style={{ width: 38, textAlign: "right" }}>{fmt3(row.consistency)}</span>
-            <span style={{ color: pass ? "var(--good-text)" : "var(--muted)", fontWeight: 600 }}>{pass ? "✓" : "✗"}</span>
-          </div>
-        );
-      })}
-      <div style={{ fontFamily: MONO_FONT, fontSize: 10.5, color: "var(--muted)" }}>incl. ≥ 0,80 →</div>
-    </div>
-  );
-}
-
-/* ---------- Das nehmen Sie mit ---------- */
-
-function Deliverables() {
-  const [locale] = useLocale();
-  const items: [string, DictKey, DictKey][] = [
-    ["BERICHT.PDF", "landing.deliver.pdf.title", "landing.deliver.pdf.desc"],
-    ["ANALYSE.R", "landing.deliver.r.title", "landing.deliver.r.desc"],
-    ["PROTOKOLL.JSON", "landing.deliver.json.title", "landing.deliver.json.desc"],
-  ];
-  return (
-    <section style={sectionStyle}>
-      <SectionHeading>{t(locale, "landing.deliver.title")}</SectionHeading>
-      <p style={{ color: "var(--ink-2)", fontSize: 15, maxWidth: "62ch", margin: "10px 0 0" }}>
-        {t(locale, "landing.deliver.sub")}
-      </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginTop: 22 }}>
-        {items.map(([tag, title, desc]) => (
-          <div key={tag} className="oq-card" style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
-            <span
-              style={{
-                display: "inline-block",
-                fontFamily: MONO_FONT,
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "0.06em",
-                color: "var(--brand)",
-                background: "var(--brand-wash)",
-                border: "1px solid var(--line)",
-                borderRadius: 999,
-                padding: "3px 10px",
-              }}
-            >
-              {tag}
-            </span>
-            <h3 style={{ fontSize: 16, fontWeight: 650, margin: "12px 0 6px" }}>{t(locale, title)}</h3>
-            <p style={{ fontSize: 14, lineHeight: 1.55, color: "var(--ink-2)", margin: 0 }}>{t(locale, desc)}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Methodenstrenge ---------- */
-
-function Rigor() {
-  const [locale] = useLocale();
-  const rows: [string, DictKey][] = [
-    // ACHTUNG: Diese Zahl ist eine Behauptung über `scripts/cross-validate.mjs`.
-    // Sie MUSS mit dem Status in VALIDATION.md übereinstimmen — Stand: 25
-    // Szenarien (19 Lösungsmodelle + 6 Notwendigkeit/superSubset), 23 PASS,
-    // zwei analysierte und dort dokumentierte Abweichungen derselben
-    // ESA-Ursache. Wer ein Szenario hinzufügt oder eine Abweichung behebt,
-    // zieht diesen Wert und `landing.h.proof` nach; `scripts/cross-validate.mjs`
-    // erzwingt das bei jedem Lauf.
-    ["23/25", "landing.rigor.r1"],
-    ["m(c) = 0,500", "landing.rigor.r2"],
-    ["3", "landing.rigor.r3"],
-    ["MIT", "landing.rigor.r4"],
-  ];
-  return (
-    <section style={sectionStyle}>
-      <SectionHeading>{t(locale, "landing.rigor.title")}</SectionHeading>
-      <div style={{ marginTop: 18, borderTop: "1px solid var(--line)" }}>
-        {rows.map(([value, textKey]) => (
-          <div
-            key={value}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(120px, 160px) 1fr",
-              gap: 18,
-              alignItems: "baseline",
-              padding: "14px 2px",
-              borderBottom: "1px solid var(--line)",
-            }}
-          >
-            <span style={{ fontFamily: MONO_FONT, fontSize: 17, fontWeight: 600, color: "var(--brand)", whiteSpace: "nowrap" }}>{value}</span>
-            <span style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink-2)" }}>{t(locale, textKey)}</span>
-          </div>
-        ))}
-      </div>
-      <p style={{ marginTop: 14, fontSize: 14.5 }}>
-        <a href="/methodik" style={{ ...inlineLinkStyle, fontWeight: 600 }}>{t(locale, "landing.rigor.linkMethodik")} →</a>
-        <span style={{ color: "var(--muted)" }}>{"  ·  "}</span>
-        <a href="https://github.com/brandi1409/openqca" target="_blank" rel="noreferrer" style={{ ...inlineLinkStyle, fontWeight: 600 }}>
-          {t(locale, "landing.rigor.linkCode")} →
-        </a>
-      </p>
-    </section>
-  );
-}
-
-/* ---------- Vergleich ---------- */
-
-function Compare() {
-  const [locale] = useLocale();
-  const head = ["", "openQCA", "fsQCA 4", t(locale, "landing.compare.colR")];
-  const rows: [DictKey, string, string, string][] = [
-    ["landing.compare.install", t(locale, "landing.compare.install.a"), t(locale, "landing.compare.install.b"), t(locale, "landing.compare.install.c")],
-    ["landing.compare.coach", "✓", "—", "—"],
-    ["landing.compare.calib", t(locale, "landing.compare.calib.a"), "✓", t(locale, "landing.compare.calib.c")],
-    ["landing.compare.esa", "✓", "✓", "✓"],
-    ["landing.compare.export", t(locale, "landing.compare.export.a"), "—", t(locale, "landing.compare.export.c")],
-    ["landing.compare.oss", "MIT", t(locale, "landing.compare.oss.b"), "GPL"],
-  ];
-  const cellStyle: CSSProperties = { padding: "10px 14px", fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", borderBottom: "1px solid var(--line)", textAlign: "left", verticalAlign: "top" };
-  return (
-    <section style={sectionStyle}>
-      <SectionHeading>{t(locale, "landing.compare.title")}</SectionHeading>
-      <div style={{ marginTop: 18, overflowX: "auto", border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)" }}>
-        <table className="oq-compare" style={{ borderCollapse: "collapse", width: "100%", minWidth: 560 }}>
-          <thead>
-            <tr>
-              {head.map((h, i) => (
-                <th key={i} scope="col" style={{ ...cellStyle, fontWeight: 700, color: i === 1 ? "var(--brand)" : "var(--ink)", background: "var(--panel-2)" }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([labelKey, a, b, c]) => (
-              <tr key={labelKey}>
-                <th scope="row" style={{ ...cellStyle, fontWeight: 600, color: "var(--ink)" }}>{t(locale, labelKey)}</th>
-                <td style={{ ...cellStyle, fontWeight: 600, color: "var(--ink)" }}>{a}</td>
-                <td style={cellStyle}>{b}</td>
-                <td style={cellStyle}>{c}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55, marginTop: 12, maxWidth: "70ch" }}>
-        {t(locale, "landing.compare.note")}
-      </p>
-    </section>
-  );
-}
-
-/* ---------- Funktionsliste (kompakt) ---------- */
-
-function FeatureList() {
-  const [locale] = useLocale();
-  const items: DictKey[] = [
-    "landing.fl.i1",
-    "landing.fl.i2",
-    "landing.fl.i3",
-    "landing.fl.i4",
-    "landing.fl.i5",
-    "landing.fl.i6",
-    "landing.fl.i7",
-    "landing.fl.i8",
-  ];
-  return (
-    <section id="funktionen" style={sectionStyle}>
-      <SectionHeading>{t(locale, "landing.fl.title")}</SectionHeading>
-      <ul
-        style={{
-          listStyle: "none",
-          margin: "18px 0 0",
-          padding: 0,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: "10px 26px",
-        }}
-      >
-        {items.map((key) => (
-          <li key={key} style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 14.5, lineHeight: 1.55, color: "var(--ink-2)" }}>
-            <span aria-hidden style={{ color: "var(--good-text)", fontWeight: 700 }}>✓</span>
-            <span>{t(locale, key)}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/* ---------- In drei Schritten ---------- */
-
-function Steps() {
-  const [locale] = useLocale();
-  const steps: [string, DictKey, DictKey][] = [
-    ["1", "landing.steps.step1.title", "landing.steps.step1.desc"],
-    ["2", "landing.steps.step2.title", "landing.steps.step2.desc"],
-    ["3", "landing.steps.step3.title", "landing.steps.step3.desc"],
-  ];
-  return (
-    <section style={sectionStyle}>
-      <SectionHeading>{t(locale, "landing.steps.title")}</SectionHeading>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginTop: 22 }}>
-        {steps.map(([n, title, desc]) => (
-          <div key={n} className="oq-step" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <span
-              aria-hidden
-              className="oq-step-num"
-              style={{
-                flex: "none",
-                width: 34,
-                height: 34,
-                borderRadius: "50%",
-                display: "grid",
-                placeItems: "center",
-                background: "var(--brand)",
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: 15,
-              }}
-            >
-              {n}
-            </span>
-            <div>
-              <h3 style={{ fontSize: 15.5, fontWeight: 650, margin: "4px 0 4px" }}>{t(locale, title)}</h3>
-              <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", margin: 0 }}>{t(locale, desc)}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Local-first ---------- */
-
-function Privacy() {
-  const [locale] = useLocale();
-  return (
-    <section style={sectionStyle}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 26, alignItems: "start", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "24px 24px" }}>
-        <div>
-          <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 24, fontWeight: 700, letterSpacing: "-0.005em", margin: "0 0 12px" }}>
-            {t(locale, "landing.privacy.title")}
-          </h2>
-          <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--ink-2)", margin: 0 }}>
-            {t(locale, "landing.privacy.body")}
-          </p>
-        </div>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-          <PrivacyItem>{t(locale, "landing.privacy.li1")}</PrivacyItem>
-          <PrivacyItem>{t(locale, "landing.privacy.li2")}</PrivacyItem>
-          <PrivacyItem>
-            {t(locale, "landing.privacy.li3.pre")}
-            <a href="/rechtliches/impressum" style={inlineLinkStyle}>{t(locale, "landing.privacy.li3.impressum")}</a>
-            {" · "}
-            <a href="/rechtliches/datenschutz" style={inlineLinkStyle}>{t(locale, "landing.privacy.li3.datenschutz")}</a>
-          </PrivacyItem>
-        </ul>
-      </div>
-    </section>
-  );
-}
-
-function PrivacyItem({ children }: { children: ReactNode }) {
-  return (
-    <li style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 14.5, color: "var(--ink-2)" }}>
-      <span aria-hidden style={{ color: "var(--good-text)", fontWeight: 700, lineHeight: 1.5 }}>✓</span>
-      <span>{children}</span>
-    </li>
-  );
-}
-
-/* ---------- Tarif-Teaser ---------- */
-
-function PricingTeaser() {
-  const [locale] = useLocale();
-  return (
-    <section style={sectionStyle}>
-      <SectionHeading>{t(locale, "landing.pricing.title")}</SectionHeading>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 22 }}>
-        <MiniCard name={t(locale, "landing.pricing.free.name")} desc={t(locale, "landing.pricing.free.desc")} />
-        <MiniCard name={t(locale, "landing.pricing.cloud.name")} desc={t(locale, "landing.pricing.cloud.desc")} />
-      </div>
-      <p style={{ marginTop: 16 }}>
-        <a href="/preise" style={{ ...inlineLinkStyle, fontSize: 14.5, fontWeight: 600 }}>
-          {t(locale, "landing.pricing.allDetails")} →
-        </a>
-      </p>
-    </section>
-  );
-}
-
-function MiniCard({ name, desc }: { name: string; desc: string }) {
-  return (
-    <div className="oq-card" style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "18px 20px" }}>
-      <h3 style={{ fontSize: 17, fontWeight: 650, margin: "0 0 8px" }}>{name}</h3>
-      <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", margin: 0 }}>{desc}</p>
-    </div>
-  );
-}
-
-/* ---------- Download-Teaser ---------- */
-
-function DownloadTeaser() {
-  const [locale] = useLocale();
-  return (
-    <section style={sectionStyle}>
-      <div style={{ background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 14, padding: "24px 24px", display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ maxWidth: "56ch" }}>
-          <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 22, fontWeight: 700, letterSpacing: "-0.005em", margin: "0 0 8px" }}>
-            {t(locale, "landing.download.title")}
-          </h2>
-          <p style={{ fontSize: 15, lineHeight: 1.55, color: "var(--ink-2)", margin: 0 }}>
-            {t(locale, "landing.download.body")}
-          </p>
-        </div>
-        <CtaButton href="/download" primary>{t(locale, "landing.download.cta")}</CtaButton>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- CTA-Band ---------- */
-
-function CtaBand() {
-  const [locale] = useLocale();
-  return (
-    <section style={{ background: "var(--brand-wash)", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", marginTop: 20 }}>
-      <div style={{ ...sectionStyle, paddingTop: 48, paddingBottom: 48, textAlign: "center" }}>
-        <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 30, fontWeight: 700, letterSpacing: "-0.008em", margin: "0 auto", maxWidth: "26ch" }}>
-          {t(locale, "landing.cta.title")}
-        </h2>
-        <div style={{ marginTop: 22 }}>
-          <CtaButton href="/app?demo=1" primary large>{t(locale, "landing.h.ctaDemo")}</CtaButton>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Bausteine ---------- */
-
-const sectionStyle: CSSProperties = { maxWidth: 1080, margin: "0 auto", padding: "44px 26px" };
-
-const inlineLinkStyle: CSSProperties = { color: "var(--accent-deep)", textDecoration: "none" };
-
-function SectionHeading({ children }: { children: ReactNode }) {
-  return (
-    <h2 style={{ fontFamily: DISPLAY_FONT, fontSize: 28, fontWeight: 700, letterSpacing: "-0.008em", margin: 0 }}>
-      {children}
-    </h2>
-  );
-}
-
-function CtaButton({ href, children, primary, large }: { href: string; children: ReactNode; primary?: boolean; large?: boolean }) {
-  return (
-    <a
-      href={href}
-      className={primary ? "oq-btn oq-btn--primary" : "oq-btn oq-btn--ghost"}
-      style={{
-        fontSize: large ? 15.5 : 14,
-        padding: large ? "11px 22px" : "8px 15px",
-      }}
-    >
-      {children}
-    </a>
-  );
-}
+function Workflow(){const [locale]=useLocale();const items:[string,DictKey,DictKey][]=[["01","landing.workflow.brief.title","landing.workflow.brief.desc"],["02","landing.workflow.decisions.title","landing.workflow.decisions.desc"],["03","landing.workflow.evidence.title","landing.workflow.evidence.desc"],["04","landing.workflow.pack.title","landing.workflow.pack.desc"]];return <section id="funktionen" className="oq-land-section"><p className="oq-land-kicker">{t(locale,"landing.workflow.eyebrow")}</p><h2 className="oq-land-heading">{t(locale,"landing.workflow.title")}</h2><p className="oq-land-intro">{t(locale,"landing.workflow.intro")}</p><ol className="oq-land-workflow">{items.map(([n,title,desc])=><li key={n}><span className="oq-land-workflow__num" aria-hidden>{n}</span><h3>{t(locale,title)}</h3><p>{t(locale,desc)}</p></li>)}</ol></section>}
+function Validation(){const [locale]=useLocale();const rows:[string,DictKey,DictKey][]=[["23/25","landing.validation.matrix.title","landing.validation.matrix.body"],[locale==="de"?"86,3 %":"86.3%","landing.validation.deviations.title","landing.validation.deviations.body"],[locale==="de"?"≤ 0,01":"≤ 0.01","landing.validation.calibration.title","landing.validation.calibration.body"]];return <section id="validation" className="oq-land-validation"><div className="oq-land-section"><p className="oq-land-kicker">{t(locale,"landing.validation.eyebrow")}</p><h2 className="oq-land-heading">{t(locale,"landing.validation.title")}</h2><p className="oq-land-intro">{t(locale,"landing.validation.intro")}</p><div className="oq-land-record">{rows.map(([value,title,body])=><div key={title} className="oq-land-record__row"><span className="oq-land-record__value">{value}</span><span className="oq-land-record__title">{t(locale,title)}</span><p>{t(locale,body)}</p></div>)}</div><p className="oq-land-scope">{t(locale,"landing.validation.scope")}</p><div className="oq-land-links" aria-label={t(locale,"landing.validation.linksAria")}><a className="oq-land-link" href="https://github.com/brandi1409/openqca/blob/main/VALIDATION.md" target="_blank" rel="noreferrer">{t(locale,"landing.validation.linkRecord")}</a><a className="oq-land-link" href="https://github.com/brandi1409/openqca/blob/main/scripts/cross-validate.mjs" target="_blank" rel="noreferrer">{t(locale,"landing.validation.linkScript")}</a><Link className="oq-land-link" href="/methodik">{t(locale,"landing.validation.linkMethods")}</Link></div></div></section>}
+function Compare(){const [locale]=useLocale();const rows:[DictKey,DictKey,DictKey,DictKey][]=[["landing.compare.start","landing.compare.start.openqca","landing.compare.start.fsqca","landing.compare.start.r"],["landing.compare.provenance","landing.compare.provenance.openqca","landing.compare.provenance.fsqca","landing.compare.provenance.r"],["landing.compare.evidence","landing.compare.evidence.openqca","landing.compare.evidence.fsqca","landing.compare.evidence.r"],["landing.compare.bridge","landing.compare.bridge.openqca","landing.compare.bridge.fsqca","landing.compare.bridge.r"],["landing.compare.scope","landing.compare.scope.openqca","landing.compare.scope.fsqca","landing.compare.scope.r"]];return <section className="oq-land-section"><p className="oq-land-kicker">{t(locale,"landing.compare.eyebrow")}</p><h2 className="oq-land-heading">{t(locale,"landing.compare.title")}</h2><p className="oq-land-intro">{t(locale,"landing.compare.intro")}</p><div className="oq-land-table" role="region" tabIndex={0} aria-label={t(locale,"landing.compare.tableAria")}><table><thead><tr><th>{t(locale,"landing.compare.dimension")}</th><th>openQCA</th><th>fsQCA 4</th><th>{t(locale,"landing.compare.colR")}</th></tr></thead><tbody>{rows.map(([label,a,b,c])=><tr key={label}><th scope="row">{t(locale,label)}</th><td>{t(locale,a)}</td><td>{t(locale,b)}</td><td>{t(locale,c)}</td></tr>)}</tbody></table></div><p className="oq-land-note">{t(locale,"landing.compare.note")}</p></section>}
+function PricingBoundary(){const [locale]=useLocale();return <section className="oq-land-section"><p className="oq-land-kicker">{t(locale,"landing.pricing.eyebrow")}</p><h2 className="oq-land-heading">{t(locale,"landing.pricing.title")}</h2><p className="oq-land-intro">{t(locale,"landing.pricing.intro")}</p><div className="oq-land-pricing"><Tier label={t(locale,"landing.pricing.free.label")} name={t(locale,"landing.pricing.free.name")}>{t(locale,"landing.pricing.free.desc")}</Tier><Tier label={t(locale,"landing.pricing.cloud.label")} name={t(locale,"landing.pricing.cloud.name")}>{t(locale,"landing.pricing.cloud.desc")}</Tier></div><p className="oq-land-note">{t(locale,"landing.pricing.note")}</p><p><Link className="oq-land-link" href="/preise">{t(locale,"landing.pricing.details")}</Link></p></section>}
+function Tier({label,name,children}:{label:string;name:string;children:ReactNode}){return <div className="oq-land-tier"><p className="oq-land-tier__label">{label}</p><h3>{name}</h3><p className="oq-land-tier__desc">{children}</p></div>}
+function CtaBand(){const [locale]=useLocale();return <section className="oq-land-final"><div className="oq-land-section"><h2>{t(locale,"landing.cta.title")}</h2><p className="oq-land-intro">{t(locale,"landing.cta.sub")}</p><div className="oq-land-actions"><Cta href="/app" primary large>{t(locale,"landing.hero.ctaOwn")}</Cta><Cta href="/app?demo=1" large>{t(locale,"landing.hero.ctaDemo")}</Cta></div></div></section>}
+function Cta({href,children,primary,large}:{href:string;children:ReactNode;primary?:boolean;large?:boolean}){return <Link href={href} className={`oq-btn ${primary?"oq-btn--primary":"oq-btn--secondary"}${large?" oq-btn--large":""}`}>{children}</Link>}

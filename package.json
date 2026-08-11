@@ -17,7 +17,9 @@
     "check:r": "node scripts/cross-validate.mjs",
     "check:r-calibration": "node scripts/calibrate-cross-validate.mjs",
     "check:engine-package": "node scripts/check-engine-package.mjs",
-    "verify": "npm run test:engine && npm run check:reference && npm run check:r && npm run check:r-calibration && npm run lint --workspace web && npm run build --workspace web"
+    "verify": "npm run test:engine && npm run check:reference && npm run check:r && npm run check:r-calibration && npm run lint --workspace web && npm run build --workspace web && npm run test:e2e --workspace web",
+    "smoke:staging": "bash deploy/smoke-staging.sh",
+    "release:staging": "bash deploy/staging-release.sh"
   },
   "license": "MIT"
 }

@@ -46,6 +46,7 @@ function commitId(): string {
 const commit = commitId();
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   env: {
     // Build-Zeitstempel für die Service-Worker-Versionierung (QUALITY-SPEC A5.1):
     // PwaRegister registriert /sw.js?v=<dieser Wert> — jede neue Version ergibt

@@ -144,6 +144,7 @@ export function ExampleDatasets({ onSelect }: ExampleDatasetsProps) {
             <button
               key={entry.file}
               type="button"
+              className="oq-example-card"
               onClick={() => choose(entry)}
               onMouseEnter={() => setHovered(entry.file)}
               onMouseLeave={() => setHovered(null)}
@@ -174,7 +175,7 @@ export function ExampleDatasets({ onSelect }: ExampleDatasetsProps) {
 const gridStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 12,
+  gap: "var(--space-3)",
 };
 
 function cardStyle(active: boolean): React.CSSProperties {
@@ -182,16 +183,16 @@ function cardStyle(active: boolean): React.CSSProperties {
     display: "flex",
     flexDirection: "column",
     alignItems: "stretch",
-    gap: 8,
+    gap: "var(--space-2)",
     textAlign: "left",
     font: "inherit",
     cursor: "pointer",
-    padding: "13px 14px",
-    borderRadius: 10,
+    padding: "var(--space-3) var(--space-4)",
+    borderRadius: "var(--radius-surface)",
     border: `1px solid ${active ? "var(--accent)" : "var(--line)"}`,
     background: active ? "var(--accent-wash)" : "var(--panel)",
-    boxShadow: active ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
-    transition: "border-color 120ms ease, background 120ms ease",
+    boxShadow: active ? "var(--shadow-raised)" : "none",
+    transition: "border-color var(--transition-fast), background-color var(--transition-fast)",
     color: "var(--ink)",
   };
 }

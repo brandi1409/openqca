@@ -7,6 +7,7 @@
 import type { NecessityEntry, Solution, TruthTableResult, TruthTableRow } from "@openqca/engine";
 import type { CalibSpecs } from "@/lib/calibration-model";
 import { citationInfo } from "@/lib/citation";
+import type { AnalysisDecisionState, ResearchBrief } from "@/lib/workspace-model";
 
 export interface ReportInput {
   datasetName: string;
@@ -24,6 +25,8 @@ export interface ReportInput {
   parsimonious: Solution;
   necessity: NecessityEntry[];
   expectations: Record<string, string>;
+  researchBrief: ResearchBrief;
+  analysisDecisions: AnalysisDecisionState;
   rScript: string;
   locale?: "de" | "en";
   /**
@@ -39,6 +42,7 @@ export interface ReportInput {
    * Vorrang; dieses hier erscheint dann nicht zusätzlich.
    */
   provisional?: boolean;
+  provisionalReasons?: string[];
 }
 
 /** HTML-Escaping für alle dynamischen Strings (Namen, Fälle, Ausdrücke). */
@@ -462,6 +466,52 @@ export function generateReportHtml(input: ReportInput): string {
   );
 
   const cite = citationInfo();
+  const briefTitle = locale === "en" ? "Research brief" : "Research Brief";
+  const ledgerTitle = locale === "en" ? "Decision ledger" : "Entscheidungsprotokoll";
+  const yes = locale === "en" ? "confirmed" : "bestätigt";
+  const no = locale === "en" ? "not confirmed" : "nicht bestätigt";
+  const briefRows: Array<[string, string]> = locale === "en"
+    ? [
+        ["Research question", input.researchBrief.question],
+        ["Case universe", input.researchBrief.caseUniverse],
+        ["Time period", input.researchBrief.timePeriod],
+        ["Outcome concept", input.researchBrief.outcomeConcept],
+        ["Condition-selection rationale", input.researchBrief.conditionSelectionRationale],
+        ["Status", input.researchBrief.confirmed ? yes : no],
+      ]
+    : [
+        ["Forschungsfrage", input.researchBrief.question],
+        ["Falluniversum", input.researchBrief.caseUniverse],
+        ["Zeitraum", input.researchBrief.timePeriod],
+        ["Outcome-Konzept", input.researchBrief.outcomeConcept],
+        ["Begründung der Bedingungsauswahl", input.researchBrief.conditionSelectionRationale],
+        ["Status", input.researchBrief.confirmed ? yes : no],
+      ];
+  const decisionRows: Array<[string, string, string, string]> = [
+    [
+      copy.frequencyCutoff,
+      String(input.freqCut),
+      input.analysisDecisions.frequencyCutoff.rationale,
+      input.analysisDecisions.frequencyCutoff.confirmed ? yes : no,
+    ],
+    [
+      copy.consistencyCutoff,
+      String(input.consCut),
+      input.analysisDecisions.consistencyCutoff.rationale,
+      input.analysisDecisions.consistencyCutoff.confirmed ? yes : no,
+    ],
+    [
+      copy.directionalExpectations,
+      input.conditions
+        .map((condition) => `${condition}: ${input.expectations[condition] ?? "present"}`)
+        .join(", "),
+      input.analysisDecisions.directionalExpectations.rationale,
+      input.analysisDecisions.directionalExpectations.confirmed ? yes : no,
+    ],
+  ];
+  const provisionalDetails = input.provisionalReasons?.length
+    ? `<ul>${input.provisionalReasons.map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="${locale}">
@@ -476,11 +526,33 @@ export function generateReportHtml(input: ReportInput): string {
     input.demo
       ? `<div class="demo-banner" role="note"><strong>${copy.demoBannerTitle}</strong><span>${copy.demoBannerBody}</span></div>`
       : input.provisional
-        ? `<div class="demo-banner" role="note"><strong>${copy.provisionalBannerTitle}</strong><span>${copy.provisionalBannerBody}</span></div>`
+        ? `<div class="demo-banner" role="note"><strong>${copy.provisionalBannerTitle}</strong><span>${copy.provisionalBannerBody}</span>${provisionalDetails}</div>`
         : ""
   }
   <p class="subtitle">${copy.dataset}: <strong>${esc(input.datasetName)}</strong> &nbsp;·&nbsp; ${copy.cases}: <strong>${input.caseCount}</strong> &nbsp;·&nbsp; ${copy.created}: ${esc(created)}</p>
   <p class="note">${copy.createdWith}</p>
+
+  <h2>${briefTitle}</h2>
+  <table>
+    <tbody>
+      ${briefRows.map(([field, value]) => `<tr><th>${esc(field)}</th><td>${esc(value || "—")}</td></tr>`).join("")}
+    </tbody>
+  </table>
+
+  <h2>${ledgerTitle}</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>${locale === "en" ? "Decision" : "Entscheidung"}</th>
+        <th>${locale === "en" ? "Current value" : "Aktueller Wert"}</th>
+        <th>${locale === "en" ? "Rationale" : "Begründung"}</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${decisionRows.map(([decision, value, rationale, status]) => `<tr><td>${esc(decision)}</td><td>${esc(value || "—")}</td><td>${esc(rationale || "—")}</td><td>${esc(status)}</td></tr>`).join("")}
+    </tbody>
+  </table>
 
   <h2>${copy.calibration}</h2>
   ${calibrationTable(input.anchors, input.calibSpecs, input.varMeta, locale)}
@@ -498,8 +570,11 @@ export function generateReportHtml(input: ReportInput): string {
   ${necessityTable(input.necessity, locale)}
   <p class="hint">${copy.necessityHint}</p>
 
-  <h2>${copy.reproducibility}</h2>
-  <pre>${esc(input.rScript)}</pre>
+  ${
+    input.rScript
+      ? `<h2>${copy.reproducibility}</h2><pre>${esc(input.rScript)}</pre>`
+      : ""
+  }
 
   <h2>${copy.citation}</h2>
   <p>${esc(cite.plain)}</p>

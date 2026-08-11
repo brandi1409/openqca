@@ -58,10 +58,11 @@ export const DEMO_SOLUTION = /WOHLSTAND\*BILDUNG\*STABIL/;
  * sind Kalibrierkurve, Truth Table, Lösungen und XY-Plot im DOM.
  */
 export async function loadDemo(page: Page): Promise<void> {
-  await page.goto("/app");
+  await page.goto("/app#answer");
+  await page.reload();
   await dismissConsent(page);
-  await page.getByRole("button", { name: "Demo-Datensatz laden" }).click();
-  await expect(page.getByText(DEMO_SOLUTION).first()).toBeVisible({
+  await page.getByRole("button", { name: "Synthetisches Beispiel öffnen" }).click();
+  await expect(page.getByTestId("solution-formula-intermediate")).toContainText(DEMO_SOLUTION, {
     timeout: 15_000,
   });
 }
@@ -72,16 +73,17 @@ export async function loadDemo(page: Page): Promise<void> {
  * Deskriptivstatistik gerendert hat.
  */
 export async function loadExample(page: Page, cardName: RegExp): Promise<void> {
-  await page.goto("/app");
-  await dismissConsent(page);
+  await loadDemo(page);
+  await openDestination(page, "research");
+  await page.getByText("Synthetische Lehrdatensätze", { exact: true }).click();
   await page.getByRole("button", { name: cardName }).click();
-  // Deskriptivstatistik-Karte erscheint, sobald nutzbare Set-Spalten vorliegen.
-  await expect(page.locator("#deskriptiv")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("research-brief-editor")).toBeVisible({ timeout: 15_000 });
 }
 
 /** Load the repository's real raw-data fixture through the browser file input. */
 export async function loadRawRohwerte(page: Page): Promise<void> {
-  await page.goto("/app");
+  await page.goto("/app#answer");
+  await page.reload();
   await dismissConsent(page);
   const candidateRoots = [
     process.env.INIT_CWD,
@@ -93,7 +95,8 @@ export async function loadRawRohwerte(page: Page): Promise<void> {
     .find((candidate) => existsSync(candidate));
   if (!fixturePath) throw new Error("Raw fixture datasets/rohwerte-demokratie.csv not found");
   await page.locator('input[type="file"]').setInputFiles(fixturePath);
-  await expect(page.locator("#deskriptiv")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Import übernehmen" }).click();
+  await expect(page.getByTestId("research-brief-editor")).toBeVisible({ timeout: 15_000 });
 }
 
 /**
@@ -105,6 +108,7 @@ export async function loadRawRohwerte(page: Page): Promise<void> {
  * daher meist schon richtig; der Helfer ist deshalb idempotent.
  */
 export async function openDocumentationView(page: Page): Promise<void> {
+  await openDestination(page, "decisions");
   const docTab = page.getByTestId("calibration-view-doc");
   await docTab.waitFor({ state: "visible", timeout: 15_000 });
   if ((await docTab.getAttribute("aria-pressed")) !== "true") await docTab.click();
@@ -128,21 +132,69 @@ export const PROTOCOL_EXPORT_LABELS = [
 
 /** Alle vier Export-Buttons sind gesperrt und die Begründung steht daneben. */
 export async function expectExportGateClosed(page: Page): Promise<void> {
-  const protocol = page.locator("#protokoll");
+  await openDestination(page, "defense");
+  const protocol = page.getByTestId("defense-artifacts");
   await expect(protocol).toBeVisible({ timeout: 15_000 });
-  await expect(protocol).toContainText(/Der Export ist das Replikationsartefakt/);
   for (const label of PROTOCOL_EXPORT_LABELS) {
     await expect(protocol.getByRole("button", { name: label }), String(label)).toBeDisabled();
   }
+  await expect(page.getByTestId("defense-r-preview")).toHaveCount(0);
 }
 
-/** Alle vier Export-Buttons sind frei und der Sperrgrund ist verschwunden. */
+/** All four replication artifacts are enabled once the shared defense gate passes. */
 export async function expectExportGateOpen(page: Page): Promise<void> {
-  const protocol = page.locator("#protokoll");
+  await openDestination(page, "defense");
+  const protocol = page.getByTestId("defense-artifacts");
+  const checklist = await page.locator(".oq-defense-checklist").first().innerText();
   await expect(protocol).toBeVisible({ timeout: 15_000 });
-  await expect(protocol).not.toContainText(/Der Export ist das Replikationsartefakt/);
   for (const label of PROTOCOL_EXPORT_LABELS) {
-    await expect(protocol.getByRole("button", { name: label }), String(label)).toBeEnabled();
+    await expect(
+      protocol.getByRole("button", { name: label }),
+      `${String(label)}\n${checklist}`,
+    ).toBeEnabled();
+  }
+  await expect(page.getByTestId("defense-r-preview")).toBeVisible();
+}
+
+export type DestinationName = "answer" | "research" | "decisions" | "evidence" | "defense";
+
+const DESTINATION_LABELS: Record<DestinationName, string> = {
+  answer: "Antwort",
+  research: "Forschungsdesign",
+  decisions: "Entscheidungen",
+  evidence: "Evidenz",
+  defense: "Prüfpaket",
+};
+
+/** Open one controlled workspace destination and wait for its focused heading. */
+export async function openDestination(page: Page, name: DestinationName): Promise<void> {
+  await page.getByRole("navigation", { name: "Analysebereiche" })
+    .getByRole("button", { name: DESTINATION_LABELS[name], exact: true })
+    .click();
+  const heading = page.getByRole("heading", { name: DESTINATION_LABELS[name], level: 1 });
+  await expect(heading).toBeVisible();
+  await expect(heading).toBeFocused();
+}
+
+/** Complete the research brief and the three value-bound analysis decisions. */
+export async function completeResearchAndAnalysisDecisions(page: Page): Promise<void> {
+  await openDestination(page, "research");
+  await page.getByTestId("brief-question").fill("Welche Konfigurationen erklären das Outcome?");
+  await page.getByTestId("brief-caseUniverse").fill("Alle importierten Vergleichsfälle");
+  await page.getByTestId("brief-timePeriod").fill("2020 bis 2025");
+  await page.getByTestId("brief-outcomeConcept").fill("Mitgliedschaft im untersuchten Outcome");
+  await page.getByTestId("brief-conditionSelectionRationale").fill("Theoriegeleitete Auswahl der Bedingungen");
+  await page.getByRole("button", { name: "Forschungsdesign bestätigen" }).click();
+
+  await openDestination(page, "decisions");
+  for (const testId of [
+    "decision-frequency-cutoff",
+    "decision-consistency-cutoff",
+    "decision-directional-expectations",
+  ]) {
+    const block = page.getByTestId(testId);
+    await block.locator("textarea").fill(`Begründung für ${testId}`);
+    await block.getByRole("button", { name: "Aktuellen Wert bestätigen" }).click();
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 export type Locale = "de" | "en";
 
@@ -42,6 +42,9 @@ function subscribe(onChange: () => void): () => void {
  */
 export function useLocale(): [Locale, (next: Locale) => void] {
   const locale = useSyncExternalStore(subscribe, readLocale, serverSnapshot);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const setLocale = useCallback((next: Locale) => {
     try {

@@ -50,7 +50,7 @@ Wenn Sie ein Konto anlegen, verarbeiten wir bzw. unsere Auftragsverarbeiter zus�
 
 - **Konto/Authentifizierung:** Bei der Anmeldung verarbeitet unser Dienstleister Supabase Ihre **E-Mail-Adresse** (Anmeldung per Magic Link, ohne Passwort).
 - **Cloud-Speicherung von Projekten:** Gespeicherte Projekte (Projektname und Analysedaten als JSON) liegen in der Supabase-Datenbank. Der Zugriff ist per **Row-Level-Security** technisch so beschränkt, dass nur der jeweilige Account auf seine eigenen Projekte zugreifen kann.
-- **KI-Assistenzfunktionen** (Anthropic API): **derzeit nicht aktiv** — siehe Abschnitt 7.3.
+- **KI-Assistenzfunktionen** (OpenAI API): optional und instanzabhängig — siehe Abschnitt 7.3.
 - **Zahlungsabwicklung** (Stripe): **derzeit nicht aktiv** — siehe Abschnitt 7.4.
 
 ## 5. Zugriff auf die Website / Bereitstellung der Anwendung
@@ -108,19 +108,37 @@ Mit Auftragsverarbeitern wird jeweils ein Vertrag zur Auftragsverarbeitung nach 
 - **Rechtsgrundlage:** Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung — Bereitstellung des Cloud-Dienstes).
 - **Rolle:** Auftragsverarbeiter (Art. 28 DSGVO).
 
-### 7.3 Anthropic — KI-Assistenzfunktionen (derzeit nicht aktiv)
+### 7.3 OpenAI — optionale KI-Assistenzfunktionen
 
-KI-Funktionen sind in openQCA **derzeit nicht aktiv**. Bei Aktivierung gilt:
+Die KI-Helfer sind nur verfügbar, wenn der Betreiber sie ausdrücklich
+konfiguriert und freischaltet. Vor dem Versand zeigt openQCA die vollständige,
+typisierte Nutzlast zur Prüfung; erst eine separate Versandhandlung löst den
+Netzwerkaufruf aus.
 
-- **Anbieter:** Anthropic, PBC, USA.
-- **Funktion:** KI-gestützte Assistenz über die Anthropic-API.
-- **Verarbeitete Daten:** die Inhalte, die Sie aktiv an die KI-Funktion übergeben (z. B. Teile Ihres Datensatzes, Kalibrierungsangaben, Prompts) sowie die generierten Antworten.
-- **Wichtiger Hinweis:** KI-Funktionen erfordern zwingend die Übertragung der jeweiligen Eingabedaten an Anthropic. Übergeben Sie daher keine personenbezogenen oder sensiblen Daten Dritter an die KI-Funktion, für die Sie keine Rechtsgrundlage haben; anonymisieren oder pseudonymisieren Sie Forschungsdaten nach Möglichkeit vorab.
-- **Zweck:** Erbringung der von Ihnen angeforderten KI-Assistenz.
-- **Rechtsgrundlage:** Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung) bzw. Art. 6 Abs. 1 lit. a DSGVO (Einwilligung), soweit die KI-Funktion optional ausgestaltet ist.
-- **Rolle:** Auftragsverarbeiter (Art. 28 DSGVO).
+- **Anbieter:** OpenAI, L.L.C., USA.
+- **Funktion:** strukturierte Schreibhilfe für Research Brief,
+  Kalibrierungsevidenz und Analysebegründungen über die Responses API.
+- **Verarbeitete Daten:** ausschließlich die in der sichtbaren Nutzlastvorschau
+  enthaltenen, von Ihnen geprüften Textfelder sowie die strukturierte Antwort.
+  Fallzeilen, Dateien, Membership-Vektoren, Truth Tables, QCA-Ergebnisse und
+  Exporte gehören nicht zum freigegebenen Aufgabenvertrag.
+- **Speicherung beim API-Aufruf:** openQCA setzt `store: false`. Unabhängig
+  davon können beim Anbieter technisch notwendige Sicherheits- und
+  Missbrauchsprüfungen nach dessen geltenden Vertrags- und
+  Datenschutzbedingungen erfolgen.
+- **Wichtiger Hinweis:** Tragen Sie keine personenbezogenen, vertraulichen oder
+  sensiblen Angaben in die freizugebenden Textfelder ein.
+- **Zweck:** Erbringung der ausdrücklich angeforderten Schreib- und
+  Begründungsprüfung; die KI berechnet oder verändert keine QCA-Ergebnisse.
+- **Rechtsgrundlage:** Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung) bzw.
+  Art. 6 Abs. 1 lit. a DSGVO, soweit eine gesonderte Einwilligung erforderlich
+  ist.
+- **Rolle:** Auftragsverarbeiter (Art. 28 DSGVO), vorbehaltlich der konkreten
+  Vertrags- und Instanzkonfiguration.
 
-Vor Aktivierung werden diese Angaben aktualisiert und die Nutzer informiert.
+Vor produktiver Aktivierung müssen AV-Vertrag, Drittlandgrundlage,
+Aufbewahrungsbedingungen und die konkrete Modell-/Regionkonfiguration
+qualifiziert geprüft und hier dokumentiert werden.
 
 ### 7.4 Stripe — Zahlungsabwicklung (derzeit nicht aktiv)
 
@@ -140,7 +158,7 @@ Einige der genannten Dienstleister verarbeiten personenbezogene Daten (auch) in 
 - Soweit ein Anbieter unter dem **EU-U.S. Data Privacy Framework (DPF)** zertifiziert ist, erfolgt die Übermittlung auf Grundlage des Angemessenheitsbeschlusses der EU-Kommission (Art. 45 DSGVO).
 - Andernfalls stützen wir die Übermittlung auf die **Standardvertragsklauseln** der EU-Kommission (Art. 46 Abs. 2 lit. c DSGVO) und gegebenenfalls ergänzende Schutzmaßnahmen.
 
-Der konkrete Zertifizierungsstatus ist je Anbieter zu verifizieren. [PRÜFEN: DPF-Status bzw. SCC-Grundlage je Dienst (Vercel, Supabase, bei Aktivierung auch Anthropic und Stripe) anhand der DPF-Liste und der AV-Verträge dokumentieren.]
+Der konkrete Zertifizierungsstatus ist je Anbieter zu verifizieren. [PRÜFEN: DPF-Status bzw. SCC-Grundlage je Dienst (VPS-Hoster, Supabase, bei Aktivierung auch OpenAI und Stripe) anhand der DPF-Liste und der AV-Verträge dokumentieren.]
 
 Trotz dieser Garantien kann in Drittländern ein mit der EU vergleichbares Datenschutzniveau nicht in allen Fällen sichergestellt werden; insbesondere können dortige Behörden Zugriffsmöglichkeiten haben.
 

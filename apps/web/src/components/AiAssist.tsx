@@ -2,111 +2,40 @@
 
 import { useState } from "react";
 import { useLocale } from "@/i18n/locale";
-import { t } from "@/i18n/dict";
 import { getSupabase } from "@/lib/supabase";
+import { isAdoptableDraft, reviewedPayloadPreview } from "@/lib/ai-reviewed-summary";
+import { parseReviewedSummary, type AiAssistRequest, type ReviewedSummary } from "@/lib/ai-contract";
 
-type AssistTask = "anchors" | "skew" | "methods";
+type Result = { summary: ReviewedSummary; model: string; provider: string };
+function copy(locale: "de" | "en") { return locale === "en" ? {
+  review: "Review the exact payload before sending. No data leaves this device until you explicitly send it.", preview: "Reviewed payload", send: "Send reviewed payload", busy: "Requesting structured review…", adopt: "Use draft in this field", status: "Status", uncertainty: "Uncertainty", evidence: "Evidence needed", limitations: "Limitations", provider: "Provider", network: "The request could not be sent.", invalid: "The service returned an invalid response.",
+} : {
+  review: "Prüfen Sie die exakte Nutzlast vor dem Senden. Erst der ausdrückliche Versand verlässt dieses Gerät.", preview: "Geprüfte Nutzlast", send: "Geprüfte Nutzlast senden", busy: "Strukturierte Prüfung wird angefordert…", adopt: "Entwurf in dieses Feld übernehmen", status: "Status", uncertainty: "Unsicherheit", evidence: "Benötigte Evidenz", limitations: "Grenzen", provider: "Anbieter", network: "Die Anfrage konnte nicht gesendet werden.", invalid: "Der Dienst hat keine gültige Antwort geliefert.",
+}; }
+function list(items: string[]) { return <ul>{items.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>; }
 
-/**
- * KI-Assistent-Schaltfläche. Ruft /api/ai/assist. Ohne konfigurierten Schlüssel
- * antwortet die Route mit 501 → hier als „Cloud-Tarif"-Hinweis dargestellt.
- */
-export function AiAssist({
-  task,
-  label,
-  getData,
-  needsContext,
-}: {
-  task: AssistTask;
-  label: string;
-  getData: () => Record<string, unknown>;
-  needsContext?: boolean;
-}) {
-  const [locale] = useLocale();
-  const [busy, setBusy] = useState(false);
-  const [context, setContext] = useState("");
-  const [result, setResult] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-
-  async function run() {
-    setBusy(true);
-    setResult(null);
-    setNote(null);
+export function AiAssist({ request, label, onAdopt }: { request: () => AiAssistRequest; label: string; onAdopt?: (draft: string) => void }) {
+  const [locale] = useLocale(); const text = copy(locale);
+  const [prepared, setPrepared] = useState<AiAssistRequest | null>(null);
+  const [busy, setBusy] = useState(false); const [result, setResult] = useState<Result | null>(null); const [note, setNote] = useState<string | null>(null);
+  async function send() {
+    if (!prepared) return; setBusy(true); setResult(null); setNote(null);
     try {
-      const sb = getSupabase();
-      const { data } = (await sb?.auth.getSession()) ?? { data: null };
-      const token = data?.session?.access_token;
+      const sb = getSupabase(); const { data } = (await sb?.auth.getSession()) ?? { data: null };
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch("/api/ai/assist", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ task, context, data: getData() }),
-      });
-      const json = await res.json();
-      if (res.ok) setResult(json.text as string);
-      else setNote((json.error as string) ?? t(locale, "ai.unavailable"));
-    } catch {
-      setNote(t(locale, "ai.networkError"));
-    } finally {
-      setBusy(false);
-    }
+      if (data?.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
+      const response = await fetch("/api/ai/assist", { method: "POST", headers, body: JSON.stringify(prepared) });
+      const json = await response.json().catch(() => null) as { summary?: unknown; model?: unknown; provider?: unknown; error?: { message?: unknown } } | null;
+      const summary = parseReviewedSummary(json?.summary);
+      if (response.ok && summary && typeof json?.model === "string" && typeof json.provider === "string") setResult({ summary, model: json.model, provider: json.provider });
+      else setNote(typeof json?.error?.message === "string" ? json.error.message : text.invalid);
+    } catch { setNote(text.network); } finally { setBusy(false); }
   }
-
-  return (
-    <div style={{ marginTop: 8 }}>
-      {needsContext && (
-        <input
-          value={context}
-          onChange={(e) => setContext(e.target.value)}
-          placeholder={t(locale, "ai.contextPlaceholder")}
-          style={{
-            width: "100%",
-            font: "inherit",
-            fontSize: 13.5,
-            border: "1px solid var(--line)",
-            borderRadius: 8,
-            padding: "6px 9px",
-            background: "var(--panel-2)",
-            color: "var(--ink)",
-            marginBottom: 6,
-          }}
-        />
-      )}
-      <button
-        onClick={run}
-        disabled={busy}
-        className="oq-btn"
-        style={{
-          fontSize: 13.5,
-          padding: "7px 12px",
-          border: "1px solid color-mix(in srgb, var(--ai) 30%, transparent)",
-          background: "color-mix(in srgb, var(--ai) 8%, transparent)",
-          color: "var(--ink)",
-        }}
-      >
-        ✦ {busy ? "…" : label}
-      </button>
-      {note && (
-        <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "8px 0 0" }}>{note}</p>
-      )}
-      {result && (
-        <div
-          style={{
-            marginTop: 10,
-            fontSize: 13.5,
-            lineHeight: 1.55,
-            color: "var(--ink-2)",
-            background: "var(--panel-2)",
-            borderLeft: "3px solid var(--ai)",
-            borderRadius: 8,
-            padding: "11px 13px",
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {result}
-        </div>
-      )}
-    </div>
-  );
+  const status = result?.summary.status === "ok" ? (locale === "en" ? "ready for review" : "zur Prüfung bereit") : result?.summary.status === "incomplete" ? (locale === "en" ? "incomplete" : "unvollständig") : (locale === "en" ? "refused" : "abgelehnt");
+  return <section className="oq-ai-assist" aria-label={label}>
+    <button type="button" className="oq-btn oq-ai-assist__trigger" onClick={() => { setPrepared(request()); setResult(null); setNote(null); }} disabled={busy}>{label}</button>
+    {prepared && <div className="oq-ai-assist__preview"><strong>{text.preview}</strong><p>{text.review}</p><dl>{reviewedPayloadPreview(prepared).map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl><button type="button" className="oq-btn oq-btn--primary" onClick={() => void send()} disabled={busy}>{busy ? text.busy : text.send}</button></div>}
+    <p className="oq-ai-assist__note" role="status" aria-live="polite">{note}</p>
+    {result && <div className="oq-ai-assist__result"><p><strong>{text.status}:</strong> {status}</p>{result.summary.draft && <div className="oq-ai-assist__text">{result.summary.draft}</div>}{result.summary.uncertainty.length > 0 && <><strong>{text.uncertainty}</strong>{list(result.summary.uncertainty)}</>}{result.summary.evidenceNeeds.length > 0 && <><strong>{text.evidence}</strong>{list(result.summary.evidenceNeeds)}</>}{result.summary.limitations.length > 0 && <><strong>{text.limitations}</strong>{list(result.summary.limitations)}</>}<p><strong>{text.provider}:</strong> {result.provider} · {result.model}</p>{onAdopt && isAdoptableDraft(result.summary) && <button type="button" className="oq-btn" onClick={() => onAdopt(result.summary.draft)}>{text.adopt}</button>}</div>}
+  </section>;
 }

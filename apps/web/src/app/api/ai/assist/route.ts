@@ -1,130 +1,171 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-import { AI_MODELS } from "@/lib/config";
+import { aiProviderAvailable, completeAi } from "@/lib/ai-provider";
+import { parseAiAssistRequest } from "@/lib/ai-contract";
+import { recordAiRequest } from "@/lib/ai-telemetry";
 import { getServiceSupabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
+const REQUIRE_CLOUD_TIER = process.env.AI_REQUIRE_CLOUD_TIER !== "false";
+const WINDOW_MS = 60_000;
+const MAX_BODY_BYTES = positiveInt(process.env.AI_REQUEST_BODY_BYTES, 12_000);
+const MAX_PREAUTH_REQUESTS = positiveInt(process.env.AI_PREAUTH_RATE_LIMIT, 20);
+const MAX_USER_REQUESTS = positiveInt(process.env.AI_USER_RATE_LIMIT, 6);
+const MAX_CONCURRENT = positiveInt(process.env.AI_MAX_CONCURRENT, 2);
 
-const API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
-const REQUIRE_CLOUD_TIER = process.env.AI_REQUIRE_CLOUD_TIER === "true";
+type Locale = "de" | "en";
+type RequestEntry = { started: number[]; active: number };
+const preauthRequests = new Map<string, number[]>();
+const userRequests = new Map<string, RequestEntry>();
 
-/** Liest den Supabase-Access-Token aus dem Authorization-Header und prüft ihn per Service-Client. */
-async function requireUser(request: Request) {
+function positiveInt(raw: string | undefined, fallback: number): number {
+  const value = Number.parseInt(raw ?? "", 10);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
+function message(locale: Locale, code: string): string {
+  const de: Record<string, string> = {
+    invalid_request: "Diese KI-Anfrage entspricht nicht dem geprüften Aufgabenvertrag.",
+    disabled: "KI ist auf dieser Instanz nicht konfiguriert.",
+    auth_required: "Bitte anmelden. Die KI-Helfer gehören zum Cloud-Tarif.",
+    plan_required: "Die KI-Helfer gehören zum Cloud-Tarif.",
+    rate_limited: "Zu viele KI-Anfragen. Bitte kurz warten.",
+    unavailable: "Der KI-Anbieter ist vorübergehend nicht erreichbar.",
+    invalid_response: "Der KI-Anbieter hat kein prüfbares strukturiertes Ergebnis geliefert.",
+  };
+  const en: Record<string, string> = {
+    invalid_request: "This AI request does not match the reviewed task contract.",
+    disabled: "AI is not configured on this instance.",
+    auth_required: "Please sign in. AI assistance is part of the Cloud plan.",
+    plan_required: "AI assistance is part of the Cloud plan.",
+    rate_limited: "Too many AI requests. Please wait briefly.",
+    unavailable: "The AI provider is temporarily unavailable.",
+    invalid_response: "The AI provider did not return a reviewable structured result.",
+  };
+  return (locale === "en" ? en : de)[code] ?? (locale === "en" ? en.unavailable : de.unavailable);
+}
+
+function error(locale: Locale, code: string, status: number) {
+  return NextResponse.json({ error: { code, message: message(locale, code) } }, { status });
+}
+
+function requestIp(request: Request): string {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || request.headers.get("x-real-ip")?.trim()
+    || "unknown";
+}
+
+function sweep(now: number): void {
+  for (const [id, times] of preauthRequests) {
+    const current = times.filter((time) => now - time < WINDOW_MS);
+    if (current.length === 0) preauthRequests.delete(id);
+    else preauthRequests.set(id, current);
+  }
+  for (const [id, entry] of userRequests) {
+    entry.started = entry.started.filter((time) => now - time < WINDOW_MS);
+    if (entry.started.length === 0 && entry.active === 0) userRequests.delete(id);
+  }
+}
+
+function admitPreauth(id: string, now: number): boolean {
+  const started = (preauthRequests.get(id) ?? []).filter((time) => now - time < WINDOW_MS);
+  if (started.length >= MAX_PREAUTH_REQUESTS) return false;
+  started.push(now);
+  preauthRequests.set(id, started);
+  return true;
+}
+
+async function readBoundedBody(request: Request): Promise<unknown> {
+  const declaredLength = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) return null;
+  if (!request.body) return null;
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return null;
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
+  }
+}
+
+function rawLocale(raw: unknown): Locale {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return "de";
+  return (raw as Record<string, unknown>).locale === "en" ? "en" : "de";
+}
+
+async function authorize(request: Request, locale: Locale): Promise<{ id: string } | NextResponse> {
+  if (!REQUIRE_CLOUD_TIER) return { id: requestIp(request) };
   const serviceClient = getServiceSupabase();
-  if (!serviceClient) {
-    return {
-      error: NextResponse.json({ error: "Tarifprüfung nicht konfiguriert." }, { status: 501 }),
-    } as const;
-  }
+  if (!serviceClient) return error(locale, "disabled", 501);
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  const { data, error } = await serviceClient.auth.getUser(token);
-  if (error || !data.user) {
-    return {
-      error: NextResponse.json(
-        { error: "Bitte anmelden — die KI-Helfer gehören zum Cloud-Tarif." },
-        { status: 401 },
-      ),
-    } as const;
-  }
-  return { serviceClient, user: data.user } as const;
+  const { data, error: authError } = await serviceClient.auth.getUser(token);
+  if (authError || !data.user) return error(locale, "auth_required", 401);
+  const { data: profile } = await serviceClient.from("profiles").select("tier").eq("user_id", data.user.id).single();
+  if (profile?.tier !== "cloud") return error(locale, "plan_required", 402);
+  return { id: data.user.id };
 }
 
-type AssistTask = "anchors" | "skew" | "methods";
-
-interface AssistBody {
-  task: AssistTask;
-  context?: string;
-  data?: Record<string, unknown>;
-}
-
-function buildPrompt(body: AssistBody): { model: string; system: string; prompt: string } {
-  const d = body.data ?? {};
-  switch (body.task) {
-    case "anchors":
-      return {
-        model: AI_MODELS.light,
-        system:
-          "Du bist ein methodischer Assistent für Qualitative Comparative Analysis (QCA). Antworte auf Deutsch, knapp und praxisnah. Betone, dass Kalibrierungsanker inhaltlich/theoretisch begründet sein müssen, nicht rein datengetrieben.",
-        prompt:
-          `Bedingung: "${d.variable ?? "(unbenannt)"}" (${d.unit ?? "Einheit unbekannt"}).\n` +
-          `Kurzbeschreibung der inhaltlichen Bedeutung: ${body.context ?? "(keine)"}\n` +
-          `Wertebereich der Fälle: min ${d.min ?? "?"}, median ${d.median ?? "?"}, max ${d.max ?? "?"}.\n\n` +
-          `Schlage drei Kalibrierungsanker für die direkte Methode vor (voll draußen = 0,05; Kreuzung = 0,50; voll drinnen = 0,95) und begründe jeden in einem kurzen Satz theoretisch/inhaltlich. Gib die drei Zahlen klar an.`,
-      };
-    case "skew":
-      return {
-        model: AI_MODELS.light,
-        system:
-          "Du bist ein methodischer Assistent für QCA. Antworte auf Deutsch, knapp und konkret.",
-        prompt:
-          `Von ${d.total ?? "?"} Fällen sind ${d.inside ?? "?"} „drinnen" (Zugehörigkeit > 0,5) und ${d.atHalf ?? 0} liegen exakt bei 0,5.\n` +
-          `Erkläre in 2-3 Sätzen, was diese Verteilung für die Analyse bedeutet (Trennschärfe des Sets, ggf. Schiefe, ggf. 0,5-Problem) und was zu tun ist.`,
-      };
-    case "methods":
-      return {
-        model: AI_MODELS.writing,
-        system:
-          "Du bist ein wissenschaftlicher Autor. Schreibe einen präzisen, sachlichen Methoden-Absatz auf Deutsch, zitierfähig, ohne Übertreibung. Nur den Absatz ausgeben.",
-        prompt:
-          `Entwirf einen Methoden-Absatz zur Kalibrierung für eine QCA-Studie.\n` +
-          `Bedingung: ${d.variable ?? "(unbenannt)"} (${d.unit ?? "Einheit unbekannt"}).\n` +
-          `Methode: direkte Methode (Ragin 2008), Anker ${d.anchors ?? "(?)"} (voll draußen 0,05 / Kreuzung 0,50 / voll drinnen 0,95).\n` +
-          `Zusätzliche Begründung des Nutzers: ${body.context ?? "(keine)"}\n` +
-          `Von ${d.total ?? "?"} Fällen weisen ${d.inside ?? "?"} eine Zugehörigkeit > 0,5 auf.`,
-      };
-    default:
-      throw new Error("Unbekannte Aufgabe.");
-  }
+function isResponse(value: { id: string } | NextResponse): value is NextResponse {
+  return value instanceof NextResponse;
 }
 
 export async function POST(request: Request) {
-  if (!API_KEY) {
-    return NextResponse.json(
-      { error: "Die KI-Funktionen gehören zum Cloud-Tarif und sind ohne konfigurierten API-Schlüssel deaktiviert." },
-      { status: 501 },
-    );
-  }
-  let body: AssistBody;
-  try {
-    body = (await request.json()) as AssistBody;
-  } catch {
-    return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+  const now = Date.now();
+  sweep(now);
+  if (!admitPreauth(requestIp(request), now)) return error("de", "rate_limited", 429);
+
+  const raw = await readBoundedBody(request);
+  const locale = rawLocale(raw);
+  const body = parseAiAssistRequest(raw);
+  if (!body) return error(locale, "invalid_request", 400);
+  if (!aiProviderAvailable()) {
+    recordAiRequest(body.task, "disabled", now);
+    return error(locale, "disabled", 501);
   }
 
-  if (REQUIRE_CLOUD_TIER) {
-    const auth = await requireUser(request);
-    if ("error" in auth) return auth.error;
-    const { serviceClient, user } = auth;
-    const { data: profile } = await serviceClient
-      .from("profiles")
-      .select("tier")
-      .eq("user_id", user.id)
-      .single();
-    if (profile?.tier !== "cloud") {
-      return NextResponse.json(
-        { error: "Die KI-Helfer gehören zum Cloud-Tarif. Details unter /preise." },
-        { status: 402 },
-      );
-    }
+  const auth = await authorize(request, locale);
+  if (isResponse(auth)) return auth;
+  const entry = userRequests.get(auth.id) ?? { started: [], active: 0 };
+  entry.started = entry.started.filter((time) => now - time < WINDOW_MS);
+  if (entry.started.length >= MAX_USER_REQUESTS || entry.active >= MAX_CONCURRENT) {
+    recordAiRequest(body.task, "rate_limited", now);
+    return error(locale, "rate_limited", 429);
   }
+  entry.started.push(now);
+  entry.active += 1;
+  userRequests.set(auth.id, entry);
 
   try {
-    const { model, system, prompt } = buildPrompt(body);
-    const client = new Anthropic({ apiKey: API_KEY });
-    const message = await client.messages.create({
-      model,
-      max_tokens: 900,
-      system,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("")
-      .trim();
-    return NextResponse.json({ text, model });
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : "Unbekannter Fehler";
-    return NextResponse.json({ error: `KI-Aufruf fehlgeschlagen: ${detail}` }, { status: 502 });
+    const result = await completeAi(body);
+    recordAiRequest(body.task, "returned", now);
+    return NextResponse.json({ version: "v1", ...result });
+  } catch (cause) {
+    const code = cause instanceof Error && (cause.message === "AI_UNSTRUCTURED" || cause.message === "AI_POLICY_VIOLATION") ? "invalid_response" : "unavailable";
+    recordAiRequest(body.task, code, now);
+    return error(locale, code, 502);
+  } finally {
+    entry.active -= 1;
   }
 }

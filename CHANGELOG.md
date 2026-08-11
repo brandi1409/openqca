@@ -16,6 +16,21 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   Ecken eines Drei-Bedingungen-Würfels in positive, negative und Remainder, jede
   Kombination von Richtungserwartungen.
 
+- **Forschungsfragen-zentrierter Arbeitsraum.** Die bisherige Sechs-Schritte-Navigation ist durch
+  fünf kontrollierte Ziele ersetzt: Antwort, Forschungsdesign, Entscheidungen, Evidenz und
+  Prüfpaket. Ein bestätigbarer Research Brief, ein priorisierter Decision Ledger und eine
+  fallbasierte Hauptaussage binden Ergebnisse sichtbar an Frage und Fälle.
+- **Gemeinsames Defense-Gate.** Berichtsvorschau und berechenbare Ergebnisse bleiben früh
+  verfügbar; JSON, Rohdaten, Markdown und R-Skript werden erst zusammen freigeschaltet, wenn
+  Forschungsdesign, aktive Set-Kalibrierungen und wertgebundene Analyseentscheidungen bestätigt
+  sind. Demo-Daten bleiben grundsätzlich gesperrt.
+
+### Geändert
+
+- **Explizites Fortsetzen statt Autoload.** Autosave bleibt bestehen, aber kompatible lokale
+  V1-/V2-Projekte werden beim Einstieg nur als Resume-Kandidat mit Speicherzeitpunkt angeboten.
+  `?demo=1` bleibt ein direkter Lehrmodus.
+
 ### Korrigiert
 - **Reichweite der ESA-Abweichung erstmals gemessen.** Über 13.216 Konstellationen
   (drei Bedingungen, bis zu drei positive Ecken, alle Erwartungskombinationen) stimmt die

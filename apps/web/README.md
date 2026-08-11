@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# openQCA Web
 
-## Getting Started
+Next.js-Arbeitsraum für die lokale, reproduzierbare QCA-Analyse.
 
-First, run the development server:
+## Lokale Entwicklung
+
+Vom Repository-Root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev --workspace web
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Die App läuft unter `http://localhost:3000/app`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Arbeitsraum-Vertrag
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`/app` besitzt fünf kontrollierte Ziele: `#answer`, `#research`, `#decisions`, `#evidence`
+und `#defense`. Navigation aktualisiert die URL und Browser-History, ohne den Analysezustand
+zu demontieren.
 
-## Learn More
+Lokale Projekte werden automatisch als Envelope `openqca-local-project` Version 2 gespeichert.
+Beim App-Start wird ein kompatibler V1- oder V2-Stand nur als Resume-Kandidat angezeigt; geladen
+wird er ausschließlich über die explizite Schaltfläche. `?demo=1` lädt weiterhin direkt das
+synthetische Lehrbeispiel und wechselt zu `#answer`.
 
-To learn more about Next.js, take a look at the following resources:
+Rechnen und Verteidigen sind getrennt: berechenbare Ergebnisse erscheinen sofort als vorläufig.
+Berichtsvorschau und Antwort bleiben zugänglich; die vier Replikationsartefakte werden erst
+gemeinsam freigeschaltet, wenn Forschungsbrief, aktive Set-Kalibrierungen und die drei
+wertgebundenen Analyseentscheidungen bestätigt sind. Demo-Daten sind nie zitier- oder exportfähig.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Prüfung
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run lint --workspace web
+npm run build --workspace web
+cd apps/web && npx playwright test
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Die Playwright-Konfiguration startet den Produktions-Build auf Port 3100.

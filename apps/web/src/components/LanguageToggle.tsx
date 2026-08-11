@@ -15,7 +15,7 @@ export function LanguageToggle() {
   const [locale, setLocale] = useLocale();
 
   return (
-    <span role="group" aria-label={t(locale, "toggle.ariaLabel")} style={groupStyle}>
+    <span className="oq-language-toggle" role="group" aria-label={t(locale, "toggle.ariaLabel")} style={groupStyle}>
       {OPTIONS.map((opt) => {
         const active = locale === opt;
         return (
@@ -37,25 +37,28 @@ export function LanguageToggle() {
 const groupStyle: CSSProperties = {
   display: "inline-flex",
   border: "1px solid var(--line)",
-  borderRadius: 7,
+  borderRadius: "var(--radius-control)",
   overflow: "hidden",
 };
 
 const baseButtonStyle: CSSProperties = {
+  minWidth: 44,
+  minHeight: 44,
+  padding: "3px 9px",
+  border: "none",
   font: "inherit",
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: 650,
   letterSpacing: "0.03em",
-  padding: "3px 9px",
-  cursor: "pointer",
-  border: "none",
   lineHeight: 1.4,
+  cursor: "pointer",
 };
 
 const activeStyle: CSSProperties = {
   ...baseButtonStyle,
-  background: "var(--brand)",
-  color: "#fff",
+  color: "var(--accent-deep)",
+  background: "var(--accent-wash)",
+  boxShadow: "inset 0 0 0 1px color-mix(in oklch, var(--accent) 28%, transparent)",
   cursor: "default",
 };
 

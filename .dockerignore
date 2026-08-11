@@ -1,0 +1,11 @@
+.git
+.claude
+.codex
+node_modules
+**/node_modules
+**/.next
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+screenshots
+prototypes

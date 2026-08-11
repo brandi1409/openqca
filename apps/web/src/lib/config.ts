@@ -13,8 +13,6 @@ export const stripeEnabledClient = Boolean(stripePublishableKey);
 
 export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-/** KI-Modelle: Haiku für leichte Helfer, Sonnet für Textgenerierung. */
-export const AI_MODELS = {
-  light: "claude-haiku-4-5",
-  writing: "claude-sonnet-5",
-} as const;
+/** Server-side AI can be disabled independently of any configured provider key. */
+export const aiEnabled = process.env.AI_ENABLED === "true";
+

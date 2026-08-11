@@ -22,70 +22,32 @@ const TERMS: { term: DictKey; def: DictKey }[] = [
 export function Glossary() {
   const [locale] = useLocale();
   const [open, setOpen] = useState(false);
+  const toggleLabel = t(locale, "gloss.toggle").replace(/^[^\p{L}\p{N}]+/u, "");
 
   return (
-    <div
-      style={{
-        background: "var(--panel-2)",
-        border: "1px solid var(--line)",
-        borderRadius: 12,
-        marginBottom: 16,
-      }}
-    >
+    <div className="oq-glossary">
       <button
         type="button"
-        className="oq-btn oq-btn--quiet"
+        className="oq-btn oq-btn--quiet oq-glossary__toggle"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          fontSize: 13.5,
-          textAlign: "left",
-        }}
       >
-        <span>{t(locale, "gloss.toggle")}</span>
-        <span aria-hidden style={{ color: "var(--muted)", fontSize: 12 }}>
-          {open ? "▲" : "▼"}
-        </span>
+        <span>{toggleLabel}</span>
+        <span aria-hidden>{open ? "−" : "+"}</span>
       </button>
       {open && (
-        <div style={{ padding: "0 14px 14px" }}>
-          <dl
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "10px 20px",
-              margin: 0,
-            }}
-          >
+        <div className="oq-glossary__content">
+          <dl className="oq-glossary__terms">
             {TERMS.map(({ term, def }) => (
               <div key={term}>
-                <dt style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", margin: 0 }}>
-                  {t(locale, term)}
-                </dt>
-                <dd style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "2px 0 0" }}>
-                  {t(locale, def)}
-                </dd>
+                <dt>{t(locale, term)}</dt>
+                <dd>{t(locale, def)}</dd>
               </div>
             ))}
           </dl>
-          <div style={{ marginTop: 12 }}>
-            <a
-              href="/methodik"
-              style={{
-                fontSize: 13.5,
-                color: "var(--accent-deep)",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              {t(locale, "gloss.moreLink")}
-            </a>
-          </div>
+          <a href="/methodik" className="oq-glossary__more">
+            {t(locale, "gloss.moreLink")}
+          </a>
         </div>
       )}
     </div>

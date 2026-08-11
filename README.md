@@ -14,19 +14,26 @@ Quelloffenes, reproduzierbares Werkzeug für **Qualitative Comparative Analysis 
 > are internal regression snapshots. Interface and reports are available in German and English;
 > methodology documentation is in [`docs/qca-primer.en.md`](docs/qca-primer.en.md).
 
-## So sieht es aus
+## Arbeitsraum
 
-| | |
-|---|---|
-| ![Startseite](docs/screenshots/01-start.png) | ![Kalibrierung mit Ankerkurve](docs/screenshots/02-kalibrierung.png) |
-| Startseite — die Zahlen der Beispiel-Pipeline rechnet die Engine beim Laden live. | Schritt 3: drei begründbare Anker je Set, ziehbare Kurve, Verteilung der Rohwerte als Striche unter der Achse. |
-| ![Notwendigkeitsanalyse](docs/screenshots/03-notwendigkeit.png) | ![Truth Table](docs/screenshots/04-truthtable.png) |
-| Schritt 4: Der Befund steht über der Tabelle — Kandidaten namentlich, SUIN-Kombinationen nach RoN sortiert. | Schritt 5: Truth Table mit Frequenz- und Konsistenz-Cutoff. |
+Die Web-App ist als forschungsfragen-zentrierter Arbeitsraum organisiert:
 
-![Lösungen](docs/screenshots/05-loesungen.png)
+- **Antwort** zeigt früh einen berechneten, fallbasierten Befund und kennzeichnet ihn bis zur
+  Bestätigung der Entscheidungen als vorläufig.
+- **Forschungsdesign** bindet Frage, Falluniversum, Zeitraum, Outcome-Konzept und
+  Bedingungsauswahl an die aktuelle Variablenrollen.
+- **Entscheidungen** priorisiert offene Begründungen und enthält Kalibrierung, Cutoffs sowie
+  Richtungserwartungen.
+- **Evidenz** führt von Notwendigkeit und Truth Table über Lösungen und Falldiagnostik bis zu
+  XY-Plot und Robustheitsraster.
+- **Prüfpaket** erzeugt den vorläufigen Bericht und schaltet JSON, Rohdaten, Markdown und
+  R-Skript gemeinsam frei, sobald Forschungsdesign, aktive Sets und Analyseentscheidungen
+  bestätigt sind.
 
-Schritt 5: komplexe, intermediäre und sparsame Lösung mit Fit-Kennzahlen, Fall-Diagnostik
-je Pfad und dem Hinweis, welche Lösung üblicherweise berichtet wird.
+Projekte werden weiterhin automatisch lokal gespeichert, aber beim nächsten Besuch **nicht
+automatisch geladen**. Die Einstiegskarte zeigt stattdessen den gespeicherten Kandidaten mit
+Zeitpunkt; erst „Gespeichertes Projekt laden“ übernimmt ihn. `?demo=1` bleibt der direkte
+synthetische Lehrmodus.
 
 ## Warum es das gibt
 
@@ -75,15 +82,18 @@ openqca/
   ebenfalls mit `QCA` überein; die direkte Methode folgt Ragins ±3-Logit-Fixpunkten und weicht
   dokumentiert um < 0,01 von den R-Zielwerten ab. **Welche Zahl extern validiert und welche eine
   interne Regression ist, steht präzise in [`VALIDATION.md`](VALIDATION.md).**
-- **Web-App:** geführter 6-Schritte-Ablauf — Import (CSV/XLSX), Variablen & Rollen, Kalibrier-Workbench
+- **Web-App:** fünf kontrollierte Analyseziele — Antwort, Forschungsdesign, Entscheidungen,
+  Evidenz und Prüfpaket. CSV/XLSX-Import, Variablenrollen, Kalibrier-Workbench
   (Set-Definition, Methodenwahl, Anker, Evidenz, Fallprüfung, Anker-Sensitivität), Notwendigkeit,
   Truth Table mit allen drei Lösungstypen, Robustheit und Analyse des negierten Outcomes (~Y).
-  Exporte: Protokoll (JSON), Markdown, äquivalentes **R-Skript**, druckfähiger Bericht. DE/EN.
-- **Qualitätssicherung:** 55 Playwright-E2E-Tests prüfen Flüsse, visuelle Integrität (Hell/Dunkel ×
-  Desktop/Mobil) und Design-Konsistenz. Verbindliche Abnahmekriterien: [`docs/QUALITY-SPEC.md`](docs/QUALITY-SPEC.md).
-- **Cloud (optional, abschaltbar):** Konto (Supabase Magic Link), Projekt-Speicherung, KI-Assistenten
-  (Anthropic) und Zahlungen (Stripe) — vollständig im Code, aktiviert allein über Env-Variablen.
-  Ohne Schlüssel läuft die App rein lokal.
+  Exporte: Protokoll (JSON), Markdown, äquivalentes **R-Skript**, Rohdaten und druckfähiger Bericht.
+  DE/EN.
+- **Qualitätssicherung:** Playwright-E2E-Tests prüfen Arbeitsraum-Flüsse, visuelle Integrität
+  (Hell/Dunkel × Desktop/Mobil) und Design-Konsistenz. Verbindliche Abnahmekriterien:
+  [`docs/QUALITY-SPEC.md`](docs/QUALITY-SPEC.md).
+- **Cloud (optional, abschaltbar):** Konto (Supabase Magic Link), manuelle
+  Projekt-Speicherung, geprüfte OpenAI-Schreibhilfen und Zahlungen (Stripe).
+  Ohne passende Serverkonfiguration läuft die vollständige Analyse rein lokal.
 
 **Bewusst offen** (mit Begründung in [`docs/ROADMAP.md`](docs/ROADMAP.md)): externe Validierung der
 Vier-Werte-Kalibrierung (kein passendes Orakel im R-Paket), Zeitreihen-/Panel-QCA (Datenmodell fehlt),

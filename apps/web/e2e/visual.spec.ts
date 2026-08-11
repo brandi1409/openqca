@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ROUTES, loadDemo, loadExample, expectNoSvgLabelOverlaps } from "./helpers";
+import { ROUTES, loadDemo, loadExample, expectNoSvgLabelOverlaps, openDestination } from "./helpers";
 
 /**
  * A3 — Visuelle Integrität, geprüft in 4 Matrizen: Light/Dark × Desktop(1280)/
@@ -19,9 +19,15 @@ for (const colorScheme of SCHEMES) {
 
       test("A3.1 keine überlappenden SVG-Text-Labels (Demo & Fuzzy)", async ({ page }) => {
         await loadDemo(page);
+        await openDestination(page, "decisions");
+        await expectNoSvgLabelOverlaps(page);
+        await openDestination(page, "evidence");
         await expectNoSvgLabelOverlaps(page);
 
         await loadExample(page, /Fuzzy-Sets Beispiel/);
+        await openDestination(page, "decisions");
+        await expectNoSvgLabelOverlaps(page);
+        await openDestination(page, "evidence");
         await expectNoSvgLabelOverlaps(page);
       });
 
@@ -87,6 +93,7 @@ for (const colorScheme of SCHEMES) {
         page,
       }) => {
         await loadDemo(page);
+        await openDestination(page, "decisions");
         const quick = page.getByTestId("calibration-quick");
         const sliders = quick.getByRole("slider");
         const count = await sliders.count();
