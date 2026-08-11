@@ -163,6 +163,8 @@ site_url = "https://openqca.vercel.app"
 additional_redirect_urls = [
   "https://openqca.vercel.app",
   "https://openqca.vercel.app/**",
+  "https://openqca.185-163-119-246.sslip.io",
+  "https://openqca.185-163-119-246.sslip.io/**",
   "http://localhost:3000",
   "http://localhost:3000/**",
   "http://127.0.0.1:3000",
