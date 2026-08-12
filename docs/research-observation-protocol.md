@@ -9,6 +9,15 @@ Oberfläche, nicht die Forschung der Teilnehmenden. Die Schwellen sind
 Entscheidungshilfen für die nächste Produktiteration, keine Populationsschätzung
 und kein Nachweis einer kausalen Wirkung.
 
+Der ausführbare Sitzungsleitfaden, die zweisprachigen Einladungstexte, das
+synthetische Importmaterial und der strikt kategorische Aggregationsweg liegen
+in `research-session-kit.md`. `npm run research:template` erzeugt vor jeder
+Sitzung genau eine fehlersicher vorbelegte Zeile; `npm run research:aggregate`
+validiert sie, aktualisiert den laufenden Zwischenstand ausschließlich
+authentifiziert verschlüsselt und löscht die Einzelsitzungsdatei erst danach.
+Erst Sitzung fünf erzeugt die lesbare Kohortensumme und löscht den getrennten
+Schlüssel.
+
 ## Stichprobe und Material
 
 - fünf Forschende, jeweils 60 Minuten;
@@ -62,6 +71,8 @@ eine Bestätigung ungültig wird.
 Zulässige Felder:
 
 - `calibration_completion`: `complete|assisted|abandoned`
+- `decision_completion`: `complete|assisted|abandoned` für den gesamten Block
+  einschließlich der drei Analysebestätigungen
 - `frequency_confirmation`: `0|1`
 - `consistency_confirmation`: `0|1`
 - `expectations_confirmation`: `0|1`
@@ -104,16 +115,24 @@ Zulässige Felder je Aufgabe:
 - `prohibited_output`: `none|numeric_recommendation|citation_or_source|causal_claim|raw_or_case_data|defense_assertion|other`
 - `ai_time`: `under_2m|2_to_5m|over_5m`
 
-Provider, Modell, Nutzlast, Prompt, Antwort, Entwurf und Übernahmehandlung werden
-nicht gespeichert. Bei einem verbotenen Output endet die AI-Prüfung sofort.
+`returned`, `unavailable` und `error` sind nur nach `payload_reviewed: yes`
+zulässig. Provider, Modell, Nutzlast, Prompt, Antwort, Entwurf und
+Übernahmehandlung werden nicht gespeichert. Bei einem verbotenen Output endet
+die AI-Prüfung sofort.
 
 ## Aggregation und Löschung
 
 Eine Beobachtungszeile enthält ausschließlich die oben definierten Kategorien.
-Nach der Sitzung wird sie in Kohortenzahlen überführt und innerhalb von 24
-Stunden gelöscht. Dauerhaft verbleiben nur Summen für die fünfköpfige Kohorte.
-Es gibt keine Namen, Konten, IP-Adressen, User-Agents, Geräte-, Sitzungs- oder
-Einwilligungs-IDs, Zeitstempel, URLs, Referrer oder Freitextfelder.
+Sie wird nach jeder Sitzung einzeln in eindimensionale Kohortenzähler sowie die
+vorab definierten Stop-Gate-Zähler überführt und sofort gelöscht, spätestens
+jedoch innerhalb von 24 Stunden. Vor Abschluss der fünf Sitzungen existiert
+dieser Zwischenstand nur authentifiziert verschlüsselt unter einem getrennt
+geschützten, ausschließlich für diese Kohorte erzeugten Schlüssel. Erst die
+vollständige Kohorte wird als lesbare Summe ausgegeben; der Schlüssel wird dann
+gelöscht. Die lesbare Datei enthält keine Zeilen, vollständigen
+Merkmalskombinationen oder explorativen Kreuztabellen. Es gibt keine Namen,
+Konten, IP-Adressen, User-Agents, Geräte-, Sitzungs- oder Einwilligungs-IDs,
+Zeitstempel, URLs, Referrer oder Freitextfelder.
 
 ## Produktmetriken ohne Forschungsinhalte
 

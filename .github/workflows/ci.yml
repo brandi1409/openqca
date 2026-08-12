@@ -34,6 +34,9 @@ jobs:
       - name: Deployment — Compose contracts
         run: npm run check:deployment
 
+      - name: Research protocol — privacy and stop-gate contracts
+        run: npm run test:research-protocol
+
       - name: Web — Lint
         run: npm run lint --workspace web
 

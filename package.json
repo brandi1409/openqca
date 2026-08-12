@@ -18,7 +18,11 @@
     "check:r-calibration": "node scripts/calibrate-cross-validate.mjs",
     "check:engine-package": "node scripts/check-engine-package.mjs",
     "check:deployment": "node scripts/check-deployment.mjs",
-    "verify": "npm run test:engine && npm run check:reference && npm run check:r && npm run check:r-calibration && npm run check:deployment && npm run lint --workspace web && npm run build --workspace web && npm run test:e2e --workspace web",
+    "test:research-protocol": "node --test scripts/aggregate-research-observations.test.mjs",
+    "research:key": "node scripts/aggregate-research-observations.mjs --create-key",
+    "research:template": "node scripts/aggregate-research-observations.mjs --template",
+    "research:aggregate": "node scripts/aggregate-research-observations.mjs",
+    "verify": "npm run test:engine && npm run check:reference && npm run check:r && npm run check:r-calibration && npm run check:deployment && npm run test:research-protocol && npm run lint --workspace web && npm run build --workspace web && npm run test:e2e --workspace web",
     "smoke:staging": "bash deploy/smoke-staging.sh",
     "release:staging": "bash deploy/staging-release.sh"
   },
