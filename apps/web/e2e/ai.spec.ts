@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { aiRequestPrivacyIssues, parseAiAssistRequest } from "../src/lib/ai-contract";
 
 const briefPayload = {
   version: "v2",
@@ -12,6 +13,28 @@ const briefPayload = {
     conditionSelectionRationale: "Theoretisch begründete Bedingungen",
   },
 };
+
+test("short case labels do not block ordinary reviewed prose", () => {
+  const parsed = parseAiAssistRequest(briefPayload);
+  expect(parsed?.task).toBe("brief_clarify");
+  if (!parsed || parsed.task !== "brief_clarify") {
+    throw new Error("brief fixture did not satisfy the reviewed request contract");
+  }
+  expect(
+    aiRequestPrivacyIssues(
+      {
+        ...parsed,
+        payload: {
+          ...parsed.payload,
+          question: "Welche Bedingungen erklären a resilient community?",
+          conditionSelectionRationale: "Variable A folgt dem theoretischen Rahmen.",
+          timePeriod: "2020/2021/2022",
+        },
+      },
+      ["A", "B"],
+    ),
+  ).toEqual([]);
+});
 
 test("AI route rejects legacy and forbidden-data payloads before provider access", async ({ request }) => {
   const legacy = await request.post("/api/ai/assist", { data: { task: "methods", locale: "de", context: "x", data: {} } });

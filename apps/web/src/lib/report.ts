@@ -515,7 +515,10 @@ export function generateReportHtml(input: ReportInput): string {
       input.analysisDecisions.directionalExpectations.confirmed ? yes : no,
     ],
   ];
-  const aiProvenanceRows = listAiWritingProvenance(input.aiWritingProvenance);
+  const aiProvenanceRows = listAiWritingProvenance(
+    input.aiWritingProvenance,
+    input.varMeta ?? {},
+  );
   const aiProvenanceTitle =
     locale === "en" ? "Adopted AI writing provenance" : "Provenienz übernommener KI-Texte";
   const aiProvenanceNone =

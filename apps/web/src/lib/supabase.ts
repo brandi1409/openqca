@@ -14,10 +14,14 @@ export function getSupabase(): SupabaseClient | null {
   return browserClient;
 }
 
+export function serviceSupabaseAvailable(): boolean {
+  return Boolean(supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 /** Server-Client mit Service-Role (nur in Route-Handlern verwenden, nie im Browser). */
 export function getServiceSupabase(): SupabaseClient | null {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!supabaseUrl || !serviceKey) return null;
+  if (!serviceSupabaseAvailable()) return null;
   return createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

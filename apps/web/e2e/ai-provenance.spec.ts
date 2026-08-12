@@ -14,6 +14,7 @@ import {
   type VarMeta,
 } from "../src/lib/workspace-model";
 import type { RawDataset } from "../src/lib/demo";
+import { migrateSpecsFromAnchors } from "../src/lib/calibration-model";
 import {
   CALIBRATION_PROTOCOL_SCHEMA_VERSION,
   buildCalibrationNarrative,
@@ -67,7 +68,7 @@ async function provenanceFixture(): Promise<AiWritingProvenance> {
 
 test("AI writing provenance stores bounded metadata and hashes, never source text", async () => {
   const provenance = await provenanceFixture();
-  const rows = listAiWritingProvenance(provenance);
+  const rows = listAiWritingProvenance(provenance, varMeta);
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({
     task: "brief_clarify",
@@ -98,11 +99,14 @@ test("exported calibration provenance uses a generic target and omits its privat
     "Previous definition",
     "Adopted definition",
   );
-  const rows = listAiWritingProvenance({
-    brief_clarify: {},
-    calibration_evidence_gaps: { "participant-email@example.test": entry },
-    decision_rationale_review: {},
-  });
+  const rows = listAiWritingProvenance(
+    {
+      brief_clarify: {},
+      calibration_evidence_gaps: { "participant-email@example.test": entry },
+      decision_rationale_review: {},
+    },
+    varMeta,
+  );
   expect(rows).toEqual([
     {
       task: "calibration_evidence_gaps",
@@ -116,6 +120,69 @@ test("exported calibration provenance uses a generic target and omits its privat
   ]);
   expect(JSON.stringify(rows)).not.toContain("participant-email@example.test");
   expect(JSON.stringify(rows)).not.toContain(entry.hashSalt);
+});
+
+test("parked calibration provenance returns when an ignored set is reactivated", async () => {
+  const entry = await buildAiWritingProvenanceEntry(
+    {
+      provider: "mock",
+      model: "test-model",
+      generatedAt: "2026-08-11T10:00:00.000Z",
+    },
+    "Previous definition",
+    "Adopted definition",
+  );
+  const provenance: AiWritingProvenance = {
+    brief_clarify: {},
+    calibration_evidence_gaps: { A: entry },
+    decision_rationale_review: {},
+  };
+  const ignoredVarMeta: Record<string, VarMeta> = {
+    ...varMeta,
+    A: { ...varMeta.A, role: "ignore" },
+  };
+  expect(listAiWritingProvenance(provenance, ignoredVarMeta)).toEqual([]);
+
+  const calibSpecs = migrateSpecsFromAnchors(["A", "Y"], dataset.anchors);
+  calibSpecs.A = {
+    ...calibSpecs.A,
+    set: { ...calibSpecs.A.set, definition: "Adopted definition" },
+  };
+  const reloadedIgnored = normalizeSavedState({
+    dataset,
+    anchors: dataset.anchors,
+    varMeta: ignoredVarMeta,
+    calibSpecs,
+    demoMode: false,
+    freqCut: 1,
+    consCut: 0.8,
+    expectations: {},
+    researchBrief: brief,
+    analysisDecisions: decisions,
+    aiWritingProvenance: provenance,
+  });
+  expect(reloadedIgnored).not.toBeNull();
+  const verifiedParked = await verifyAiWritingProvenance(reloadedIgnored!);
+  expect(verifiedParked.calibration_evidence_gaps.A).toEqual(entry);
+  expect(listAiWritingProvenance(verifiedParked, ignoredVarMeta)).toEqual([]);
+
+  const reloadedActive = normalizeSavedState({
+    ...reloadedIgnored!,
+    varMeta,
+  });
+  expect(reloadedActive).not.toBeNull();
+  const verifiedActive = await verifyAiWritingProvenance(reloadedActive!);
+  expect(listAiWritingProvenance(verifiedActive, varMeta)).toEqual([
+    {
+      task: "calibration_evidence_gaps",
+      target: "calibrationDefinition.1",
+      provider: "mock",
+      model: "test-model",
+      generatedAt: "2026-08-11T10:00:00.000Z",
+      previousTextHash: entry.previousTextHash,
+      adoptedTextHash: entry.adoptedTextHash,
+    },
+  ]);
 });
 test("saved-state normalization preserves valid provenance and drops malformed entries", async () => {
   const provenance = await provenanceFixture();
@@ -222,7 +289,9 @@ test("JSON, Markdown, and report exports disclose adopted AI writing provenance"
   const markdown = buildCalibrationNarrative({ ...commonProtocol, locale: "en" });
   expect(markdown).toContain("## Adopted AI writing provenance");
   expect(markdown).toContain("mock / test-model");
-  expect(markdown).toContain(listAiWritingProvenance(aiWritingProvenance)[0].adoptedTextHash);
+  expect(markdown).toContain(
+    listAiWritingProvenance(aiWritingProvenance, varMeta)[0].adoptedTextHash,
+  );
 
   const truthTable: TruthTableResult = {
     conditions: ["A"],
@@ -269,5 +338,7 @@ test("JSON, Markdown, and report exports disclose adopted AI writing provenance"
   });
   expect(report).toContain("Adopted AI writing provenance");
   expect(report).toContain("mock / test-model");
-  expect(report).toContain(listAiWritingProvenance(aiWritingProvenance)[0].previousTextHash);
+  expect(report).toContain(
+    listAiWritingProvenance(aiWritingProvenance, varMeta)[0].previousTextHash,
+  );
 });

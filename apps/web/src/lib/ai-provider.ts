@@ -4,7 +4,8 @@ import {
   type AiAssistRequest,
   type AiReviewResponse,
 } from "@/lib/ai-contract";
-import { evaluateAiReviewResponse } from "@/lib/ai-evaluation";
+import { evaluateAiReviewResponse, nonNegatedMatch } from "@/lib/ai-evaluation";
+import { serviceSupabaseAvailable } from "@/lib/supabase";
 
 type AiProvider = "openai" | "gemini";
 export interface AiCompletionResult {
@@ -24,6 +25,11 @@ export function aiProviderAvailable(): boolean {
   if (provider === "openai") return Boolean(process.env.OPENAI_API_KEY);
   if (provider === "gemini") return Boolean(process.env.GEMINI_API_KEY);
   return false;
+}
+
+export function aiAssistAvailable(): boolean {
+  return aiProviderAvailable() &&
+    (process.env.AI_REQUIRE_CLOUD_TIER === "false" || serviceSupabaseAvailable());
 }
 
 function promptFor(request: AiAssistRequest): { instructions: string; input: string } {
@@ -69,22 +75,46 @@ function validatedResponse(value: unknown, request: AiAssistRequest): AiReviewRe
   return normalized;
 }
 
-function requestText(request: AiAssistRequest): string {
-  return Object.values(request.payload).join("\n");
+const DIRECTIVE_PREFIX = String.raw`(?:^\s*(?:(?:please|bitte)\s+)?|\b(?:(?:can|could|would)\s+you|(?:please|bitte|should|must|soll(?:te|test|tet|ten)?|muss(?:t|tet|ten)?)|(?:you|du|sie)\s+(?:should|must|soll(?:te|st|en)?|muss(?:t|en)?))\s+)`;
+
+function directivePattern(action: RegExp, target: RegExp, gap = 80): RegExp {
+  return new RegExp(
+    `${DIRECTIVE_PREFIX}(?:${action.source}).{0,${gap}}(?:${target.source})`,
+    "iu",
+  );
 }
 
+const UNSAFE_REQUEST_INTENT = [
+  directivePattern(
+    /\b(?:claim\w*|assert\w*|state\w*|draw\w*|formulat\w*|behaupt\w*|schlussfolger\w*|stell\w*)\b/iu,
+    /\b(?:caus\w*|kausal\w*|verursach\w*|bewirk\w*|determines?|leads?\s+to|increases?|reduces?|führt\s+(?:zu|zum|zur)|erhöh\w*|verringer\w*)\b/iu,
+  ),
+  directivePattern(
+    /\b(?:choose|select|recommend|give|name|calculate|compute|derive|assign|set|optimi[sz]\w*|wähl\w*|empfehl\w*|empfiehl\w*|nenn\w*|berechn\w*|ermittl\w*|bestimm\w*|zuweis\w*|setz\w*)\b/iu,
+    /\b(?:calibrat\w*|cutoff\w*|threshold\w*|membership\w*|anchor\w*|numeric\w*|number\w*|optimal\w*|value\w*|consistency\w*|frequency\w*|qca|anker\w*|kalibrier\w*|schwellen\w*|zugehörig\w*|numer\w*|wert\w*|konsistenz\w*|frequenz\w*)\b/iu,
+  ),
+  directivePattern(
+    /\b(?:add|insert|invent|fabricat\w*|ergänz\w*|erfind\w*)\b/iu,
+    /\b(?:citation|source|study|literatur\w*|quelle\w*|studie\w*)\b/iu,
+  ),
+  directivePattern(
+    /\b(?:choose|select|assign|treat|classif\w*|wähl\w*|bestimm\w*|zuweis\w*|behandel\w*|klassifizier\w*)\b/iu,
+    /\b(?:role|condition|outcome|rolle\w*|bedingung\w*|ergebnis\w*)\b/iu,
+  ),
+  directivePattern(
+    /\b(?:analy[sz]\w*|review\w*|inspect\w*|prüf\w*|analysier\w*|untersuch\w*)\b/iu,
+    /\b(?:case|row|raw data|fall|zeile|rohdaten)\w*\b/iu,
+  ),
+  directivePattern(
+    /\b(?:certif\w*|confirm\w*|guarantee\w*|approv\w*|bestätig\w*|garantier\w*|freigib\w*)\b/iu,
+    /\b(?:project|protocol|review package|defense|outcome|result|projekt\w*|protokoll\w*|prüfpaket\w*|verteidigung\w*|ergebnis\w*)\b/iu,
+  ),
+] as const;
+
 function refusalForUnsafeIntent(request: AiAssistRequest): AiReviewResponse | null {
-  const value = requestText(request);
-  const unsafe = [
-    /(?=.*\b(?:causal\w*|kausal\w*)\b)(?=.*\b(?:conclusion|claim|schlussfolger\w*|behaupt\w*)\b)/iu,
-    /(?=.*\b(?:claim|assert|state|behaupt\w*)\b)(?=.*\b(?:caus\w*|verursach\w*|bewirk\w*)\b)/iu,
-    /(?=.*\b(?:choose|select|recommend|give|name|calculate|compute|derive|assign|optimi[sz]\w*|wähl\w*|empfehl\w*|empfiehl\w*|nenn\w*|berechn\w*|ermittl\w*|bestimm\w*|zuweis\w*)\b)(?=.*\b(?:calibrat\w*|cutoff\w*|threshold\w*|membership\w*|anchor\w*|numeric\w*|number\w*|optimal\w*|value\w*|consistency\w*|frequency\w*|qca|anker\w*|kalibrier\w*|schwellen\w*|zugehörig\w*|numer\w*|wert\w*|konsistenz\w*|frequenz\w*)\b)/iu,
-    /\b(?:set|setz\w*)\s+(?:(?:the|a|an|den|die|das|einen|eine)\s+)?(?:calibrat\w*|cutoff\w*|threshold\w*|membership\w*|anchor\w*|value\w*|consistency\w*|frequency\w*|anker\w*|kalibrier\w*|schwellen\w*|zugehörig\w*|wert\w*|konsistenz\w*|frequenz\w*)\b/iu,
-    /(?=.*\b(?:add|insert|invent|fabricat\w*|ergänz\w*|erfind\w*)\b)(?=.*\b(?:citation|source|study|literatur\w*|quelle\w*|studie\w*)\b)/iu,
-    /(?=.*\b(?:choose|select|assign|wähl\w*|bestimm\w*|zuweis\w*)\b)(?=.*\b(?:role|condition|outcome|rolle\w*|bedingung\w*)\b)/iu,
-    /(?=.*\b(?:analy[sz]\w*|review\w*|inspect\w*|prüf\w*|analysier\w*|untersuch\w*)\b)(?=.*\b(?:case|row|raw data|fall|zeile|rohdaten)\w*\b)/iu,
-    /(?=.*\b(?:certif\w*|confirm\w*|guarantee\w*|approv\w*|bestätig\w*|garantier\w*|freigib\w*)\b)(?=.*\b(?:project|protocol|review package|defense|outcome|result|projekt\w*|protokoll\w*|prüfpaket\w*|verteidigung\w*|ergebnis\w*)\b)/iu,
-  ].some((pattern) => pattern.test(value));
+  const unsafe = Object.values(request.payload).some((value) =>
+    UNSAFE_REQUEST_INTENT.some((pattern) => nonNegatedMatch(value, pattern))
+  );
   if (!unsafe) return null;
   const base = {
     status: "refusal" as const,

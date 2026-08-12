@@ -96,6 +96,7 @@ const GENERIC_CASE_IDENTIFIER = /\b(?:case|fall|participant|teilnehmer|patient)[
 const RAW_FILE_REFERENCE = /\.(?:csv|tsv|xlsx?|sav|dta|txt)\b/iu;
 const JSON_ROW = /\{\s*["'][^"']+["']\s*:/u;
 const NUMERIC_CELL = /^[-+]?(?:\p{N}+(?:[.,]\p{N}+)?|[01])$/u;
+const YEAR_SEQUENCE = /^(?:(?:19|20)\p{N}{2})(?:[\s./-](?:19|20)\p{N}{2}){1,4}$/u;
 
 function looksLikeDelimitedRow(value: string): boolean {
   if (value.includes("\t")) return true;
@@ -110,6 +111,7 @@ function looksLikeDelimitedRow(value: string): boolean {
 function looksLikePhoneNumber(value: string): boolean {
   return [...value.normalize("NFKC").matchAll(PHONE_CANDIDATE)].some((match) => {
     const candidate = match[0];
+    if (YEAR_SEQUENCE.test(candidate.trim())) return false;
     const digits = candidate.replace(/[^\p{N}]/gu, "");
     if (digits.length < 9 || digits.length > 15) return false;
     const separators = candidate.match(/[\s./-]/gu)?.length ?? 0;
@@ -126,6 +128,7 @@ function containsSensitiveValue(textValue: string, sensitiveValues: readonly str
   return sensitiveValues.some((candidate) => {
     const token = candidate.normalize("NFKC").trim();
     if (!token) return false;
+    if (token.length < 2) return false;
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
     return new RegExp(
       `(?:^|[^\\p{L}\\p{N}_])${escaped}(?=$|[^\\p{L}\\p{N}_])`,

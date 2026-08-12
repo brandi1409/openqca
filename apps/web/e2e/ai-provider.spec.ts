@@ -289,6 +289,49 @@ test("unsafe intent in every reviewed field is refused before provider access", 
   expect(fetchCalls).toBe(0);
 });
 
+test("safe intent language is reviewed instead of refused", async () => {
+  process.env.AI_ENABLED = "true";
+  process.env.AI_PROVIDER = "gemini";
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return new Response(JSON.stringify({
+      candidates: [{
+        finishReason: "STOP",
+        content: { parts: [{ text: JSON.stringify({
+          task: "decision_rationale_review",
+          status: "ok",
+          review: "The rationale is specific and bounded.",
+          suggested: {
+            decision: "directionalExpectations",
+            rationale: "The selected decision follows the preregistered design.",
+          },
+          uncertainty: [],
+          evidenceNeeds: [],
+          limitations: [],
+        }) }] },
+      }],
+    }), { status: 200 });
+  };
+
+  for (const rationale of [
+    "We do not make causal claims; the selected decision follows the preregistered design.",
+    "Wir stellen keine kausalen Behauptungen auf; die gewählte Entscheidung folgt dem präregistrierten Design.",
+    "We use the published scale to define set membership.",
+    "Use of the published scale defines set membership.",
+  ]) {
+    const result = await completeAi({
+      version: AI_CONTRACT_VERSION,
+      task: "decision_rationale_review",
+      locale: rationale.startsWith("Wir") ? "de" : "en",
+      payload: { decision: "directionalExpectations", rationale },
+    });
+    expect(result.review.status, rationale).not.toBe("refusal");
+  }
+  expect(fetchCalls).toBe(4);
+});
+
 test("provider incomplete status is never upgraded by the local completeness gate", async () => {
   process.env.AI_ENABLED = "true";
   process.env.AI_PROVIDER = "gemini";

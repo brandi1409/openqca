@@ -75,6 +75,7 @@ export function emptyAiWritingProvenance(): AiWritingProvenance {
   };
 }
 
+
 export interface SavedState {
   dataset: RawDataset;
   anchors: Anchors;
@@ -249,7 +250,6 @@ function normalizeAiWritingEntry(raw: unknown): AiWritingProvenanceEntry | null 
 function normalizeAiWritingProvenance(
   raw: unknown,
   columns: string[],
-  varMeta: Record<string, VarMeta>,
 ): AiWritingProvenance {
   const normalized = emptyAiWritingProvenance();
   if (!isRecord(raw)) return normalized;
@@ -272,7 +272,6 @@ function normalizeAiWritingProvenance(
 
   if (isRecord(raw.calibration_evidence_gaps)) {
     for (const column of columns) {
-      if (varMeta[column]?.role === "ignore") continue;
       const entry = normalizeAiWritingEntry(raw.calibration_evidence_gaps[column]);
       if (entry) normalized.calibration_evidence_gaps[column] = entry;
     }
@@ -294,6 +293,7 @@ function publicAiWritingEntry(
 
 export function listAiWritingProvenance(
   provenance: AiWritingProvenance,
+  varMeta: Readonly<Record<string, { role: string }>>,
 ): AiWritingProvenanceRow[] {
   const rows: AiWritingProvenanceRow[] = [];
   const question = provenance.brief_clarify.question;
@@ -318,7 +318,10 @@ export function listAiWritingProvenance(
       });
     }
   }
-  Object.keys(provenance.calibration_evidence_gaps).sort().forEach((column, index) => {
+  const calibrationColumns = Object.keys(provenance.calibration_evidence_gaps)
+    .filter((column) => varMeta[column]?.role !== "ignore")
+    .sort();
+  calibrationColumns.forEach((column, index) => {
     rows.push({
       task: "calibration_evidence_gaps",
       target: `calibrationDefinition.${index + 1}`,
@@ -401,7 +404,6 @@ export function normalizeSavedState(raw: unknown): SavedState | null {
     aiWritingProvenance: normalizeAiWritingProvenance(
       input.aiWritingProvenance,
       columns,
-      varMeta,
     ),
   };
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { aiProviderAvailable, completeAi } from "@/lib/ai-provider";
+import { aiAssistAvailable, completeAi } from "@/lib/ai-provider";
 import { AI_CONTRACT_VERSION, parseAiAssistRequest } from "@/lib/ai-contract";
 import { recordAiRequest } from "@/lib/ai-telemetry";
 import { getServiceSupabase } from "@/lib/supabase";
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
   const locale = rawLocale(raw);
   const body = parseAiAssistRequest(raw);
   if (!body) return error(locale, "invalid_request", 400);
-  if (!aiProviderAvailable()) {
+  if (!aiAssistAvailable()) {
     recordAiRequest(body.task, "disabled", now);
     return error(locale, "disabled", 501);
   }

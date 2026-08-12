@@ -568,7 +568,10 @@ export function buildCalibrationProtocolJson(args: {
     methodologyReferences: METHODOLOGY_REFERENCES,
     dataset: args.ds.name,
     researchBrief: args.researchBrief,
-    aiWritingProvenance: listAiWritingProvenance(args.aiWritingProvenance),
+    aiWritingProvenance: listAiWritingProvenance(
+      args.aiWritingProvenance,
+      args.varMeta,
+    ),
     engine: {
       calibration:
         "direct logistic Ragin 2008 (log-odds ±3 at anchors ≈0.0474/0.5/0.9526); linear fuzzy is piecewise linear between the same three anchors (QCA::calibrate logistic=FALSE); crisp threshold inclusive (>= for higher-membership scales, <= for inverted scales)",
@@ -778,7 +781,10 @@ export function buildCalibrationNarrative(args: {
   lines.push("");
   lines.push(en ? "## Adopted AI writing provenance" : "## Provenienz übernommener KI-Texte");
   lines.push("");
-  const aiProvenanceRows = listAiWritingProvenance(args.aiWritingProvenance);
+  const aiProvenanceRows = listAiWritingProvenance(
+    args.aiWritingProvenance,
+    args.varMeta,
+  );
   if (aiProvenanceRows.length === 0) {
     lines.push(
       en
