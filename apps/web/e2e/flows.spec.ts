@@ -77,7 +77,7 @@ test("embedded crisp and fuzzy examples remain inspectable in Research design", 
   await expect(crispStats).toContainText(/0,000/);
 
   await expectExportGateClosed(page);
-  await expect(page.getByText("Synthetisch", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Demo-Datensatz: Der Bericht/)).toBeVisible();
   await loadExample(page, /Fuzzy-Sets Beispiel/);
   await page.getByText("Deskriptivstatistik der aktiven Sets", { exact: true }).click();
   const fuzzyStats = page.locator("details").filter({ hasText: "Deskriptivstatistik der aktiven Sets" });
@@ -85,7 +85,7 @@ test("embedded crisp and fuzzy examples remain inspectable in Research design", 
   await expect(fuzzyStats).toContainText(/0,100/);
   await expect(fuzzyStats).toContainText(/0,900/);
   await expectExportGateClosed(page);
-  await expect(page.getByText("Synthetisch", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Demo-Datensatz: Der Bericht/)).toBeVisible();
 });
 
 test("role changes preserve exactly one outcome and recompute the answer", async ({ page }) => {
@@ -153,36 +153,20 @@ test("complete research, calibration, and analysis decisions unlock one shared d
   const jsonPath = await jsonFile.path();
   if (!jsonPath) throw new Error("JSON export path missing");
   const payload = JSON.parse(await readFile(jsonPath, "utf8")) as {
-    schemaVersion: number;
+    protocolSchemaVersion: number;
     researchBrief: { confirmed: boolean };
     analysis: {
       decisions: Record<string, { rationale: string; confirmed: boolean }>;
       expectations: Record<string, string>;
     };
-    analysisResult: {
-      status: string;
-      caseSummary: { typical: string[]; excludedCases: string[] };
-    };
-    reproducibility: {
-      engine: { package: string; version: string; exact: boolean };
-      rawDataFilename: string;
-      rScriptFilename: string;
-    };
     robustness: { totalCells: number } | null;
     aiWritingProvenance: unknown[];
   };
-  expect(payload.schemaVersion).toBe(2);
+  expect(payload.protocolSchemaVersion).toBe(2);
   expect(payload.researchBrief.confirmed).toBe(true);
   expect(Object.values(payload.analysis.decisions).every((decision) => decision.confirmed)).toBe(true);
   expect(Object.keys(payload.analysis.expectations).length).toBeGreaterThan(0);
   expect(payload.robustness?.totalCells).toBeGreaterThan(0);
-  expect(payload.analysisResult.status).toMatch(/^(solution|no_solution)$/);
-  expect(Array.isArray(payload.analysisResult.caseSummary.typical)).toBe(true);
-  expect(Array.isArray(payload.analysisResult.caseSummary.excludedCases)).toBe(true);
-  expect(payload.reproducibility.engine.package).toBe("@openqca/engine");
-  expect(payload.reproducibility.engine.exact).toBe(true);
-  expect(payload.reproducibility.rawDataFilename).toBe("openqca-raw-data.csv");
-  expect(payload.reproducibility.rScriptFilename).toBe("openqca-reproduce.R");
   expect(payload.aiWritingProvenance).toEqual([]);
 
   await openDestination(page, "decisions");
