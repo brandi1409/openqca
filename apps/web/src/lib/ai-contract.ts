@@ -1,44 +1,185 @@
 import type { Locale } from "@/i18n/locale";
 
-export const AI_CONTRACT_VERSION = "v1" as const;
-export const AI_TASKS = ["brief_clarify", "calibration_evidence_gaps", "decision_rationale_review"] as const;
+export const AI_CONTRACT_VERSION = "v2" as const;
+export const AI_TASKS = [
+  "brief_clarify",
+  "calibration_evidence_gaps",
+  "decision_rationale_review",
+] as const;
 export type AiTask = (typeof AI_TASKS)[number];
+export type AiReviewStatus = "ok" | "incomplete" | "refusal";
+export type DecisionRationaleTarget =
+  | "frequencyCutoff"
+  | "consistencyCutoff"
+  | "directionalExpectations";
 
-export interface ReviewedSummary { status: "ok" | "incomplete" | "refusal"; draft: string; uncertainty: string[]; evidenceNeeds: string[]; limitations: string[] }
-export interface AiRequestBase { version: typeof AI_CONTRACT_VERSION; task: AiTask; locale: Locale }
-export interface BriefClarifyRequest extends AiRequestBase { task: "brief_clarify"; payload: { question: string; caseUniverse: string; timePeriod: string; outcomeConcept: string; conditionSelectionRationale: string } }
-export interface CalibrationEvidenceGapsRequest extends AiRequestBase { task: "calibration_evidence_gaps"; payload: { variable: string; setLabel: string; definition: string; rationale: string } }
-export interface DecisionRationaleReviewRequest extends AiRequestBase { task: "decision_rationale_review"; payload: { decision: "frequencyCutoff" | "consistencyCutoff" | "directionalExpectations"; rationale: string } }
-export type AiAssistRequest = BriefClarifyRequest | CalibrationEvidenceGapsRequest | DecisionRationaleReviewRequest;
+export interface AiRequestBase {
+  version: typeof AI_CONTRACT_VERSION;
+  task: AiTask;
+  locale: Locale;
+}
+
+export interface BriefClarifyRequest extends AiRequestBase {
+  task: "brief_clarify";
+  payload: {
+    question: string;
+    caseUniverse: string;
+    timePeriod: string;
+    outcomeConcept: string;
+    conditionSelectionRationale: string;
+  };
+}
+
+export interface CalibrationEvidenceGapsRequest extends AiRequestBase {
+  task: "calibration_evidence_gaps";
+  payload: {
+    variable: string;
+    setLabel: string;
+    definition: string;
+    rationale: string;
+  };
+}
+
+export interface DecisionRationaleReviewRequest extends AiRequestBase {
+  task: "decision_rationale_review";
+  payload: {
+    decision: DecisionRationaleTarget;
+    rationale: string;
+  };
+}
+
+export type AiAssistRequest =
+  | BriefClarifyRequest
+  | CalibrationEvidenceGapsRequest
+  | DecisionRationaleReviewRequest;
+
+interface AiReviewBase {
+  task: AiTask;
+  status: AiReviewStatus;
+  review: string;
+  uncertainty: string[];
+  evidenceNeeds: string[];
+  limitations: string[];
+}
+
+export interface BriefClarifyReview extends AiReviewBase {
+  task: "brief_clarify";
+  suggested: { question: string };
+}
+
+export interface CalibrationEvidenceGapsReview extends AiReviewBase {
+  task: "calibration_evidence_gaps";
+  suggested: { variable: string; definition: string };
+}
+
+export interface DecisionRationaleReview extends AiReviewBase {
+  task: "decision_rationale_review";
+  suggested: { decision: DecisionRationaleTarget; rationale: string };
+}
+
+export type AiReviewResponse =
+  | BriefClarifyReview
+  | CalibrationEvidenceGapsReview
+  | DecisionRationaleReview;
 
 const MAX_TEXT = 2_000;
+
 function text(value: unknown, required = true): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return (required && !trimmed) || trimmed.length > MAX_TEXT ? null : trimmed;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(record).every((key) => keys.includes(key));
+}
+function isAiReviewStatus(value: unknown): value is AiReviewStatus {
+  return value === "ok" || value === "incomplete" || value === "refusal";
+}
+
+
 /** Parses only the reviewed, non-numerical payloads that may leave the browser. */
 export function parseAiAssistRequest(value: unknown): AiAssistRequest | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  if (record.version !== AI_CONTRACT_VERSION || !AI_TASKS.includes(record.task as AiTask)) return null;
-  if (Object.keys(record).some((key) => !["version", "task", "locale", "payload"].includes(key))) return null;
-  if ((record.locale !== "de" && record.locale !== "en") || typeof record.payload !== "object" || record.payload === null || Array.isArray(record.payload)) return null;
-  const p = record.payload as Record<string, unknown>;
-  if (record.task === "brief_clarify") {
-    if (Object.keys(p).some((key) => !["question", "caseUniverse", "timePeriod", "outcomeConcept", "conditionSelectionRationale"].includes(key))) return null;
-    const question = text(p.question); const caseUniverse = text(p.caseUniverse); const timePeriod = text(p.timePeriod); const outcomeConcept = text(p.outcomeConcept); const conditionSelectionRationale = text(p.conditionSelectionRationale);
-    return question && caseUniverse && timePeriod && outcomeConcept && conditionSelectionRationale ? { version: AI_CONTRACT_VERSION, task: "brief_clarify", locale: record.locale, payload: { question, caseUniverse, timePeriod, outcomeConcept, conditionSelectionRationale } } : null;
+  if (!isRecord(value)) return null;
+  if (value.version !== AI_CONTRACT_VERSION || !AI_TASKS.includes(value.task as AiTask)) {
+    return null;
   }
-  if (record.task === "calibration_evidence_gaps") {
-    if (Object.keys(p).some((key) => !["variable", "setLabel", "definition", "rationale"].includes(key))) return null;
-    const variable = text(p.variable); const setLabel = text(p.setLabel); const definition = text(p.definition); const rationale = text(p.rationale);
-    return variable && setLabel && definition && rationale ? { version: AI_CONTRACT_VERSION, task: "calibration_evidence_gaps", locale: record.locale, payload: { variable, setLabel, definition, rationale } } : null;
+  if (!hasOnlyKeys(value, ["version", "task", "locale", "payload"])) return null;
+  if ((value.locale !== "de" && value.locale !== "en") || !isRecord(value.payload)) {
+    return null;
   }
-  if (Object.keys(p).some((key) => !["decision", "rationale"].includes(key))) return null;
-  const rationale = text(p.rationale);
-  return (p.decision === "frequencyCutoff" || p.decision === "consistencyCutoff" || p.decision === "directionalExpectations") && rationale ? { version: AI_CONTRACT_VERSION, task: "decision_rationale_review", locale: record.locale, payload: { decision: p.decision, rationale } } : null;
+  const payload = value.payload;
+  if (value.task === "brief_clarify") {
+    if (
+      !hasOnlyKeys(payload, [
+        "question",
+        "caseUniverse",
+        "timePeriod",
+        "outcomeConcept",
+        "conditionSelectionRationale",
+      ])
+    ) {
+      return null;
+    }
+    const question = text(payload.question);
+    const caseUniverse = text(payload.caseUniverse);
+    const timePeriod = text(payload.timePeriod);
+    const outcomeConcept = text(payload.outcomeConcept);
+    const conditionSelectionRationale = text(payload.conditionSelectionRationale);
+    return question &&
+      caseUniverse &&
+      timePeriod &&
+      outcomeConcept &&
+      conditionSelectionRationale
+      ? {
+          version: AI_CONTRACT_VERSION,
+          task: "brief_clarify",
+          locale: value.locale,
+          payload: {
+            question,
+            caseUniverse,
+            timePeriod,
+            outcomeConcept,
+            conditionSelectionRationale,
+          },
+        }
+      : null;
+  }
+  if (value.task === "calibration_evidence_gaps") {
+    if (!hasOnlyKeys(payload, ["variable", "setLabel", "definition", "rationale"])) {
+      return null;
+    }
+    const variable = text(payload.variable);
+    const setLabel = text(payload.setLabel);
+    const definition = text(payload.definition);
+    const rationale = text(payload.rationale);
+    return variable && setLabel && definition && rationale
+      ? {
+          version: AI_CONTRACT_VERSION,
+          task: "calibration_evidence_gaps",
+          locale: value.locale,
+          payload: { variable, setLabel, definition, rationale },
+        }
+      : null;
+  }
+  if (!hasOnlyKeys(payload, ["decision", "rationale"])) return null;
+  const rationale = text(payload.rationale);
+  const decision = payload.decision;
+  return (decision === "frequencyCutoff" ||
+    decision === "consistencyCutoff" ||
+    decision === "directionalExpectations") &&
+    rationale
+    ? {
+        version: AI_CONTRACT_VERSION,
+        task: "decision_rationale_review",
+        locale: value.locale,
+        payload: { decision, rationale },
+      }
+    : null;
 }
 
 function stringList(value: unknown): string[] | null {
@@ -46,18 +187,146 @@ function stringList(value: unknown): string[] | null {
   const values = value.map((item) => text(item));
   return values.every((item): item is string => item !== null) ? values : null;
 }
-export function parseReviewedSummary(value: unknown): ReviewedSummary | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  if (record.status !== "ok" && record.status !== "incomplete" && record.status !== "refusal") return null;
-  const draft = text(record.draft, false); const uncertainty = stringList(record.uncertainty); const evidenceNeeds = stringList(record.evidenceNeeds); const limitations = stringList(record.limitations);
-  return draft !== null && uncertainty !== null && evidenceNeeds !== null && limitations !== null ? { status: record.status, draft, uncertainty, evidenceNeeds, limitations } : null;
+
+/**
+ * Parses a provider response against the request that produced it. Echoed
+ * task/target fields must match, so a valid response cannot be adopted into a
+ * different research field.
+ */
+export function parseAiReviewResponse(
+  value: unknown,
+  request: AiAssistRequest,
+): AiReviewResponse | null {
+  if (!isRecord(value)) return null;
+  const status = value.status;
+  if (
+    !hasOnlyKeys(value, [
+      "task",
+      "status",
+      "review",
+      "suggested",
+      "uncertainty",
+      "evidenceNeeds",
+      "limitations",
+    ]) ||
+    value.task !== request.task ||
+    !isAiReviewStatus(status) ||
+    !isRecord(value.suggested)
+  ) {
+    return null;
+  }
+  const review = text(value.review, false);
+  const uncertainty = stringList(value.uncertainty);
+  const evidenceNeeds = stringList(value.evidenceNeeds);
+  const limitations = stringList(value.limitations);
+  if (
+    review === null ||
+    uncertainty === null ||
+    evidenceNeeds === null ||
+    limitations === null
+  ) {
+    return null;
+  }
+  const base = {
+    status,
+    review,
+    uncertainty,
+    evidenceNeeds,
+    limitations,
+  };
+  if (request.task === "brief_clarify") {
+    if (!hasOnlyKeys(value.suggested, ["question"])) return null;
+    const question = text(value.suggested.question, false);
+    return question === null
+      ? null
+      : { task: "brief_clarify", ...base, suggested: { question } };
+  }
+  if (request.task === "calibration_evidence_gaps") {
+    if (!hasOnlyKeys(value.suggested, ["variable", "definition"])) return null;
+    const variable = text(value.suggested.variable);
+    const definition = text(value.suggested.definition, false);
+    return variable === request.payload.variable && definition !== null
+      ? {
+          task: "calibration_evidence_gaps",
+          ...base,
+          suggested: { variable, definition },
+        }
+      : null;
+  }
+  if (!hasOnlyKeys(value.suggested, ["decision", "rationale"])) return null;
+  const rationale = text(value.suggested.rationale, false);
+  return value.suggested.decision === request.payload.decision && rationale !== null
+    ? {
+        task: "decision_rationale_review",
+        ...base,
+        suggested: { decision: request.payload.decision, rationale },
+      }
+    : null;
 }
 
-export const reviewedSummaryJsonSchema = {
-  name: "openqca_reviewed_summary_v1", strict: true,
-  schema: { type: "object", additionalProperties: false, required: ["status", "draft", "uncertainty", "evidenceNeeds", "limitations"], properties: {
-    status: { type: "string", enum: ["ok", "incomplete", "refusal"] }, draft: { type: "string", maxLength: 2000 },
-    uncertainty: { type: "array", items: { type: "string", maxLength: 2000 }, maxItems: 8 }, evidenceNeeds: { type: "array", items: { type: "string", maxLength: 2000 }, maxItems: 8 }, limitations: { type: "array", items: { type: "string", maxLength: 2000 }, maxItems: 8 },
-  } },
+const listSchema = {
+  type: "array",
+  items: { type: "string", maxLength: MAX_TEXT },
+  maxItems: 8,
 } as const;
+
+const baseProperties = {
+  status: { type: "string", enum: ["ok", "incomplete", "refusal"] },
+  review: { type: "string", maxLength: MAX_TEXT },
+  uncertainty: listSchema,
+  evidenceNeeds: listSchema,
+  limitations: listSchema,
+} as const;
+
+/** Strict task-specific schema shared by OpenAI and Gemini. */
+export function aiReviewResponseJsonSchema(request: AiAssistRequest) {
+  const suggested =
+    request.task === "brief_clarify"
+      ? {
+          type: "object",
+          additionalProperties: false,
+          required: ["question"],
+          properties: { question: { type: "string", maxLength: MAX_TEXT } },
+        }
+      : request.task === "calibration_evidence_gaps"
+        ? {
+            type: "object",
+            additionalProperties: false,
+            required: ["variable", "definition"],
+            properties: {
+              variable: { type: "string", enum: [request.payload.variable] },
+              definition: { type: "string", maxLength: MAX_TEXT },
+            },
+          }
+        : {
+            type: "object",
+            additionalProperties: false,
+            required: ["decision", "rationale"],
+            properties: {
+              decision: { type: "string", enum: [request.payload.decision] },
+              rationale: { type: "string", maxLength: MAX_TEXT },
+            },
+          };
+  return {
+    name: `openqca_${request.task}_review_v2`,
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "task",
+        "status",
+        "review",
+        "suggested",
+        "uncertainty",
+        "evidenceNeeds",
+        "limitations",
+      ],
+      properties: {
+        task: { type: "string", enum: [request.task] },
+        ...baseProperties,
+        suggested,
+      },
+    },
+  } as const;
+}

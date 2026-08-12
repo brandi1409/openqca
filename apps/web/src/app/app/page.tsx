@@ -41,6 +41,17 @@ import { InfoHint } from "@/components/InfoHint";
 import { Kpi as UiKpi, SectionHeading } from "@/components/ui";
 import { CalibrationWorkbench } from "@/components/calibration/CalibrationWorkbench";
 import { AiAssist } from "@/components/AiAssist";
+import {
+  verifyAiWritingProvenance,
+  buildAiWritingProvenanceEntry,
+  type AiAdoptionMetadata,
+} from "@/lib/ai-reviewed-summary";
+import {
+  AI_CONTRACT_VERSION,
+  type AiAssistRequest,
+  type AiReviewResponse,
+  type DecisionRationaleTarget,
+} from "@/lib/ai-contract";
 import { CalibrationQuick } from "@/components/calibration/CalibrationQuick";
 import {
   anchorsFromSpecs,
@@ -75,6 +86,7 @@ import {
 } from "@/lib/protocol-export";
 import {
   EMPTY_ANALYSIS_DECISIONS,
+  emptyAiWritingProvenance,
   EMPTY_RESEARCH_BRIEF,
   aggregateCaseDiagnostics,
   analysisDecisionReadiness,
@@ -85,6 +97,7 @@ import {
   normalizeSavedState,
   type CalibrationDefenseResult,
   researchBriefReadiness,
+  type AiWritingProvenance,
   type AnalysisDecisionState,
   type Anchors,
   type DecisionIssue,
@@ -168,6 +181,7 @@ function rawAnchorsOf(ds: RawDataset, varMeta: Record<string, VarMeta>, calibSpe
   );
 }
 
+
 export default function Home() {
   const [locale] = useLocale();
   const [destination, setDestination] = useState<WorkspaceDestination>("answer");
@@ -189,6 +203,11 @@ export default function Home() {
     consistencyCutoff: { ...EMPTY_ANALYSIS_DECISIONS.consistencyCutoff },
     directionalExpectations: { ...EMPTY_ANALYSIS_DECISIONS.directionalExpectations },
   });
+  const [aiWritingProvenance, setAiWritingProvenance] =
+    useState<AiWritingProvenance>(emptyAiWritingProvenance);
+  const aiTargetRevisions = useRef(new Map<string, number>());
+  const aiProvenanceEpoch = useRef(0);
+  const aiLoadValidationEpoch = useRef(0);
   const [resumeCandidate, setResumeCandidate] = useState<LocalProjectEnvelope | null>(null);
   const [localProjectStatus, setLocalProjectStatus] = useState("");
   const [importError, setImportError] = useState("");
@@ -244,6 +263,52 @@ export default function Home() {
       frequencyCutoff: { ...EMPTY_ANALYSIS_DECISIONS.frequencyCutoff },
       consistencyCutoff: { ...EMPTY_ANALYSIS_DECISIONS.consistencyCutoff },
       directionalExpectations: { ...EMPTY_ANALYSIS_DECISIONS.directionalExpectations },
+    });
+  }
+  function aiRevisionKey(task: AiReviewResponse["task"], target: string): string {
+    return JSON.stringify([task, target]);
+  }
+
+  function currentAiTargetRevision(task: AiReviewResponse["task"], target: string): string {
+    return `${aiProvenanceEpoch.current}:${aiTargetRevisions.current.get(aiRevisionKey(task, target)) ?? 0}`;
+  }
+
+  function bumpAiTargetRevision(task: AiReviewResponse["task"], target: string): void {
+    const key = aiRevisionKey(task, target);
+    aiLoadValidationEpoch.current += 1;
+    aiTargetRevisions.current.set(key, (aiTargetRevisions.current.get(key) ?? 0) + 1);
+  }
+
+  function resetAiWritingProvenance(): void {
+    aiLoadValidationEpoch.current += 1;
+    aiProvenanceEpoch.current += 1;
+    aiTargetRevisions.current.clear();
+    setAiWritingProvenance(emptyAiWritingProvenance());
+  }
+
+  function clearBriefQuestionProvenance(): void {
+    setAiWritingProvenance((current) =>
+      current.brief_clarify.question
+        ? { ...current, brief_clarify: {} }
+        : current,
+    );
+  }
+
+  function clearDecisionProvenance(decision: DecisionRationaleTarget): void {
+    setAiWritingProvenance((current) => {
+      if (!current.decision_rationale_review[decision]) return current;
+      const decisionEntries = { ...current.decision_rationale_review };
+      delete decisionEntries[decision];
+      return { ...current, decision_rationale_review: decisionEntries };
+    });
+  }
+
+  function clearCalibrationProvenance(column: string): void {
+    setAiWritingProvenance((current) => {
+      if (!current.calibration_evidence_gaps[column]) return current;
+      const calibrationEntries = { ...current.calibration_evidence_gaps };
+      delete calibrationEntries[column];
+      return { ...current, calibration_evidence_gaps: calibrationEntries };
     });
   }
 
@@ -344,6 +409,7 @@ export default function Home() {
     setExpectations(normalizeExpectations(conditionColumns, {}));
     setResearchBrief(isDemo ? syntheticBrief(dataset, outcomeLabel) : { ...EMPTY_RESEARCH_BRIEF });
     resetAnalysisDecisions();
+    resetAiWritingProvenance();
     setXySource("");
     setImportError("");
     if (options.destination) {
@@ -481,10 +547,11 @@ export default function Home() {
       expectations,
       researchBrief,
       analysisDecisions,
+      aiWritingProvenance,
     };
   }
 
-  function loadState(raw: unknown): boolean {
+  async function loadState(raw: unknown): Promise<boolean> {
     let state: SavedState | null;
     try {
       state = normalizeSavedState(raw);
@@ -492,6 +559,10 @@ export default function Home() {
       return false;
     }
     if (!state) return false;
+    const validationEpoch = ++aiLoadValidationEpoch.current;
+    const verifiedProvenance = await verifyAiWritingProvenance(state);
+    if (aiLoadValidationEpoch.current !== validationEpoch) return false;
+
     setDemoMode(state.demoMode);
     setDs(state.dataset);
     setAnchors(state.anchors);
@@ -510,6 +581,9 @@ export default function Home() {
     setExpectations(state.expectations);
     setResearchBrief(state.researchBrief);
     setAnalysisDecisions(state.analysisDecisions);
+    aiProvenanceEpoch.current += 1;
+    aiTargetRevisions.current.clear();
+    setAiWritingProvenance(verifiedProvenance);
     setFocusVar(firstRawFocus(state.dataset, state.varMeta));
     setImportError("");
     return true;
@@ -522,9 +596,9 @@ export default function Home() {
     if (saved) setResumeCandidate(readLocalProject());
   }
 
-  function restoreLocalProject() {
+  async function restoreLocalProject() {
     const saved = readLocalProject();
-    if (!saved || !loadState(saved.state)) {
+    if (!saved || !(await loadState(saved.state))) {
       setLocalProjectStatus(t(locale, "data.localMissing"));
       return;
     }
@@ -546,8 +620,10 @@ export default function Home() {
       expectations,
       researchBrief,
       analysisDecisions,
+      aiWritingProvenance,
     } satisfies SavedState);
   }, [
+    aiWritingProvenance,
     analysisDecisions,
     anchors,
     calibSpecs,
@@ -564,7 +640,165 @@ export default function Home() {
     field: keyof Omit<ResearchBrief, "confirmed">,
     value: string,
   ) {
+    if (researchBrief[field] !== value) {
+      bumpAiTargetRevision("brief_clarify", "question");
+      if (field === "question") clearBriefQuestionProvenance();
+    }
     setResearchBrief((current) => ({ ...current, [field]: value, confirmed: false }));
+  }
+
+  function changeAnalysisDecisions(next: AnalysisDecisionState): void {
+    for (const decision of [
+      "frequencyCutoff",
+      "consistencyCutoff",
+      "directionalExpectations",
+    ] as const) {
+      if (analysisDecisions[decision].rationale === next[decision].rationale) continue;
+      bumpAiTargetRevision("decision_rationale_review", decision);
+      clearDecisionProvenance(decision);
+    }
+    setAnalysisDecisions(next);
+  }
+
+  function changeCalibSpecs(next: CalibSpecs): void {
+    for (const column of new Set([...Object.keys(calibSpecs), ...Object.keys(next)])) {
+      const previousSpec = calibSpecs[column];
+      const nextSpec = next[column];
+      const previousSource = previousSpec
+        ? [
+            previousSpec.set.setLabel,
+            previousSpec.set.definition,
+            previousSpec.set.unit,
+            previousSpec.set.scopePopulation,
+            previousSpec.set.timePeriod,
+          ]
+        : [];
+      const nextSource = nextSpec
+        ? [
+            nextSpec.set.setLabel,
+            nextSpec.set.definition,
+            nextSpec.set.unit,
+            nextSpec.set.scopePopulation,
+            nextSpec.set.timePeriod,
+          ]
+        : [];
+      if (JSON.stringify(previousSource) !== JSON.stringify(nextSource)) {
+        bumpAiTargetRevision("calibration_evidence_gaps", column);
+      }
+      if ((previousSpec?.set.definition ?? "") !== (nextSpec?.set.definition ?? "")) {
+        clearCalibrationProvenance(column);
+      }
+    }
+    setCalibSpecs(next);
+  }
+
+  async function adoptBriefQuestion(
+    review: AiReviewResponse,
+    metadata: AiAdoptionMetadata,
+    submittedRequest: AiAssistRequest,
+  ): Promise<boolean> {
+    if (review.task !== "brief_clarify") return false;
+    if (
+      submittedRequest.task !== "brief_clarify" ||
+      submittedRequest.payload.question !== researchBrief.question.trim()
+    ) return false;
+    const target = "question";
+    const previousText = researchBrief.question;
+    const adoptedText = review.suggested.question;
+    const revision = currentAiTargetRevision(review.task, target);
+    const entry = await buildAiWritingProvenanceEntry(metadata, previousText, adoptedText);
+    if (currentAiTargetRevision(review.task, target) !== revision) return false;
+    bumpAiTargetRevision(review.task, target);
+    setResearchBrief((current) =>
+      current.question === previousText
+        ? { ...current, question: adoptedText, confirmed: false }
+        : current,
+    );
+    setAiWritingProvenance((current) => ({
+      ...current,
+      brief_clarify: { question: entry },
+    }));
+    return true;
+  }
+  async function adoptDecisionRationale(
+    review: AiReviewResponse,
+    metadata: AiAdoptionMetadata,
+    submittedRequest: AiAssistRequest,
+  ): Promise<boolean> {
+    if (review.task !== "decision_rationale_review") return false;
+    if (
+      submittedRequest.task !== "decision_rationale_review" ||
+      submittedRequest.payload.decision !== review.suggested.decision
+    ) return false;
+    const decision = review.suggested.decision;
+    if (
+      submittedRequest.payload.rationale !== analysisDecisions[decision].rationale.trim()
+    ) return false;
+    const previousText = analysisDecisions[decision].rationale;
+    const adoptedText = review.suggested.rationale;
+    const revision = currentAiTargetRevision(review.task, decision);
+    const entry = await buildAiWritingProvenanceEntry(metadata, previousText, adoptedText);
+    if (currentAiTargetRevision(review.task, decision) !== revision) return false;
+    bumpAiTargetRevision(review.task, decision);
+    setAnalysisDecisions((current) =>
+      current[decision].rationale === previousText
+        ? {
+            ...current,
+            [decision]: { rationale: adoptedText, confirmed: false },
+          }
+        : current,
+    );
+    setAiWritingProvenance((current) => ({
+      ...current,
+      decision_rationale_review: {
+        ...current.decision_rationale_review,
+        [decision]: entry,
+      },
+    }));
+    return true;
+  }
+
+  async function adoptCalibrationDefinition(
+    review: AiReviewResponse,
+    metadata: AiAdoptionMetadata,
+    submittedRequest: AiAssistRequest,
+  ): Promise<boolean> {
+    if (review.task !== "calibration_evidence_gaps") return false;
+    if (
+      submittedRequest.task !== "calibration_evidence_gaps" ||
+      submittedRequest.payload.variable !== review.suggested.variable
+    ) return false;
+    const column = review.suggested.variable;
+    const spec = calibSpecs[column];
+    if (!spec) return false;
+    if (submittedRequest.payload.definition !== spec.set.definition.trim()) return false;
+    const previousText = spec.set.definition;
+    const adoptedText = review.suggested.definition;
+    const revision = currentAiTargetRevision(review.task, column);
+    const entry = await buildAiWritingProvenanceEntry(metadata, previousText, adoptedText);
+    if (currentAiTargetRevision(review.task, column) !== revision) return false;
+    bumpAiTargetRevision(review.task, column);
+    setCalibSpecs((current) => {
+      const currentSpec = current[column];
+      if (!currentSpec || currentSpec.set.definition !== previousText) return current;
+      return {
+        ...current,
+        [column]: {
+          ...currentSpec,
+          set: { ...currentSpec.set, definition: adoptedText },
+          caseReviewConfirmed: false,
+          sensitivity: { ...currentSpec.sensitivity, reviewed: false },
+        },
+      };
+    });
+    setAiWritingProvenance((current) => ({
+      ...current,
+      calibration_evidence_gaps: {
+        ...current.calibration_evidence_gaps,
+        [column]: entry,
+      },
+    }));
+    return true;
   }
 
   function changeVarMeta(next: Record<string, VarMeta>) {
@@ -894,7 +1128,7 @@ export default function Home() {
                 <AiAssist
                   label={locale === "en" ? "Clarify research brief" : "Forschungsdesign klären"}
                   request={() => ({
-                    version: "v1",
+                    version: AI_CONTRACT_VERSION,
                     task: "brief_clarify",
                     locale,
                     payload: {
@@ -905,7 +1139,9 @@ export default function Home() {
                       conditionSelectionRationale: researchBrief.conditionSelectionRationale,
                     },
                   })}
-                  onAdopt={(draft) => changeResearchBrief("question", draft)}
+                  sourceRevision={() => currentAiTargetRevision("brief_clarify", "question")}
+                  focusTargetId="brief-question"
+                  onAdopt={adoptBriefQuestion}
                 />
                 <div className="oq-research-layout">
                   <div className="oq-research-primary">
@@ -937,7 +1173,12 @@ export default function Home() {
                         <Button onClick={() => fileRef.current?.click()}>{t(locale, "data.reloadBtn")}</Button>
                         <Button onClick={saveLocalProject}>{t(locale, "data.saveLocal")}</Button>
                         <Button onClick={restoreLocalProject}>{t(locale, "data.loadLocal")}</Button>
-                        <CloudSaveLoad getState={currentState} onLoad={loadState} />
+                        <CloudSaveLoad
+                          getState={currentState}
+                          onLoad={(raw) => {
+                            void loadState(raw);
+                          }}
+                        />
                       </div>
                       {localProjectStatus && <p className="hint">{localProjectStatus}</p>}
                       {importError && <Diag kind="bad">{importError}</Diag>}
@@ -1035,7 +1276,7 @@ export default function Home() {
                       ds={ds}
                       varMeta={varMeta}
                       calibSpecs={calibSpecs}
-                      setCalibSpecs={setCalibSpecs}
+                      setCalibSpecs={changeCalibSpecs}
                       anchors={anchors}
                       setAnchors={setAnchors}
                       evaluation={evaluation}
@@ -1047,7 +1288,7 @@ export default function Home() {
                       varMeta={varMeta}
                       setVarMeta={changeVarMeta}
                       calibSpecs={calibSpecs}
-                      setCalibSpecs={setCalibSpecs}
+                      setCalibSpecs={changeCalibSpecs}
                       anchors={anchors}
                       setAnchors={setAnchors}
                       focusVar={focusVar}
@@ -1059,6 +1300,10 @@ export default function Home() {
                       excludedMissingCount={excludedMissingCount}
                       freqCut={freqCut}
                       consCut={consCut}
+                      aiSourceRevision={(column) =>
+                        currentAiTargetRevision("calibration_evidence_gaps", column)
+                      }
+                      onAiAdopt={adoptCalibrationDefinition}
                     />
                   )}
                 </div>
@@ -1073,7 +1318,11 @@ export default function Home() {
                   onFreqCut={changeFreqCut}
                   onConsCut={changeConsCut}
                   onExpectations={changeExpectations}
-                  onDecisions={setAnalysisDecisions}
+                  onDecisions={changeAnalysisDecisions}
+                  aiSourceRevision={(decision) =>
+                    currentAiTargetRevision("decision_rationale_review", decision)
+                  }
+                  onAiAdopt={adoptDecisionRationale}
                 />
                 {!computableCalibration && (
                   <Diag kind="warn">{t(locale, "workspace.decisions.notComputable")}</Diag>
@@ -1206,6 +1455,7 @@ export default function Home() {
                         expectations: normalizeExpectations(conditions, expectations),
                         researchBrief,
                         analysisDecisions,
+                        aiWritingProvenance,
                         rScript: defenseReady
                           ? buildRScript({
                               ds,
@@ -1240,6 +1490,7 @@ export default function Home() {
                   defenseReady={defenseReady}
                   researchBrief={researchBrief}
                   analysisDecisions={analysisDecisions}
+                  aiWritingProvenance={aiWritingProvenance}
                   expectations={normalizeExpectations(conditions, expectations)}
                   checklist={checklist}
                 />
@@ -1762,6 +2013,8 @@ function AnalysisDecisionEditor({
   onConsCut,
   onExpectations,
   onDecisions,
+  aiSourceRevision,
+  onAiAdopt,
 }: {
   freqCut: number;
   consCut: number;
@@ -1774,8 +2027,16 @@ function AnalysisDecisionEditor({
   onConsCut: (value: number) => void;
   onExpectations: (value: Record<string, Expectation>) => void;
   onDecisions: (value: AnalysisDecisionState) => void;
+  aiSourceRevision: (decision: DecisionRationaleTarget) => string;
+  onAiAdopt: (
+    review: AiReviewResponse,
+    metadata: AiAdoptionMetadata,
+    submittedRequest: AiAssistRequest,
+  ) => boolean | void | Promise<boolean | void>;
 }) {
   const [locale] = useLocale();
+  const [coachDecision, setCoachDecision] =
+    useState<DecisionRationaleTarget | null>(null);
   const positiveRows = tt?.rows.filter((row) => row.output === 1).length ?? 0;
   const unassigned = tt ? tt.totalCaseCount - tt.assignedCaseCount : 0;
 
@@ -1784,6 +2045,48 @@ function AnalysisDecisionEditor({
     patch: Partial<AnalysisDecisionState[typeof key]>,
   ) {
     onDecisions({ ...decisions, [key]: { ...decisions[key], ...patch } });
+  }
+
+  function decisionCoach(decision: DecisionRationaleTarget) {
+    if (coachDecision !== decision) return null;
+    return (
+      <div id={`decision-ai-coach-${decision}`} className="oq-decision-coach">
+        <AiAssist
+          key={decision}
+          label={locale === "en" ? "Review rationale" : "Begründung prüfen"}
+          request={() => ({
+            version: AI_CONTRACT_VERSION,
+            task: "decision_rationale_review",
+            locale,
+            payload: { decision, rationale: decisions[decision].rationale },
+          })}
+          sourceRevision={() => aiSourceRevision(decision)}
+          focusTargetId={`decision-rationale-${decision}`}
+          onAdopt={onAiAdopt}
+        />
+      </div>
+    );
+  }
+
+  function coachToggle(decision: DecisionRationaleTarget) {
+    const expanded = coachDecision === decision;
+    return (
+      <button
+        type="button"
+        className="oq-btn oq-btn--secondary oq-decision-coach-toggle"
+        aria-expanded={expanded}
+        aria-controls={`decision-ai-coach-${decision}`}
+        onClick={() => setCoachDecision(expanded ? null : decision)}
+      >
+        {expanded
+          ? locale === "en"
+            ? "Close AI coach"
+            : "KI-Coach schließen"
+          : locale === "en"
+            ? "AI coach for this decision"
+            : "KI-Coach für diese Entscheidung"}
+      </button>
+    );
   }
 
   return (
@@ -1806,14 +2109,12 @@ function AnalysisDecisionEditor({
         <DecisionRationale
           value={decisions.frequencyCutoff.rationale}
           confirmed={decisions.frequencyCutoff.confirmed}
+          id="decision-rationale-frequencyCutoff"
           onRationale={(rationale) => updateDecision("frequencyCutoff", { rationale, confirmed: false })}
           onConfirm={() => updateDecision("frequencyCutoff", { confirmed: true })}
         />
-        <AiAssist
-          label={locale === "en" ? "Review rationale" : "Begründung prüfen"}
-          request={() => ({ version: "v1", task: "decision_rationale_review", locale, payload: { decision: "frequencyCutoff", rationale: decisions.frequencyCutoff.rationale } })}
-          onAdopt={(rationale) => updateDecision("frequencyCutoff", { rationale, confirmed: false })}
-        />
+        {coachToggle("frequencyCutoff")}
+        {decisionCoach("frequencyCutoff")}
         <p className="hint">
           {t(locale, "workspace.decision.frequency.effect", {
             positive: positiveRows,
@@ -1858,14 +2159,12 @@ function AnalysisDecisionEditor({
         <DecisionRationale
           value={decisions.consistencyCutoff.rationale}
           confirmed={decisions.consistencyCutoff.confirmed}
+          id="decision-rationale-consistencyCutoff"
           onRationale={(rationale) => updateDecision("consistencyCutoff", { rationale, confirmed: false })}
           onConfirm={() => updateDecision("consistencyCutoff", { confirmed: true })}
         />
-        <AiAssist
-          label={locale === "en" ? "Review rationale" : "Begründung prüfen"}
-          request={() => ({ version: "v1", task: "decision_rationale_review", locale, payload: { decision: "consistencyCutoff", rationale: decisions.consistencyCutoff.rationale } })}
-          onAdopt={(rationale) => updateDecision("consistencyCutoff", { rationale, confirmed: false })}
-        />
+        {coachToggle("consistencyCutoff")}
+        {decisionCoach("consistencyCutoff")}
         <p className="hint">
           {t(locale, "workspace.decision.consistency.effect", {
             positive: positiveRows,
@@ -1904,16 +2203,14 @@ function AnalysisDecisionEditor({
         <DecisionRationale
           value={decisions.directionalExpectations.rationale}
           confirmed={decisions.directionalExpectations.confirmed}
+          id="decision-rationale-directionalExpectations"
           onRationale={(rationale) =>
             updateDecision("directionalExpectations", { rationale, confirmed: false })
           }
           onConfirm={() => updateDecision("directionalExpectations", { confirmed: true })}
         />
-        <AiAssist
-          label={locale === "en" ? "Review rationale" : "Begründung prüfen"}
-          request={() => ({ version: "v1", task: "decision_rationale_review", locale, payload: { decision: "directionalExpectations", rationale: decisions.directionalExpectations.rationale } })}
-          onAdopt={(rationale) => updateDecision("directionalExpectations", { rationale, confirmed: false })}
-        />
+        {coachToggle("directionalExpectations")}
+        {decisionCoach("directionalExpectations")}
         <p className="hint">
           {t(locale, "workspace.decision.expectations.effect", {
             models: sol?.intermediate.models.length ?? 0,
@@ -1928,9 +2225,11 @@ function AnalysisDecisionEditor({
 function DecisionRationale({
   value,
   confirmed,
+  id,
   onRationale,
   onConfirm,
 }: {
+  id: string;
   value: string;
   confirmed: boolean;
   onRationale: (value: string) => void;
@@ -1942,6 +2241,7 @@ function DecisionRationale({
       <label className="oq-field">
         <span className="oq-field__label">{t(locale, "workspace.decision.rationale")}</span>
         <textarea
+          id={id}
           rows={3}
           value={value}
           onChange={(event) => onRationale(event.target.value)}
@@ -3406,6 +3706,7 @@ function ProtocolSection({
   defenseReady,
   researchBrief,
   analysisDecisions,
+  aiWritingProvenance,
   expectations,
   checklist,
 }: {
@@ -3422,6 +3723,7 @@ function ProtocolSection({
   defenseReady: boolean;
   researchBrief: ResearchBrief;
   analysisDecisions: AnalysisDecisionState;
+  aiWritingProvenance: AiWritingProvenance;
   expectations: Record<string, Expectation>;
   checklist: Array<{ key: DictKey; ready: boolean }>;
 }) {
@@ -3476,6 +3778,7 @@ function ProtocolSection({
       robustness,
       researchBrief,
       analysisDecisions,
+      aiWritingProvenance,
       expectations,
     });
     downloadText(
@@ -3510,6 +3813,7 @@ function ProtocolSection({
       locale,
       researchBrief,
       analysisDecisions,
+      aiWritingProvenance,
       expectations,
     });
     downloadText("openqca-calibration-protocol.md", md, "text/markdown;charset=utf-8");

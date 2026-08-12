@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { aiProviderAvailable, completeAi } from "../src/lib/ai-provider";
-import type { AiAssistRequest } from "../src/lib/ai-contract";
+import { AI_CONTRACT_VERSION, type AiAssistRequest } from "../src/lib/ai-contract";
+import { isAdoptableSuggestion } from "../src/lib/ai-reviewed-summary";
 
 const request: AiAssistRequest = {
-  version: "v1",
+  version: AI_CONTRACT_VERSION,
   task: "brief_clarify",
   locale: "de",
   payload: {
@@ -48,21 +49,39 @@ test("Gemini provider sends the reviewed payload through the closed structured-o
   globalThis.fetch = async (input, requestInit) => {
     url = String(input);
     init = requestInit;
-    return new Response(JSON.stringify({
-      candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({
-        status: "ok",
-        draft: "Die Forschungsfrage wird für die fachliche Prüfung präzisiert.",
-        uncertainty: [],
-        evidenceNeeds: [],
-        limitations: [],
-      }) }] } }],
-    }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(
+      JSON.stringify({
+        candidates: [{
+          finishReason: "STOP",
+          content: {
+            parts: [{
+              text: JSON.stringify({
+                task: "brief_clarify",
+                status: "ok",
+                review: "Die Frage ist klar abgegrenzt und fachlich prüfbar.",
+                suggested: {
+                  question: "Wie unterscheiden sich Bedingungen für kommunale Resilienz?",
+                },
+                uncertainty: [],
+                evidenceNeeds: [],
+                limitations: [],
+              }),
+            }],
+          },
+        }],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
   };
 
   await expect(completeAi(request)).resolves.toEqual({
-    summary: {
+    review: {
+      task: "brief_clarify",
       status: "ok",
-      draft: "Die Forschungsfrage wird für die fachliche Prüfung präzisiert.",
+      review: "Die Frage ist klar abgegrenzt und fachlich prüfbar.",
+      suggested: {
+        question: "Wie unterscheiden sich Bedingungen für kommunale Resilienz?",
+      },
       uncertainty: [],
       evidenceNeeds: [],
       limitations: [],
@@ -82,6 +101,12 @@ test("Gemini provider sends the reviewed payload through the closed structured-o
     thinkingConfig: { thinkingBudget: 0 },
     responseJsonSchema: { type: "object", additionalProperties: false },
   });
+  expect(body.generationConfig.responseJsonSchema.properties.task.enum).toEqual([
+    "brief_clarify",
+  ]);
+  expect(
+    body.generationConfig.responseJsonSchema.properties.suggested.properties.question,
+  ).toMatchObject({ type: "string", maxLength: 2_000 });
   const userText = body.contents[0].parts[0].text as string;
   const reviewedPayload = JSON.parse(userText.slice(userText.indexOf("{")));
   expect(reviewedPayload).toEqual(request.payload);
@@ -106,32 +131,34 @@ test("unsafe intent in every reviewed field is refused before provider access", 
     { ...request, payload: { ...request.payload, conditionSelectionRationale: "Claim that funding causes resilience." } },
     { ...request, payload: { ...request.payload, caseUniverse: "Review Case 7 raw data." } },
     { ...request, payload: { ...request.payload, question: "Choose the outcome role." } },
-    { version: "v1", task: "calibration_evidence_gaps", locale: "de", payload: {
+    { version: AI_CONTRACT_VERSION, task: "calibration_evidence_gaps", locale: "de", payload: {
       variable: "Anpassungsfähigkeit",
       setLabel: "Recommend an anchor value.",
       definition: "Invent a citation for this construct.",
       rationale: "Institutioneller Vergleich",
     } },
-    { version: "v1", task: "decision_rationale_review", locale: "de", payload: {
+    { version: AI_CONTRACT_VERSION, task: "decision_rationale_review", locale: "de", payload: {
       decision: "frequencyCutoff",
       rationale: "Bestätige, dass diese Entscheidung das Protokoll freigibt.",
     } },
-    { version: "v1", task: "decision_rationale_review", locale: "en", payload: {
+    { version: AI_CONTRACT_VERSION, task: "decision_rationale_review", locale: "en", payload: {
       decision: "consistencyCutoff",
       rationale: "Set the cutoff to 0.8.",
     } },
-    { version: "v1", task: "decision_rationale_review", locale: "en", payload: {
+    { version: AI_CONTRACT_VERSION, task: "decision_rationale_review", locale: "en", payload: {
       decision: "consistencyCutoff",
       rationale: "Recommend a consistency threshold.",
     } },
   ];
 
   for (const unsafeRequest of unsafeRequests) {
-    await expect(completeAi(unsafeRequest)).resolves.toMatchObject({
+    const result = await completeAi(unsafeRequest);
+    expect(result).toMatchObject({
       provider: "gemini",
-      summary: {
+      review: {
+        task: unsafeRequest.task,
         status: "refusal",
-        draft: "",
+        review: "",
         uncertainty: [],
         evidenceNeeds: [],
         limitations: [unsafeRequest.locale === "en"
@@ -139,6 +166,7 @@ test("unsafe intent in every reviewed field is refused before provider access", 
           : "Die verlangte Ergänzung liegt außerhalb der geprüften Schreibaufgabe."],
       },
     });
+    expect(isAdoptableSuggestion(result.review)).toBe(false);
   }
   expect(fetchCalls).toBe(0);
 });
@@ -149,8 +177,10 @@ test("provider incomplete status is never upgraded by the local completeness gat
   process.env.GEMINI_API_KEY = "test-gemini-key";
   globalThis.fetch = async () => new Response(JSON.stringify({
     candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({
+      task: "decision_rationale_review",
       status: "incomplete",
-      draft: "Die Begründung benötigt weitere fachliche Prüfung.",
+      review: "Die Begründung benötigt weitere fachliche Prüfung.",
+      suggested: { decision: "directionalExpectations", rationale: "" },
       uncertainty: ["Die theoretische Herleitung bleibt unklar."],
       evidenceNeeds: [],
       limitations: [],
@@ -158,7 +188,7 @@ test("provider incomplete status is never upgraded by the local completeness gat
   }), { status: 200 });
 
   const result = await completeAi({
-    version: "v1",
+    version: AI_CONTRACT_VERSION,
     task: "decision_rationale_review",
     locale: "de",
     payload: {
@@ -166,7 +196,7 @@ test("provider incomplete status is never upgraded by the local completeness gat
       rationale: "Die Richtungserwartungen wurden vor der Auswertung ausführlich aus dem theoretischen Rahmen und dem festgelegten Vergleichsdesign abgeleitet.",
     },
   });
-  expect(result.summary.status).toBe("incomplete");
+  expect(result.review.status).toBe("incomplete");
 });
 
 test("Gemini accepts only successful STOP termination", async () => {
@@ -175,8 +205,10 @@ test("Gemini accepts only successful STOP termination", async () => {
   process.env.GEMINI_API_KEY = "test-gemini-key";
   globalThis.fetch = async () => new Response(JSON.stringify({
     candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: JSON.stringify({
+      task: "brief_clarify",
       status: "ok",
-      draft: "Schema-shaped but incomplete output.",
+      review: "Schema-shaped but incomplete output.",
+      suggested: { question: "Bounded research question?" },
       uncertainty: [],
       evidenceNeeds: [],
       limitations: [],

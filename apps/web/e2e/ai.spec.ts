@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const briefPayload = {
-  version: "v1",
+  version: "v2",
   task: "brief_clarify",
   locale: "de",
   payload: {
@@ -24,7 +24,7 @@ test("AI route rejects legacy and forbidden-data payloads before provider access
   expect(confidentialRows.status()).toBe(400);
 
   const numericGate = await request.post("/api/ai/assist", {
-    data: { version: "v1", task: "decision_rationale_review", locale: "en", payload: { decision: "frequencyCutoff", rationale: "Theory", cutoff: 2 } },
+    data: { version: "v2", task: "decision_rationale_review", locale: "en", payload: { decision: "frequencyCutoff", rationale: "Theory", cutoff: 2 } },
   });
   expect(numericGate.status()).toBe(400);
   await expect(numericGate.json()).resolves.toEqual({

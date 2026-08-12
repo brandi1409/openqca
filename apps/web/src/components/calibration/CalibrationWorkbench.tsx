@@ -35,6 +35,12 @@ import { useLocale } from "@/i18n/locale";
 import { t, type DictKey } from "@/i18n/dict";
 import { InfoHint } from "@/components/InfoHint";
 import { AiAssist } from "@/components/AiAssist";
+import {
+  AI_CONTRACT_VERSION,
+  type AiAssistRequest,
+  type AiReviewResponse,
+} from "@/lib/ai-contract";
+import type { AiAdoptionMetadata } from "@/lib/ai-reviewed-summary";
 // Kurve und Crisp-Streifen leben in AnchorMapping.tsx, weil die Schnell-Ansicht
 // exakt dieselbe Interaktion braucht — eine Quelle, zwei Einsatzorte.
 import { CalibrationCurve, CrispStrip } from "@/components/calibration/AnchorMapping";
@@ -332,6 +338,8 @@ export function CalibrationWorkbench({
   excludedMissingCount,
   freqCut,
   consCut,
+  aiSourceRevision,
+  onAiAdopt,
 }: {
   ds: RawDataset;
   varMeta: Record<string, VarMeta>;
@@ -349,6 +357,12 @@ export function CalibrationWorkbench({
   excludedMissingCount: number;
   freqCut: number;
   consCut: number;
+  aiSourceRevision: (column: string) => string;
+  onAiAdopt: (
+    review: AiReviewResponse,
+    metadata: AiAdoptionMetadata,
+    submittedRequest: AiAssistRequest,
+  ) => boolean | void | Promise<boolean | void>;
 }) {
   const [locale] = useLocale();
   const [activeStep, setActiveStep] = useState<CalibrationSubstepId>("definition");
@@ -684,6 +698,21 @@ export function CalibrationWorkbench({
   function toggleSubstep(id: CalibrationSubstepId) {
     const next = !isSubstepCollapsed(id);
     setManualCollapsed((prev) => ({ ...prev, [v]: { ...prev[v], [id]: next } }));
+  }
+
+  async function adoptAiDefinition(
+    review: AiReviewResponse,
+    metadata: AiAdoptionMetadata,
+    submittedRequest: AiAssistRequest,
+  ): Promise<boolean | void> {
+    const adopted = await onAiAdopt(review, metadata, submittedRequest);
+    if (adopted === false) return false;
+    setManualCollapsed((current) => ({
+      ...current,
+      [v]: { ...current[v], definition: false },
+    }));
+    setActiveStep("definition");
+    return adopted;
   }
 
   function toggleCollapseDone() {
@@ -1106,6 +1135,7 @@ export function CalibrationWorkbench({
         <div style={{ marginTop: 10 }}>
           <Field label={t(locale, "calib.set.definition")}>
             <textarea
+              id={`calibration-set-definition-${v}`}
               style={{ ...inputStyle, minHeight: 72, resize: "vertical" }}
               value={spec.set.definition}
               onChange={(e) =>
@@ -1973,9 +2003,10 @@ export function CalibrationWorkbench({
         </div>
         <div style={{ display: "grid", gap: 8 }}>
           <AiAssist
+            key={v}
             label={locale === "en" ? "Review evidence gaps" : "Evidenzlücken prüfen"}
             request={() => ({
-              version: "v1",
+              version: AI_CONTRACT_VERSION,
               task: "calibration_evidence_gaps",
               locale,
               payload: {
@@ -1985,7 +2016,9 @@ export function CalibrationWorkbench({
                 rationale: [spec.set.unit, spec.set.scopePopulation, spec.set.timePeriod].filter(Boolean).join("; ") || (locale === "en" ? "No rationale supplied." : "Keine Begründung angegeben."),
               },
             })}
-            onAdopt={(draft) => patchSpec(v, { set: { ...spec.set, definition: draft } })}
+            sourceRevision={() => aiSourceRevision(v)}
+            focusTargetId={`calibration-set-definition-${v}`}
+            onAdopt={adoptAiDefinition}
           />
         </div>
       </div>

@@ -74,7 +74,9 @@ test("AI review stays local until required fields are complete", async ({ page }
   });
   await loadDemo(page);
   await openDestination(page, "decisions");
-  const rationale = page.getByRole("region", { name: "Begründung prüfen" }).first();
+  await expect(page.getByRole("region", { name: "Begründung prüfen" })).toHaveCount(0);
+  await page.getByRole("button", { name: "KI-Coach für diese Entscheidung" }).first().click();
+  const rationale = page.getByRole("region", { name: "Begründung prüfen" });
   await rationale.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
   await expect(rationale.getByRole("status")).toHaveText(
     "Füllen Sie alle erforderlichen Felder aus und begrenzen Sie jeden Eintrag auf 2.000 Zeichen, bevor Sie eine KI-Prüfung vorbereiten.",
@@ -84,18 +86,42 @@ test("AI review stays local until required fields are complete", async ({ page }
   expect(requests).toBe(0);
 });
 
-test("all three AI jobs expose and send only their normalized reviewed payload", async ({ page }) => {
+test("all three AI jobs expose only reviewed payloads and adopt into their exact fields", async ({ page }) => {
   const requests: Array<Record<string, unknown>> = [];
   await page.route("**/api/ai/assist", async (route) => {
-    requests.push(route.request().postDataJSON() as Record<string, unknown>);
+    const sent = route.request().postDataJSON() as Record<string, unknown>;
+    const payload = sent.payload as Record<string, string>;
+    requests.push(sent);
+    const task = String(sent.task);
+    const suggested =
+      task === "brief_clarify"
+        ? { question: "Welche Konfigurationen begleiten synthetisches Überleben?" }
+        : task === "calibration_evidence_gaps"
+          ? {
+              variable: payload.variable,
+              definition: "Das Set beschreibt hohe synthetische Anpassungsfähigkeit.",
+            }
+          : {
+              decision: payload.decision,
+              rationale: "Die Entscheidung folgt dem vorab festgelegten Vergleichsdesign.",
+            };
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        version: "v1",
-        summary: { status: "ok", draft: "Geprüfter Entwurf.", uncertainty: [], evidenceNeeds: [], limitations: [] },
+        version: "v2",
+        review: {
+          task,
+          status: "ok",
+          review: "Der Text ist klar abgegrenzt und fachlich prüfbar.",
+          suggested,
+          uncertainty: [],
+          evidenceNeeds: [],
+          limitations: [],
+        },
         model: "test-model",
         provider: "mock",
+        generatedAt: "2026-08-11T10:00:00.000Z",
       }),
     });
   });
@@ -112,19 +138,12 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
     "Outcome concept",
     "Condition rationale",
   ]);
-  await expect(brief.locator("dd")).toHaveText([
-    "Welche Kombinationen der synthetischen Bedingungen sind mit dem Set „Überleben“ in demo_zwischenkriegszeit (synthetisch) verbunden?",
-    "Synthetische Lehrfälle aus demo_zwischenkriegszeit (synthetisch)",
-    "Kein realer Zeitraum, synthetisches Lehrbeispiel",
-    "dem Set „Überleben“",
-    "Die Bedingungen wurden ausschließlich zur Demonstration des QCA-Rechenwegs konstruiert.",
-  ]);
   expect(requests).toHaveLength(0);
   await brief.getByRole("button", { name: "An KI-Coach senden" }).click();
   await expect(brief.getByText("Erstellt mit: mock · test-model")).toBeVisible();
   expect(requests).toHaveLength(1);
   expect(requests[0]).toEqual({
-    version: "v1",
+    version: "v2",
     task: "brief_clarify",
     locale: "de",
     payload: {
@@ -135,11 +154,22 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
       conditionSelectionRationale: "Die Bedingungen wurden ausschließlich zur Demonstration des QCA-Rechenwegs konstruiert.",
     },
   });
+  await brief.getByRole("button", { name: "Vorgeschlagene Frage verwenden" }).click();
+  await expect(page.getByLabel("Forschungsfrage")).toHaveValue(
+    "Welche Konfigurationen begleiten synthetisches Überleben?",
+  );
+  await expect(brief.getByRole("status")).toContainText(
+    "Der Vorschlag wurde übernommen.",
+  );
+  await expect(page.getByLabel("Forschungsfrage")).toBeFocused();
 
   await openDestination(page, "decisions");
-  const decisionText = "Die Entscheidung folgt der begrenzten Fallzahl und dem vorab festgelegten Vergleichsdesign.";
+  const decisionText =
+    "Die Entscheidung folgt der begrenzten Fallzahl und dem vorab festgelegten Vergleichsdesign.";
   await page.locator("textarea").first().fill(`  ${decisionText}  `);
-  const rationale = page.getByRole("region", { name: "Begründung prüfen" }).first();
+  await expect(page.getByRole("region", { name: "Begründung prüfen" })).toHaveCount(0);
+  await page.getByRole("button", { name: "KI-Coach für diese Entscheidung" }).first().click();
+  const rationale = page.getByRole("region", { name: "Begründung prüfen" });
   await rationale.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
   await expect(rationale.locator("dt")).toHaveText(["Decision", "Rationale"]);
   await expect(rationale.locator("dd")).toHaveText(["frequencyCutoff", decisionText]);
@@ -148,11 +178,16 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
   await expect(rationale.getByText("Erstellt mit: mock · test-model")).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[1]).toEqual({
-    version: "v1",
+    version: "v2",
     task: "decision_rationale_review",
     locale: "de",
     payload: { decision: "frequencyCutoff", rationale: decisionText },
   });
+  await rationale.getByRole("button", { name: "Vorgeschlagene Begründung verwenden" }).click();
+  await expect(page.locator("textarea").first()).toHaveValue(
+    "Die Entscheidung folgt dem vorab festgelegten Vergleichsdesign.",
+  );
+  await expect(page.locator("#decision-rationale-frequencyCutoff")).toBeFocused();
 
   await page.getByTestId("calibration-view-doc").click();
   const evidence = page.getByRole("region", { name: "Evidenzlücken prüfen" }).first();
@@ -170,13 +205,15 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
     "Zugehörigkeit zur Menge «wohlstand» (vorläufiger Platzhalter — durch eine inhaltliche Definition ersetzen).",
     "Keine Begründung angegeben.",
   ]);
-  expect((await evidence.locator("dt").allTextContents()).join(" ")).not.toMatch(/Fall|Case|Row|Datei|File/);
+  expect((await evidence.locator("dt").allTextContents()).join(" ")).not.toMatch(
+    /Fall|Case|Row|Datei|File/,
+  );
   expect(requests).toHaveLength(2);
   await evidence.getByRole("button", { name: "An KI-Coach senden" }).click();
   await expect(evidence.getByText("Erstellt mit: mock · test-model")).toBeVisible();
   expect(requests).toHaveLength(3);
   expect(requests[2]).toEqual({
-    version: "v1",
+    version: "v2",
     task: "calibration_evidence_gaps",
     locale: "de",
     payload: {
@@ -186,6 +223,66 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
       rationale: "Keine Begründung angegeben.",
     },
   });
+  await page.getByTestId("calibration-substep-toggle-definition").click();
+  await expect(page.locator("#calibration-set-definition-wohlstand")).toHaveCount(0);
+  await evidence.getByRole("button", { name: "Vorgeschlagene Definition verwenden" }).click();
+  await expect(evidence.getByRole("status")).toContainText(
+    "Der Vorschlag wurde übernommen.",
+  );
+  await expect(page.locator("#calibration-set-definition-wohlstand")).toBeFocused();
+});
+
+test("stale AI responses cannot overwrite a field edited while the request is in flight", async ({ page }) => {
+  let releaseResponse: (() => void) | undefined;
+  let markRequestSeen: (() => void) | undefined;
+  const requestSeen = new Promise<void>((resolve) => {
+    markRequestSeen = resolve;
+  });
+  const responseReleased = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  await page.route("**/api/ai/assist", async (route) => {
+    markRequestSeen?.();
+    await responseReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        version: "v2",
+        review: {
+          task: "brief_clarify",
+          status: "ok",
+          review: "Die Frage ist klar abgegrenzt.",
+          suggested: { question: "Veralteter Vorschlag" },
+          uncertainty: [],
+          evidenceNeeds: [],
+          limitations: [],
+        },
+        model: "test-model",
+        provider: "mock",
+        generatedAt: "2026-08-11T10:00:00.000Z",
+      }),
+    });
+  });
+  await loadDemo(page);
+  await openDestination(page, "research");
+  const brief = page.getByRole("region", { name: "Forschungsdesign klären" });
+  await brief.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
+  await brief.getByRole("button", { name: "An KI-Coach senden" }).click();
+  await requestSeen;
+
+  const question = page.getByLabel("Forschungsfrage");
+  await question.fill("Aktuell bearbeitete Forschungsfrage");
+  releaseResponse?.();
+
+  await expect(brief.getByRole("status")).toContainText(
+    "Die geprüfte Ausgangslage wurde geändert.",
+  );
+  await expect(question).toBeFocused();
+  await expect(question).toHaveValue("Aktuell bearbeitete Forschungsfrage");
+  await expect(
+    brief.getByRole("button", { name: "Vorgeschlagene Frage verwenden" }),
+  ).toHaveCount(0);
 });
 
 test("destination buttons update hash, focus, and browser history", async ({ page }) => {
@@ -256,6 +353,73 @@ test("V1 project is offered as a resume candidate and loads only after click", a
   await expect.poll(() =>
     page.evaluate(() => JSON.parse(localStorage.getItem("openqca_local_project") ?? "{}").version),
   ).toBe(2);
+});
+
+test("V2 restore preserves saved analysis decisions after provenance verification", async ({ page }) => {
+  await page.goto("/app#answer");
+  await page.evaluate(() => {
+    window.localStorage.setItem("openqca_local_project", JSON.stringify({
+      schema: "openqca-local-project",
+      version: 2,
+      savedAt: "2026-08-11T10:00:00.000Z",
+      state: {
+        dataset: {
+          name: "saved-decisions.csv",
+          caseCol: "Case",
+          columns: ["Case", "A", "Y"],
+          rows: [
+            { Case: "c1", A: 1, Y: 1 },
+            { Case: "c2", A: 0, Y: 0 },
+          ],
+        },
+        anchors: {},
+        varMeta: {
+          A: { type: "crisp", role: "condition" },
+          Y: { type: "crisp", role: "outcome" },
+        },
+        calibSpecs: {},
+        demoMode: false,
+        freqCut: 1,
+        consCut: 0.8,
+        expectations: { A: "present" },
+        researchBrief: {
+          question: "Which configurations explain Y?",
+          caseUniverse: "Two saved cases",
+          timePeriod: "2020",
+          outcomeConcept: "Membership in Y",
+          conditionSelectionRationale: "A follows the comparison design.",
+          confirmed: true,
+        },
+        analysisDecisions: {
+          frequencyCutoff: { rationale: "Saved frequency rationale", confirmed: true },
+          consistencyCutoff: { rationale: "Saved consistency rationale", confirmed: true },
+          directionalExpectations: {
+            rationale: "Saved directional rationale",
+            confirmed: true,
+          },
+        },
+        aiWritingProvenance: {
+          brief_clarify: {},
+          calibration_evidence_gaps: {},
+          decision_rationale_review: {},
+        },
+      },
+    }));
+  });
+  await page.reload();
+  await dismissConsent(page);
+  await page.getByRole("button", { name: "Gespeichertes Projekt laden" }).click();
+  await expect(page.getByText("Which configurations explain Y?")).toBeVisible();
+  await openDestination(page, "decisions");
+  await expect(page.locator("#decision-rationale-frequencyCutoff")).toHaveValue(
+    "Saved frequency rationale",
+  );
+  await expect(page.locator("#decision-rationale-consistencyCutoff")).toHaveValue(
+    "Saved consistency rationale",
+  );
+  await expect(page.locator("#decision-rationale-directionalExpectations")).toHaveValue(
+    "Saved directional rationale",
+  );
 });
 
 test("demo deep link wins over resume and removes the query parameter", async ({ page }) => {

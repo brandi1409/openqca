@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { aiProviderAvailable, completeAi } from "@/lib/ai-provider";
-import { parseAiAssistRequest } from "@/lib/ai-contract";
+import { AI_CONTRACT_VERSION, parseAiAssistRequest } from "@/lib/ai-contract";
 import { recordAiRequest } from "@/lib/ai-telemetry";
 import { getServiceSupabase } from "@/lib/supabase";
 
@@ -160,7 +160,11 @@ export async function POST(request: Request) {
   try {
     const result = await completeAi(body);
     recordAiRequest(body.task, "returned", now);
-    return NextResponse.json({ version: "v1", ...result });
+    return NextResponse.json({
+      version: AI_CONTRACT_VERSION,
+      ...result,
+      generatedAt: new Date().toISOString(),
+    });
   } catch (cause) {
     const code = cause instanceof Error && (cause.message === "AI_UNSTRUCTURED" || cause.message === "AI_POLICY_VIOLATION") ? "invalid_response" : "unavailable";
     recordAiRequest(body.task, code, now);

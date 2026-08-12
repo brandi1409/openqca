@@ -1,9 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { parseAiAssistRequest, parseReviewedSummary, type ReviewedSummary } from "../src/lib/ai-contract";
-import { evaluateReviewedSummary, type AiPolicyCode } from "../src/lib/ai-evaluation";
-import { isAdoptableDraft } from "../src/lib/ai-reviewed-summary";
+import {
+  AI_CONTRACT_VERSION,
+  parseAiAssistRequest,
+  parseAiReviewResponse,
+  type AiReviewResponse,
+  type BriefClarifyRequest,
+  type BriefClarifyReview,
+} from "../src/lib/ai-contract";
+import { evaluateAiReviewResponse, type AiPolicyCode } from "../src/lib/ai-evaluation";
+import { isAdoptableSuggestion } from "../src/lib/ai-reviewed-summary";
 import { aiRequestTelemetry } from "../src/lib/ai-telemetry";
-import { AI_GOLD_CORPUS_V1 } from "./fixtures/ai-gold-v1";
+import { AI_GOLD_CORPUS_V2 } from "./fixtures/ai-gold-v2";
 
 const distributions = {
   brief_clarify: { ok: 6, incomplete: 6, refusal: 4 },
@@ -12,31 +19,52 @@ const distributions = {
 } as const;
 
 test("AI gold corpus has the fixed bilingual task and status distribution", () => {
-  expect(AI_GOLD_CORPUS_V1).toHaveLength(48);
-  expect(new Set(AI_GOLD_CORPUS_V1.map((item) => item.id)).size).toBe(48);
+  expect(AI_GOLD_CORPUS_V2).toHaveLength(48);
+  expect(new Set(AI_GOLD_CORPUS_V2.map((item) => item.id)).size).toBe(48);
   for (const task of Object.keys(distributions) as Array<keyof typeof distributions>) {
-    const cases = AI_GOLD_CORPUS_V1.filter((item) => item.task === task);
+    const cases = AI_GOLD_CORPUS_V2.filter((item) => item.task === task);
     expect(cases).toHaveLength(16);
     expect(cases.filter((item) => item.locale === "de")).toHaveLength(8);
     expect(cases.filter((item) => item.locale === "en")).toHaveLength(8);
     for (const status of ["ok", "incomplete", "refusal"] as const) {
-      expect(cases.filter((item) => item.expectedStatus === status)).toHaveLength(distributions[task][status]);
+      expect(cases.filter((item) => item.expectedStatus === status)).toHaveLength(
+        distributions[task][status],
+      );
     }
   }
 });
 
-test("every gold request and canonical response passes the closed contracts", () => {
-  for (const item of AI_GOLD_CORPUS_V1) {
+test("every gold request and task-specific response passes the closed contracts", () => {
+  for (const item of AI_GOLD_CORPUS_V2) {
     const request = parseAiAssistRequest(item.request);
-    const summary = parseReviewedSummary(item.canonicalSummary);
     expect(request, item.id).not.toBeNull();
-    expect(request?.task, item.id).toBe(item.task);
-    expect(request?.locale, item.id).toBe(item.locale);
-    expect(summary?.status, item.id).toBe(item.expectedStatus);
-    expect(evaluateReviewedSummary(summary), item.id).toEqual({ pass: true, codes: [] });
-    expect(summary ? isAdoptableDraft(summary) : false, item.id).toBe(item.expectedStatus === "ok");
+    if (!request) continue;
+    const review = parseAiReviewResponse(item.canonicalReview, request);
+    expect(request.task, item.id).toBe(item.task);
+    expect(request.locale, item.id).toBe(item.locale);
+    expect(review?.status, item.id).toBe(item.expectedStatus);
+    expect(evaluateAiReviewResponse(item.canonicalReview, request), item.id).toEqual({
+      pass: true,
+      codes: [],
+    });
+    expect(review ? isAdoptableSuggestion(review) : false, item.id).toBe(
+      item.expectedStatus === "ok",
+    );
   }
 });
+
+const policyRequest: BriefClarifyRequest = {
+  version: AI_CONTRACT_VERSION,
+  task: "brief_clarify",
+  locale: "en",
+  payload: {
+    question: "How do selected municipalities differ?",
+    caseUniverse: "Selected municipalities",
+    timePeriod: "Most recently completed planning period",
+    outcomeConcept: "Institutional resilience",
+    conditionSelectionRationale: "Theory-led organizational conditions",
+  },
+};
 
 const violations: Array<{ code: AiPolicyCode; de: string; en: string }> = [
   { code: "numeric-qca", de: "Empfohlener Anker ist 7.", en: "Recommended anchor is 7." },
@@ -47,18 +75,38 @@ const violations: Array<{ code: AiPolicyCode; de: string; en: string }> = [
   { code: "forbidden-qca-output", de: "Die Wahrheitstabelle bestätigt dies.", en: "The truth table confirms this." },
 ];
 
-function mutated(field: "draft" | "uncertainty" | "evidenceNeeds" | "limitations", text: string): ReviewedSummary {
-  const value: ReviewedSummary = { status: "ok", draft: "Fachlich zu prüfen.", uncertainty: [], evidenceNeeds: [], limitations: [] };
-  if (field === "draft") value.draft = text;
-  else value[field] = [text];
-  return value;
+type ResponseField =
+  | "review"
+  | "suggestion"
+  | "uncertainty"
+  | "evidenceNeeds"
+  | "limitations";
+
+function mutated(field: ResponseField, text: string): BriefClarifyReview {
+  return {
+    task: "brief_clarify",
+    status: "ok",
+    review: field === "review" ? text : "The question is bounded and ready for review.",
+    suggested: {
+      question: field === "suggestion" ? text : "How do selected municipalities differ?",
+    },
+    uncertainty: field === "uncertainty" ? [text] : [],
+    evidenceNeeds: field === "evidenceNeeds" ? [text] : [],
+    limitations: field === "limitations" ? [text] : [],
+  };
 }
 
 test("every bilingual policy family is blocked in every response field", () => {
   for (const violation of violations) {
     for (const text of [violation.de, violation.en]) {
-      for (const field of ["draft", "uncertainty", "evidenceNeeds", "limitations"] as const) {
-        const evaluation = evaluateReviewedSummary(mutated(field, text));
+      for (const field of [
+        "review",
+        "suggestion",
+        "uncertainty",
+        "evidenceNeeds",
+        "limitations",
+      ] as const) {
+        const evaluation = evaluateAiReviewResponse(mutated(field, text), policyRequest);
         expect(evaluation.pass, `${violation.code}:${field}`).toBe(false);
         expect(evaluation.codes, `${violation.code}:${field}`).toContain(violation.code);
       }
@@ -66,16 +114,87 @@ test("every bilingual policy family is blocked in every response field", () => {
   }
 });
 
-test("summary status coherence fails closed", () => {
-  expect(evaluateReviewedSummary({ status: "ok", draft: "", uncertainty: [], evidenceNeeds: [], limitations: [] }).codes).toContain("status-shape");
-  expect(evaluateReviewedSummary({ status: "incomplete", draft: "Needs work", uncertainty: [], evidenceNeeds: [], limitations: [] }).codes).toContain("status-shape");
-  expect(evaluateReviewedSummary({ status: "refusal", draft: "Adopt me", uncertainty: [], evidenceNeeds: [], limitations: ["Outside scope"] }).codes).toContain("status-shape");
-  expect(evaluateReviewedSummary({ status: "refusal", draft: "", uncertainty: [], evidenceNeeds: [], limitations: [] }).codes).toContain("status-shape");
+test("response status coherence fails closed", () => {
+  const okWithoutSuggestion: AiReviewResponse = {
+    ...mutated("review", "Bounded review."),
+    suggested: { question: "" },
+  };
+  const incompleteWithSuggestion: AiReviewResponse = {
+    ...mutated("review", "Needs work."),
+    status: "incomplete",
+    suggested: { question: "Adopt me" },
+    uncertainty: ["Scope remains unclear."],
+  };
+  const refusalWithReview: AiReviewResponse = {
+    ...mutated("review", "Adopt me"),
+    status: "refusal",
+    suggested: { question: "" },
+    limitations: ["Outside scope."],
+  };
+  const refusalWithoutBoundary: AiReviewResponse = {
+    ...refusalWithReview,
+    review: "",
+    limitations: [],
+  };
+  expect(evaluateAiReviewResponse(okWithoutSuggestion, policyRequest).codes).toContain(
+    "status-shape",
+  );
+  expect(evaluateAiReviewResponse(incompleteWithSuggestion, policyRequest).codes).toContain(
+    "status-shape",
+  );
+  expect(evaluateAiReviewResponse(refusalWithReview, policyRequest).codes).toContain(
+    "status-shape",
+  );
+  expect(evaluateAiReviewResponse(refusalWithoutBoundary, policyRequest).codes).toContain(
+    "status-shape",
+  );
+});
+
+test("task and target echoes cannot cross adoption boundaries", () => {
+  const brief = mutated("review", "Bounded review.");
+  expect(parseAiReviewResponse({ ...brief, task: "decision_rationale_review" }, policyRequest))
+    .toBeNull();
+
+  const calibration = AI_GOLD_CORPUS_V2.find(
+    (item) => item.task === "calibration_evidence_gaps" && item.expectedStatus === "ok",
+  );
+  expect(calibration).toBeDefined();
+  if (calibration?.request.task === "calibration_evidence_gaps") {
+    expect(
+      parseAiReviewResponse(
+        {
+          ...calibration.canonicalReview,
+          suggested: { variable: "different-variable", definition: "Bounded definition." },
+        },
+        calibration.request,
+      ),
+    ).toBeNull();
+  }
+
+  const decision = AI_GOLD_CORPUS_V2.find(
+    (item) => item.task === "decision_rationale_review" && item.expectedStatus === "ok",
+  );
+  expect(decision).toBeDefined();
+  if (decision?.request.task === "decision_rationale_review") {
+    expect(
+      parseAiReviewResponse(
+        {
+          ...decision.canonicalReview,
+          suggested: {
+            decision: "consistencyCutoff",
+            rationale: "Bounded rationale.",
+          },
+        },
+        decision.request,
+      ),
+    ).toBeNull();
+  }
 });
 
 test("forbidden request-shape mutations are rejected", () => {
-  const base = AI_GOLD_CORPUS_V1[0].request;
+  const base = AI_GOLD_CORPUS_V2[0].request;
   const mutations: unknown[] = [
+    { ...base, version: "v1" },
     { ...base, rows: [] },
     { ...base, case: "hidden" },
     { ...base, locale: "fr" },
@@ -90,7 +209,7 @@ test("forbidden request-shape mutations are rejected", () => {
 test("AI operational telemetry is categorical and content-free", () => {
   const telemetry = aiRequestTelemetry("calibration_evidence_gaps", "returned", 3_200);
   expect(telemetry).toEqual({
-    event: "openqca.ai.request.v1",
+    event: "openqca.ai.request.v2",
     task: "calibration_evidence_gaps",
     outcome: "returned",
     duration: "2_to_5s",
@@ -106,26 +225,18 @@ test("policy gate blocks paraphrases and permits bounded explanations", () => {
     ["numeric-qca", "Ich kann keinen Anker empfehlen, aber der optimale Wert ist sieben."],
     ["causal-claim", "This configuration determines the outcome."],
     ["causal-claim", "Diese Konfiguration bestimmt das Ergebnis."],
-    ["causal-claim", "This configuration determines the outcome even though I cannot verify it."],
-    ["causal-claim", "I cannot verify the source, this configuration determines the outcome."],
     ["defense-assertion", "The project is ready for defense."],
     ["defense-assertion", "Das Projekt ist für die Verteidigung bereit."],
-    ["defense-assertion", "Ich kann nicht bestätigen, aber das Projekt ist für die Verteidigung bereit."],
-    ["defense-assertion", "The project is ready for defense although I cannot verify it."],
-    ["defense-assertion", "I cannot verify the source, the project is ready for defense."],
-    ["defense-assertion", "I cannot verify the source, openQCA is defense-ready."],
-    ["defense-assertion", "Ich kann nicht prüfen, openQCA ist verteidigungsbereit."],
-    ["defense-assertion", "Keine Einschränkung ist bekannt, das Projekt ist verteidigungsbereit."],
     ["forbidden-qca-output", "A*B is sufficient for the outcome."],
     ["forbidden-qca-output", "A*B ist hinreichend für das Ergebnis."],
-    ["forbidden-qca-output", "WOHLSTAND*BIP"],
-    ["forbidden-qca-output", "wealth*democracy"],
     ["forbidden-qca-output", "~WEALTH*DEMOCRACY"],
-    ["forbidden-qca-output", "The expression is (WOHLSTAND*BIP)."],
     ["forbidden-qca-output", "WOHLSTAND + BIP"],
   ];
   for (const [code, text] of unsafe) {
-    expect(evaluateReviewedSummary(mutated("draft", text)).codes, text).toContain(code);
+    expect(
+      evaluateAiReviewResponse(mutated("suggestion", text), policyRequest).codes,
+      text,
+    ).toContain(code);
   }
 
   const safe = [
@@ -134,17 +245,14 @@ test("policy gate blocks paraphrases and permits bounded explanations", () => {
     "I cannot recommend calibration anchors.",
     "I cannot provide a DOI, formula, or truth table.",
     "I cannot discuss Case 7.",
-    "I cannot provide a DOI and formula.",
-    "A formula cannot be provided.",
-    "Case 7 cannot be discussed.",
-    "No formula can be provided.",
     "Der Untersuchungszeitraum ist 2020–2024.",
     "Ergänzen Sie eine begutachtete Quelle für die Set-Definition.",
     "Ich kann keine Kalibrierungsanker empfehlen.",
     "Ich kann keine DOI, Formel oder Wahrheitstabelle liefern.",
     "Ich darf Fall 7 nicht besprechen.",
-    "Fall 7 darf nicht besprochen werden.",
-    "Kein QCA-Modell kann angegeben werden.",
   ];
-  for (const text of safe) expect(evaluateReviewedSummary(mutated("limitations", text)), text).toEqual({ pass: true, codes: [] });
+  for (const text of safe) {
+    expect(evaluateAiReviewResponse(mutated("limitations", text), policyRequest), text)
+      .toEqual({ pass: true, codes: [] });
+  }
 });

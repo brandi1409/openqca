@@ -1635,6 +1635,27 @@ input[type="number"] {
   font-weight: 750;
 }
 
+.oq-ai-assist__steps li[data-state="upcoming"] {
+  color: var(--muted);
+}
+
+.oq-ai-assist__steps li[data-state="current"] {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.oq-ai-assist__steps li[data-state="current"]::before {
+  color: var(--panel);
+  background: var(--ai);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ai) 14%, transparent);
+}
+
+.oq-ai-assist__steps li[data-state="complete"]::before {
+  color: var(--good-text);
+  background: var(--good-wash);
+  content: "✓";
+}
+
 .oq-ai-assist__trigger {
   justify-self: start;
   border-color: color-mix(in srgb, var(--ai) 38%, var(--line));
@@ -1649,6 +1670,35 @@ input[type="number"] {
   border: 1px solid color-mix(in srgb, var(--ai) 25%, var(--line));
   border-radius: var(--radius-control);
   background: var(--panel-2);
+}
+
+.oq-ai-assist__preview,
+.oq-ai-assist__result,
+.oq-ai-assist__note,
+.oq-decision-coach {
+  animation: oq-ai-assist-reveal 180ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.oq-ai-assist__preview:focus-visible,
+.oq-ai-assist__result:focus-visible {
+  outline: 2px solid var(--ai);
+  outline-offset: 3px;
+}
+
+.oq-decision-coach-toggle {
+  margin-top: var(--space-2);
+}
+
+@keyframes oq-ai-assist-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .oq-ai-assist__preview dl {

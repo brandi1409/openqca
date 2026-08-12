@@ -24,6 +24,13 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   verfügbar; JSON, Rohdaten, Markdown und R-Skript werden erst zusammen freigeschaltet, wenn
   Forschungsdesign, aktive Set-Kalibrierungen und wertgebundene Analyseentscheidungen bestätigt
   sind. Demo-Daten bleiben grundsätzlich gesperrt.
+- **Geschlossener KI-Review-Vertrag V2.** Forschungsfrage, Set-Definition und jeweils eine
+  ausgewählte Analysebegründung besitzen eigene strikt typisierte Antwortformen. Nur eine
+  ausdrücklich übernommene `ok`-Empfehlung ersetzt genau dieses Feld; parallele Änderungen
+  machen den Vorschlag ungültig und jede Übernahme hebt die menschliche Bestätigung auf.
+- **Prüfbare KI-Schreibprovenienz.** Lokale und Cloud-Projekte sowie Bericht, JSON- und
+  Markdown-Protokoll dokumentieren Provider, Modell, Erzeugungszeitpunkt und SHA-256-Hashes
+  des vorherigen und übernommenen Texts, ohne diese Texte in der Provenienz zu duplizieren.
 
 ### Geändert
 

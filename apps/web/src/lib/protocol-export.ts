@@ -21,7 +21,12 @@ import type {
   CalibrationSensitivityResultWithRows,
   SensitivityBundle,
 } from "@/lib/calibration-analysis";
-import type { AnalysisDecisionState, ResearchBrief } from "@/lib/workspace-model";
+import {
+  listAiWritingProvenance,
+  type AiWritingProvenance,
+  type AnalysisDecisionState,
+  type ResearchBrief,
+} from "@/lib/workspace-model";
 
 export type VarMeta = { type: VarType; role: "condition" | "outcome" | "ignore" };
 export type MethodologyReference = {
@@ -43,6 +48,7 @@ export type MethodologyReference = {
  */
 const TOOL_VERSION = process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "dev";
 export const RAW_DATA_FILENAME = "openqca-raw-data.csv";
+export const CALIBRATION_PROTOCOL_SCHEMA_VERSION = 2 as const;
 export const METHODOLOGY_REFERENCES: readonly MethodologyReference[] = [
   {
     id: "ragin-2008",
@@ -502,6 +508,7 @@ export function buildCalibrationProtocolJson(args: {
   researchBrief: ResearchBrief;
   analysisDecisions: AnalysisDecisionState;
   expectations: Record<string, "present" | "absent" | "either">;
+  aiWritingProvenance: AiWritingProvenance;
 }): object {
   const sets = Object.values(args.calibSpecs).filter((spec) => {
     const role = args.varMeta[spec.column]?.role;
@@ -554,12 +561,14 @@ export function buildCalibrationProtocolJson(args: {
     : [];
 
   return {
+    protocolSchemaVersion: CALIBRATION_PROTOCOL_SCHEMA_VERSION,
     tool: "openQCA",
     toolVersion: TOOL_VERSION,
     exportedAt: new Date().toISOString(),
     methodologyReferences: METHODOLOGY_REFERENCES,
     dataset: args.ds.name,
     researchBrief: args.researchBrief,
+    aiWritingProvenance: listAiWritingProvenance(args.aiWritingProvenance),
     engine: {
       calibration:
         "direct logistic Ragin 2008 (log-odds ±3 at anchors ≈0.0474/0.5/0.9526); linear fuzzy is piecewise linear between the same three anchors (QCA::calibrate logistic=FALSE); crisp threshold inclusive (>= for higher-membership scales, <= for inverted scales)",
@@ -729,6 +738,7 @@ export function buildCalibrationNarrative(args: {
   researchBrief: ResearchBrief;
   analysisDecisions: AnalysisDecisionState;
   expectations: Record<string, "present" | "absent" | "either">;
+  aiWritingProvenance: AiWritingProvenance;
 }): string {
   const locale = args.locale ?? "de";
   const en = locale === "en";
@@ -765,6 +775,27 @@ export function buildCalibrationNarrative(args: {
   lines.push(
     `- ${en ? "Directional expectations" : "Richtungserwartungen"}: ${args.conditions.map((condition) => `${condition}=${args.expectations[condition] ?? "present"}`).join(", ") || "—"}. ${args.analysisDecisions.directionalExpectations.rationale || "—"} (${args.analysisDecisions.directionalExpectations.confirmed ? "confirmed" : "not confirmed"})`,
   );
+  lines.push("");
+  lines.push(en ? "## Adopted AI writing provenance" : "## Provenienz übernommener KI-Texte");
+  lines.push("");
+  const aiProvenanceRows = listAiWritingProvenance(args.aiWritingProvenance);
+  if (aiProvenanceRows.length === 0) {
+    lines.push(
+      en
+        ? "No AI-reviewed writing is present in this protocol."
+        : "Dieses Protokoll enthält keine übernommenen KI-geprüften Texte.",
+    );
+  } else {
+    lines.push(
+      `| ${en ? "Task" : "Aufgabe"} | ${en ? "Target field" : "Zielfeld"} | Provider / ${en ? "model" : "Modell"} | ${en ? "Generated" : "Erzeugt"} | ${en ? "Previous text hash" : "Hash des vorherigen Texts"} | ${en ? "Adopted text hash" : "Hash des übernommenen Texts"} |`,
+    );
+    lines.push("| --- | --- | --- | --- | --- | --- |");
+    for (const row of aiProvenanceRows) {
+      lines.push(
+        `| ${row.task} | ${row.target} | ${row.provider} / ${row.model} | ${row.generatedAt} | \`${row.previousTextHash}\` | \`${row.adoptedTextHash}\` |`,
+      );
+    }
+  }
   lines.push("");
   lines.push(
     en

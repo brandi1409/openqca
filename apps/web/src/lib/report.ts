@@ -7,7 +7,12 @@
 import type { NecessityEntry, Solution, TruthTableResult, TruthTableRow } from "@openqca/engine";
 import type { CalibSpecs } from "@/lib/calibration-model";
 import { citationInfo } from "@/lib/citation";
-import type { AnalysisDecisionState, ResearchBrief } from "@/lib/workspace-model";
+import {
+  listAiWritingProvenance,
+  type AiWritingProvenance,
+  type AnalysisDecisionState,
+  type ResearchBrief,
+} from "@/lib/workspace-model";
 
 export interface ReportInput {
   datasetName: string;
@@ -27,6 +32,7 @@ export interface ReportInput {
   expectations: Record<string, string>;
   researchBrief: ResearchBrief;
   analysisDecisions: AnalysisDecisionState;
+  aiWritingProvenance: AiWritingProvenance;
   rScript: string;
   locale?: "de" | "en";
   /**
@@ -509,6 +515,13 @@ export function generateReportHtml(input: ReportInput): string {
       input.analysisDecisions.directionalExpectations.confirmed ? yes : no,
     ],
   ];
+  const aiProvenanceRows = listAiWritingProvenance(input.aiWritingProvenance);
+  const aiProvenanceTitle =
+    locale === "en" ? "Adopted AI writing provenance" : "Provenienz übernommener KI-Texte";
+  const aiProvenanceNone =
+    locale === "en"
+      ? "No AI-reviewed writing is present in this report."
+      : "Dieser Bericht enthält keine übernommenen KI-geprüften Texte.";
   const provisionalDetails = input.provisionalReasons?.length
     ? `<ul>${input.provisionalReasons.map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul>`
     : "";
@@ -553,6 +566,27 @@ export function generateReportHtml(input: ReportInput): string {
       ${decisionRows.map(([decision, value, rationale, status]) => `<tr><td>${esc(decision)}</td><td>${esc(value || "—")}</td><td>${esc(rationale || "—")}</td><td>${esc(status)}</td></tr>`).join("")}
     </tbody>
   </table>
+
+  <h2>${aiProvenanceTitle}</h2>
+  ${
+    aiProvenanceRows.length
+      ? `<table>
+    <thead>
+      <tr>
+        <th>${locale === "en" ? "Task" : "Aufgabe"}</th>
+        <th>${locale === "en" ? "Target field" : "Zielfeld"}</th>
+        <th>${locale === "en" ? "Provider / model" : "Provider / Modell"}</th>
+        <th>${locale === "en" ? "Generated" : "Erzeugt"}</th>
+        <th>${locale === "en" ? "Previous text hash" : "Hash des vorherigen Texts"}</th>
+        <th>${locale === "en" ? "Adopted text hash" : "Hash des übernommenen Texts"}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${aiProvenanceRows.map((row) => `<tr><td>${esc(row.task)}</td><td>${esc(row.target)}</td><td>${esc(`${row.provider} / ${row.model}`)}</td><td>${esc(row.generatedAt)}</td><td class="mono">${esc(row.previousTextHash)}</td><td class="mono">${esc(row.adoptedTextHash)}</td></tr>`).join("")}
+    </tbody>
+  </table>`
+      : `<p>${aiProvenanceNone}</p>`
+  }
 
   <h2>${copy.calibration}</h2>
   ${calibrationTable(input.anchors, input.calibSpecs, input.varMeta, locale)}

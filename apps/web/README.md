@@ -29,6 +29,20 @@ Berichtsvorschau und Antwort bleiben zugänglich; die vier Replikationsartefakte
 gemeinsam freigeschaltet, wenn Forschungsbrief, aktive Set-Kalibrierungen und die drei
 wertgebundenen Analyseentscheidungen bestätigt sind. Demo-Daten sind nie zitier- oder exportfähig.
 
+## KI-Review-Vertrag
+
+Der optionale KI-Coach arbeitet ausschließlich mit drei geschlossenen Schreibaufgaben:
+Forschungsfrage präzisieren, Set-Definition prüfen und eine ausgewählte Analysebegründung
+prüfen. Vor jedem Versand zeigt die Oberfläche die exakte Nutzlast; Datensatzzeilen,
+QCA-Ergebnisse, numerische Empfehlungen und Defense-Freigaben gehören nicht zum Vertrag.
+Eine Antwort kann nur das zuvor geprüfte Zielfeld ersetzen. Jede Übernahme hebt dessen
+menschliche Bestätigung auf.
+
+Lokale und Cloud-Projekte speichern für übernommene KI-Texte nur Provider, Modell,
+Erzeugungszeitpunkt und SHA-256-Hashes des vorherigen und übernommenen Texts. Bericht,
+JSON-Protokoll (Schema-Version 2) und Markdown-Protokoll weisen diese Provenienz aus;
+die ersetzten Texte werden nicht zusätzlich in der Provenienz dupliziert.
+
 ## Prüfung
 
 ```bash

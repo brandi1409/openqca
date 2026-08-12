@@ -15,7 +15,7 @@ function durationBucket(elapsed: number): "under_2s" | "2_to_5s" | "5_to_15s" | 
  */
 export function aiRequestTelemetry(task: AiTask, outcome: AiRequestOutcome, elapsedMs: number) {
   return {
-    event: "openqca.ai.request.v1" as const,
+    event: "openqca.ai.request.v2" as const,
     task,
     outcome,
     duration: durationBucket(elapsedMs),

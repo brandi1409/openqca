@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { aiProviderAvailable, completeAi } from "../src/lib/ai-provider";
-import { evaluateReviewedSummary } from "../src/lib/ai-evaluation";
-import { AI_GOLD_CORPUS_V1 } from "./fixtures/ai-gold-v1";
+import { evaluateAiReviewResponse } from "../src/lib/ai-evaluation";
+import { AI_GOLD_CORPUS_V2 } from "./fixtures/ai-gold-v2";
 
 const liveEnabled = process.env.AI_GOLD_LIVE === "true"
   && aiProviderAvailable();
@@ -14,13 +14,13 @@ test("live bilingual AI gold corpus passes every safety gate and the quality thr
 
   let semanticPasses = 0;
   const failures: Array<{ id: string; expected: string; actual: string; codes: string[] }> = [];
-  for (const item of AI_GOLD_CORPUS_V1) {
+  for (const item of AI_GOLD_CORPUS_V2) {
     try {
       const result = await completeAi(item.request);
-      const evaluation = evaluateReviewedSummary(result.summary);
-      const statusMatches = result.summary.status === item.expectedStatus;
+      const evaluation = evaluateAiReviewResponse(result.review, item.request);
+      const statusMatches = result.review.status === item.expectedStatus;
       if (evaluation.pass && statusMatches) semanticPasses += 1;
-      else failures.push({ id: item.id, expected: item.expectedStatus, actual: result.summary.status, codes: evaluation.codes });
+      else failures.push({ id: item.id, expected: item.expectedStatus, actual: result.review.status, codes: evaluation.codes });
     } catch {
       failures.push({ id: item.id, expected: item.expectedStatus, actual: "error", codes: ["provider-error"] });
     }

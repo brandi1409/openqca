@@ -14,6 +14,7 @@ import {
 } from "@/lib/calibration-model";
 import { numericColumns, numericValues } from "@/lib/dataset-columns";
 import type { RawDataset } from "@/lib/demo";
+import type { DecisionRationaleTarget } from "@/lib/ai-contract";
 
 export type WorkspaceDestination = "answer" | "research" | "decisions" | "evidence" | "defense";
 export type VarRole = "condition" | "outcome" | "ignore";
@@ -39,6 +40,37 @@ export interface AnalysisDecisionState {
   consistencyCutoff: ConfirmedRationale;
   directionalExpectations: ConfirmedRationale;
 }
+export interface AiWritingProvenanceEntry {
+  provider: string;
+  model: string;
+  generatedAt: string;
+  previousTextHash: string;
+  adoptedTextHash: string;
+}
+
+export interface AiWritingProvenance {
+  brief_clarify: { question?: AiWritingProvenanceEntry };
+  calibration_evidence_gaps: Record<string, AiWritingProvenanceEntry>;
+  decision_rationale_review: Partial<
+    Record<DecisionRationaleTarget, AiWritingProvenanceEntry>
+  >;
+}
+
+export interface AiWritingProvenanceRow extends AiWritingProvenanceEntry {
+  task:
+    | "brief_clarify"
+    | "calibration_evidence_gaps"
+    | "decision_rationale_review";
+  target: string;
+}
+
+export function emptyAiWritingProvenance(): AiWritingProvenance {
+  return {
+    brief_clarify: {},
+    calibration_evidence_gaps: {},
+    decision_rationale_review: {},
+  };
+}
 
 export interface SavedState {
   dataset: RawDataset;
@@ -51,6 +83,7 @@ export interface SavedState {
   expectations: Record<string, Expectation>;
   researchBrief: ResearchBrief;
   analysisDecisions: AnalysisDecisionState;
+  aiWritingProvenance: AiWritingProvenance;
   /** Legacy fields are accepted on input and intentionally ignored. */
   conditions?: string[];
   outcome?: string;
@@ -72,6 +105,10 @@ export const EMPTY_ANALYSIS_DECISIONS: AnalysisDecisionState = {
   consistencyCutoff: { ...EMPTY_RATIONALE },
   directionalExpectations: { ...EMPTY_RATIONALE },
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function isDataset(value: unknown): value is RawDataset {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
@@ -165,6 +202,112 @@ function normalizeAnalysisDecisions(raw: unknown): AnalysisDecisionState {
     directionalExpectations: normalizeConfirmedRationale(value.directionalExpectations),
   };
 }
+function normalizeAiWritingEntry(raw: unknown): AiWritingProvenanceEntry | null {
+  if (
+    !isRecord(raw) ||
+    Object.keys(raw).some(
+      (key) =>
+        ![
+          "provider",
+          "model",
+          "generatedAt",
+          "previousTextHash",
+          "adoptedTextHash",
+        ].includes(key),
+    ) ||
+    typeof raw.provider !== "string" ||
+    !raw.provider.trim() ||
+    raw.provider.length > 200 ||
+    typeof raw.model !== "string" ||
+    !raw.model.trim() ||
+    raw.model.length > 200 ||
+    typeof raw.generatedAt !== "string" ||
+    Number.isNaN(Date.parse(raw.generatedAt)) ||
+    typeof raw.previousTextHash !== "string" ||
+    !/^[a-f0-9]{64}$/u.test(raw.previousTextHash) ||
+    typeof raw.adoptedTextHash !== "string" ||
+    !/^[a-f0-9]{64}$/u.test(raw.adoptedTextHash)
+  ) {
+    return null;
+  }
+  return {
+    provider: raw.provider.trim(),
+    model: raw.model.trim(),
+    generatedAt: new Date(raw.generatedAt).toISOString(),
+    previousTextHash: raw.previousTextHash,
+    adoptedTextHash: raw.adoptedTextHash,
+  };
+}
+
+function normalizeAiWritingProvenance(
+  raw: unknown,
+  columns: string[],
+  varMeta: Record<string, VarMeta>,
+): AiWritingProvenance {
+  const normalized = emptyAiWritingProvenance();
+  if (!isRecord(raw)) return normalized;
+
+  if (isRecord(raw.brief_clarify)) {
+    const question = normalizeAiWritingEntry(raw.brief_clarify.question);
+    if (question) normalized.brief_clarify.question = question;
+  }
+
+  if (isRecord(raw.decision_rationale_review)) {
+    for (const decision of [
+      "frequencyCutoff",
+      "consistencyCutoff",
+      "directionalExpectations",
+    ] as const) {
+      const entry = normalizeAiWritingEntry(raw.decision_rationale_review[decision]);
+      if (entry) normalized.decision_rationale_review[decision] = entry;
+    }
+  }
+
+  if (isRecord(raw.calibration_evidence_gaps)) {
+    for (const column of columns) {
+      if (varMeta[column]?.role === "ignore") continue;
+      const entry = normalizeAiWritingEntry(raw.calibration_evidence_gaps[column]);
+      if (entry) normalized.calibration_evidence_gaps[column] = entry;
+    }
+  }
+  return normalized;
+}
+
+export function listAiWritingProvenance(
+  provenance: AiWritingProvenance,
+): AiWritingProvenanceRow[] {
+  const rows: AiWritingProvenanceRow[] = [];
+  const question = provenance.brief_clarify.question;
+  if (question) {
+    rows.push({
+      task: "brief_clarify",
+      target: "researchBrief.question",
+      ...question,
+    });
+  }
+  for (const decision of [
+    "frequencyCutoff",
+    "consistencyCutoff",
+    "directionalExpectations",
+  ] as const) {
+    const entry = provenance.decision_rationale_review[decision];
+    if (entry) {
+      rows.push({
+        task: "decision_rationale_review",
+        target: `analysisDecisions.${decision}.rationale`,
+        ...entry,
+      });
+    }
+  }
+  for (const column of Object.keys(provenance.calibration_evidence_gaps).sort()) {
+    rows.push({
+      task: "calibration_evidence_gaps",
+      target: `calibSpecs[${JSON.stringify(column)}].set.definition`,
+      ...provenance.calibration_evidence_gaps[column],
+    });
+  }
+  return rows;
+}
 
 function normalizeAnchors(raw: unknown, dataset: RawDataset): Anchors {
   const fallback =
@@ -236,6 +379,11 @@ export function normalizeSavedState(raw: unknown): SavedState | null {
     expectations: normalizeExpectations(conditions, input.expectations),
     researchBrief: normalizeResearchBrief(input.researchBrief),
     analysisDecisions: normalizeAnalysisDecisions(input.analysisDecisions),
+    aiWritingProvenance: normalizeAiWritingProvenance(
+      input.aiWritingProvenance,
+      columns,
+      varMeta,
+    ),
   };
 }
 

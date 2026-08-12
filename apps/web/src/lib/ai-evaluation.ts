@@ -1,4 +1,8 @@
-import { parseReviewedSummary, type ReviewedSummary } from "@/lib/ai-contract";
+import {
+  parseAiReviewResponse,
+  type AiAssistRequest,
+  type AiReviewResponse,
+} from "@/lib/ai-contract";
 
 export type AiPolicyCode =
   | "invalid-summary"
@@ -97,25 +101,52 @@ const POLICY_RULES: readonly PolicyRule[] = [
   },
 ];
 
-function responseText(summary: ReviewedSummary): { normalized: string; original: string } {
-  const original = [summary.draft, ...summary.uncertainty, ...summary.evidenceNeeds, ...summary.limitations].join("\n").normalize("NFKC");
-  return { original, normalized: original.toLocaleLowerCase("und").replace(/\s+/g, " ").trim() };
+function suggestedText(response: AiReviewResponse): string {
+  if (response.task === "brief_clarify") return response.suggested.question;
+  if (response.task === "calibration_evidence_gaps") return response.suggested.definition;
+  return response.suggested.rationale;
 }
 
-export function evaluateReviewedSummary(value: unknown): AiEvaluation {
-  const summary = parseReviewedSummary(value);
-  if (!summary) return { pass: false, codes: ["invalid-summary"] };
+function responseText(response: AiReviewResponse): { normalized: string; original: string } {
+  const original = [
+    response.review,
+    suggestedText(response),
+    ...response.uncertainty,
+    ...response.evidenceNeeds,
+    ...response.limitations,
+  ]
+    .join("\n")
+    .normalize("NFKC");
+  return {
+    original,
+    normalized: original.toLocaleLowerCase("und").replace(/\s+/g, " ").trim(),
+  };
+}
+
+export function evaluateAiReviewResponse(
+  value: unknown,
+  request: AiAssistRequest,
+): AiEvaluation {
+  const response = parseAiReviewResponse(value, request);
+  if (!response) return { pass: false, codes: ["invalid-summary"] };
 
   const codes = new Set<AiPolicyCode>();
-  const hasBoundary = summary.uncertainty.length + summary.evidenceNeeds.length + summary.limitations.length > 0;
-  if ((summary.status === "ok" && !summary.draft)
-    || (summary.status === "incomplete" && !hasBoundary)
-    || (summary.status === "refusal" && (summary.draft.length > 0 || summary.limitations.length === 0))) {
+  const suggestion = suggestedText(response);
+  const hasBoundary =
+    response.uncertainty.length + response.evidenceNeeds.length + response.limitations.length > 0;
+  if (
+    (response.status === "ok" && (!response.review || !suggestion)) ||
+    (response.status === "incomplete" && (suggestion.length > 0 || !hasBoundary)) ||
+    (response.status === "refusal" &&
+      (suggestion.length > 0 || response.review.length > 0 || response.limitations.length === 0))
+  ) {
     codes.add("status-shape");
   }
 
-  const text = responseText(summary);
-  for (const rule of POLICY_RULES) if (rule.violates(text.normalized, text.original)) codes.add(rule.code);
+  const text = responseText(response);
+  for (const rule of POLICY_RULES) {
+    if (rule.violates(text.normalized, text.original)) codes.add(rule.code);
+  }
   const sorted = [...codes].sort();
   return { pass: sorted.length === 0, codes: sorted };
 }
