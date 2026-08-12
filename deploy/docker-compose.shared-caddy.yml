@@ -5,3 +5,13 @@ services:
       service: web
     ports:
       - "127.0.0.1:${OPENQCA_UPSTREAM_PORT:?Set OPENQCA_UPSTREAM_PORT}:3000"
+    networks:
+      default:
+      edge:
+        aliases:
+          - openqca-staging
+
+networks:
+  edge:
+    external: true
+    name: ${OPENQCA_EDGE_NETWORK:-grillrocker_edge}

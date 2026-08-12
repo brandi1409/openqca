@@ -53,20 +53,24 @@ konkurrieren. Stattdessen setzt dieselbe private Env-Datei:
 ```dotenv
 OPENQCA_PROXY_MODE=shared
 OPENQCA_UPSTREAM_PORT=3212
+OPENQCA_EDGE_NETWORK=existing_caddy_network
 OPENQCA_IMAGE=ghcr.io/<owner>/openqca-web@sha256:<digest>
 NEXT_PUBLIC_SITE_URL=https://staging.example.org
 AI_ENABLED=false
 ```
 
 `deploy/docker-compose.shared-caddy.yml` übernimmt die unveränderte
-Web-Service-Definition und veröffentlicht Port 3000 ausschließlich als
-`127.0.0.1:3212`. Der vorhandene Host-Caddy erhält nach Sicherung und
-erfolgreichem `caddy validate` einen separaten Site-Block:
+Web-Service-Definition, veröffentlicht Port 3000 ausschließlich als
+`127.0.0.1:3212` für lokale Diagnose und verbindet den Web-Container zusätzlich
+mit dem bestehenden externen Caddy-Netzwerk. `OPENQCA_EDGE_NETWORK` benennt
+dieses bereits vorhandene Netzwerk; darin ist der stabile Alias
+`openqca-staging` erreichbar. Der vorhandene Container-Caddy erhält nach
+Sicherung und erfolgreichem `caddy validate` einen separaten Site-Block:
 
 ```caddyfile
 staging.example.org {
   encode zstd gzip
-  reverse_proxy 127.0.0.1:3212
+  reverse_proxy openqca-staging:3000
 }
 ```
 

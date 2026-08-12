@@ -14,6 +14,7 @@ const composeEnvKeys = [
   "OPENQCA_IMAGE",
   "OPENQCA_PROXY_MODE",
   "OPENQCA_UPSTREAM_PORT",
+  "OPENQCA_EDGE_NETWORK",
   "NEXT_PUBLIC_SITE_URL",
   "AI_ENABLED",
   "AI_PROVIDER",
@@ -59,6 +60,7 @@ try {
     [
       "OPENQCA_PROXY_MODE=shared",
       "OPENQCA_UPSTREAM_PORT=3212",
+      "OPENQCA_EDGE_NETWORK=existing_caddy_network",
       `OPENQCA_IMAGE=ghcr.io/example/openqca-web@sha256:${digest}`,
       "NEXT_PUBLIC_SITE_URL=https://staging.example.org",
       "AI_ENABLED=false",
@@ -79,6 +81,12 @@ try {
       protocol: "tcp",
     },
   ]);
+  assert.deepEqual(shared.services.web.networks, {
+    default: null,
+    edge: { aliases: ["openqca-staging"] },
+  });
+  assert.equal(shared.networks.edge.name, "existing_caddy_network");
+  assert.equal(shared.networks.edge.external, true);
 
   const managedEnv = join(fixtureDir, "managed.env");
   writeFileSync(
@@ -107,7 +115,9 @@ try {
     ],
   );
 
-  console.log("Deployment Compose contracts passed: managed proxy and loopback-only shared proxy.");
+  console.log(
+    "Deployment Compose contracts passed: managed proxy and loopback-only shared proxy on an external Caddy network.",
+  );
 } finally {
   rmSync(fixtureDir, { recursive: true, force: true });
 }
