@@ -52,7 +52,7 @@ function promptFor(request: AiAssistRequest): { instructions: string; input: str
   }
   return {
     instructions: shared,
-    input: `${statusHint === "ok" ? "Review this sufficiently specific rationale while preserving its stated justification. Put the critique in review and only a revised rationale in suggested.rationale." : "Explain only that the supplied justification needs a more specific substantive basis. Leave suggested.rationale empty."} Echo the supplied decision exactly in suggested.decision. Do not repeat its value or discuss or propose numeric values.\n${JSON.stringify(request.payload)}`,
+    input: `${statusHint === "ok" ? "Review this sufficiently specific rationale while preserving its stated justification. Put the critique in review and only a revised rationale in suggested.rationale." : "Explain only that the supplied justification needs a more specific substantive basis. Leave suggested.rationale empty."} Echo the supplied decision exactly in suggested.decision. Do not restate the selected QCA decision's value. In both review and suggested.rationale, never place a digit or number word next to a QCA decision term such as cutoff, threshold, frequency, consistency, membership, value, number, or anchor, including their German equivalents. Refer to the decision itself only as "the selected decision" in English or "die gewählte Entscheidung" in German. Preserve unrelated dates, case-universe counts, and other non-QCA quantitative context. Do not discuss or propose numeric QCA values.\n${JSON.stringify(request.payload)}`,
   };
 }
 

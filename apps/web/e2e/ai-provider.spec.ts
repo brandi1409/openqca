@@ -119,6 +119,58 @@ test("Gemini provider sends the reviewed payload through the closed structured-o
   ]);
 });
 
+test("decision review prompt scopes value-restatement rules to QCA values", async () => {
+  process.env.AI_ENABLED = "true";
+  process.env.AI_PROVIDER = "gemini";
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+
+  let providerBody: {
+    contents?: Array<{ parts?: Array<{ text?: string }> }>;
+  } | null = null;
+  globalThis.fetch = async (_input, requestInit) => {
+    providerBody = JSON.parse(String(requestInit?.body));
+    return new Response(JSON.stringify({
+      candidates: [{
+        finishReason: "STOP",
+        content: { parts: [{ text: JSON.stringify({
+          task: "decision_rationale_review",
+          status: "ok",
+          review: "The rationale links the selected decision to the 2024 preregistration and the universe of twelve synthetic municipalities.",
+          suggested: {
+            decision: "frequencyCutoff",
+            rationale: "The selected decision follows the 2024 preregistration for the universe of twelve synthetic municipalities and retains configurations represented by a single teaching case.",
+          },
+          uncertainty: [],
+          evidenceNeeds: [],
+          limitations: [],
+        }) }] },
+      }],
+    }), { status: 200 });
+  };
+
+  await expect(completeAi({
+    version: AI_CONTRACT_VERSION,
+    task: "decision_rationale_review",
+    locale: "en",
+    payload: {
+      decision: "frequencyCutoff",
+      rationale: "The frequency cutoff of one follows the 2024 preregistration for a universe of twelve synthetic municipalities and preserves configurations represented by a single teaching case.",
+    },
+  })).resolves.toMatchObject({
+    review: {
+      status: "ok",
+      suggested: { decision: "frequencyCutoff" },
+    },
+  });
+
+  const userText = providerBody?.contents?.[0]?.parts?.[0]?.text ?? "";
+  expect(userText).toContain("never place a digit or number word next to a QCA decision term");
+  expect(userText).toContain("Preserve unrelated dates, case-universe counts");
+  expect(userText).toContain('Refer to the decision itself only as "the selected decision"');
+  expect(userText).toContain('"decision":"frequencyCutoff"');
+  expect(userText).toContain('"rationale":"The frequency cutoff of one');
+});
+
 test("unsafe intent in every reviewed field is refused before provider access", async () => {
   process.env.AI_ENABLED = "true";
   process.env.AI_PROVIDER = "gemini";
