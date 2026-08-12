@@ -11,12 +11,12 @@ import {
 } from "@/lib/ai-reviewed-summary";
 import {
   AI_CONTRACT_VERSION,
+  aiRequestPrivacyIssues,
   parseAiAssistRequest,
   parseAiReviewResponse,
   type AiAssistRequest,
   type AiReviewResponse,
 } from "@/lib/ai-contract";
-
 type Result = {
   request: AiAssistRequest;
   review: AiReviewResponse;
@@ -40,7 +40,7 @@ function copy(locale: "de" | "en") {
         step2: "Send only after you approve",
         step3: "Apply or discard the suggestion yourself",
         review:
-          "This is the exact payload. No dataset rows are included in this request. Free-text fields are sent exactly as shown and may contain sensitive case information.",
+          "This is the exact payload. It is checked locally for row-like data, contact identifiers, and current case labels before it can be sent.",
         preview: "Request preview",
         prepare: "Prepare AI review",
         send: "Send to AI coach",
@@ -58,6 +58,8 @@ function copy(locale: "de" | "en") {
         invalid: "The service returned an invalid response.",
         missing:
           "Complete every required field and keep each entry within 2,000 characters before preparing an AI review.",
+        privacy:
+          "Remove dataset rows, contact details, and case identifiers before preparing an AI review.",
         discard: "Discard suggestion",
         discarded: "The suggestion was discarded.",
         adopted: "The suggestion was applied. Review and confirm the field yourself.",
@@ -65,6 +67,8 @@ function copy(locale: "de" | "en") {
           "The source field changed or provenance could not be recorded. Prepare a fresh review before applying it.",
         sourceChanged:
           "The reviewed source changed. Prepare a fresh request before applying a suggestion.",
+        unavailable:
+          "AI review is unavailable on this deployment. You can continue the analysis without it.",
       }
     : {
         eyebrow: "KI-Analysecoach",
@@ -74,7 +78,7 @@ function copy(locale: "de" | "en") {
         step2: "Erst nach Freigabe senden",
         step3: "Vorschlag selbst übernehmen oder verwerfen",
         review:
-          "Dies ist die exakte Nutzlast. Diese Anfrage enthält keine Datensatzzeilen. Freitextfelder werden exakt wie angezeigt gesendet und können sensible Fallinformationen enthalten.",
+          "Dies ist die exakte Nutzlast. Vor dem Versand wird sie lokal auf zeilenartige Daten, Kontaktdaten und aktuelle Fallkennungen geprüft.",
         preview: "Anfragevorschau",
         prepare: "KI-Prüfung vorbereiten",
         send: "An KI-Coach senden",
@@ -92,6 +96,8 @@ function copy(locale: "de" | "en") {
         invalid: "Der Dienst hat keine gültige Antwort geliefert.",
         missing:
           "Füllen Sie alle erforderlichen Felder aus und begrenzen Sie jeden Eintrag auf 2.000 Zeichen, bevor Sie eine KI-Prüfung vorbereiten.",
+        privacy:
+          "Entfernen Sie Datensatzzeilen, Kontaktdaten und Fallkennungen, bevor Sie eine KI-Prüfung vorbereiten.",
         discard: "Vorschlag verwerfen",
         discarded: "Der Vorschlag wurde verworfen.",
         adopted:
@@ -100,6 +106,8 @@ function copy(locale: "de" | "en") {
           "Das Ausgangsfeld wurde geändert oder die Provenienz konnte nicht erfasst werden. Bereiten Sie vor der Übernahme eine neue Prüfung vor.",
         sourceChanged:
           "Die geprüfte Ausgangslage wurde geändert. Bereiten Sie vor einer Übernahme eine neue Anfrage vor.",
+        unavailable:
+          "Die KI-Prüfung ist in dieser Bereitstellung nicht verfügbar. Sie können die Analyse ohne sie fortsetzen.",
       };
 }
 
@@ -145,16 +153,20 @@ function adoptLabel(task: AiAssistRequest["task"], locale: "de" | "en"): string 
     ? "Use suggested rationale"
     : "Vorgeschlagene Begründung verwenden";
 }
+const NO_SENSITIVE_VALUES: readonly string[] = [];
+
 export function AiAssist({
   request,
   label,
   sourceRevision,
+  sensitiveValues = NO_SENSITIVE_VALUES,
   focusTargetId,
   onAdopt,
 }: {
   request: () => AiAssistRequest;
   label: string;
   sourceRevision?: () => string;
+  sensitiveValues?: readonly string[];
   focusTargetId?: string;
   onAdopt?: AdoptionHandler;
 }) {
@@ -165,6 +177,7 @@ export function AiAssist({
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [available, setAvailable] = useState<boolean | null>(null);
   const [invalidPayload, setInvalidPayload] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -173,6 +186,7 @@ export function AiAssist({
   const requestRef = useRef(request);
   const sourceRevisionRef = useRef(sourceRevision);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const sensitiveValuesRef = useRef(sensitiveValues);
 
   function requestSignature(value: AiAssistRequest): string {
     return JSON.stringify(value);
@@ -197,7 +211,25 @@ export function AiAssist({
   useEffect(() => {
     requestRef.current = request;
     sourceRevisionRef.current = sourceRevision;
-  }, [request, sourceRevision]);
+    sensitiveValuesRef.current = sensitiveValues;
+  }, [request, sensitiveValues, sourceRevision]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/ai/status", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return false;
+        const payload: unknown = await response.json();
+        if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
+        return "available" in payload && payload.available === true;
+      })
+      .then((nextAvailable) => setAvailable(nextAvailable))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setAvailable(false);
+      });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (result) {
@@ -215,6 +247,7 @@ export function AiAssist({
     const restoreAiFocus = rootRef.current?.contains(document.activeElement) === true;
     if (
       current &&
+      aiRequestPrivacyIssues(current, sensitiveValuesRef.current).length === 0 &&
       requestSignature(current) === requestSignature(submitted) &&
       (result?.sourceRevision ?? preparedRevisionRef.current) === (sourceRevision?.() ?? "")
     ) return;
@@ -225,8 +258,15 @@ export function AiAssist({
   }, [applying, prepared, request, result, sourceRevision, text.sourceChanged]);
 
   function prepare() {
-    const candidate = parseAiAssistRequest(currentRequest());
+    const requested = currentRequest();
     setResult(null);
+    if (aiRequestPrivacyIssues(requested, sensitiveValuesRef.current).length > 0) {
+      setPrepared(null);
+      setNote(text.privacy);
+      setInvalidPayload(false);
+      return;
+    }
+    const candidate = parseAiAssistRequest(requested);
     if (!candidate) {
       setPrepared(null);
       setNote(null);
@@ -242,6 +282,11 @@ export function AiAssist({
 
   async function send() {
     if (!prepared) return;
+    if (aiRequestPrivacyIssues(prepared, sensitiveValuesRef.current).length > 0) {
+      setPrepared(null);
+      setNote(text.privacy);
+      return;
+    }
     const submitted = prepared;
     const submittedRevision = preparedRevisionRef.current;
     setBusy(true);
@@ -383,7 +428,12 @@ export function AiAssist({
           );
         })}
       </ol>
-      {!prepared && !result && (
+      {available === false && (
+        <p className="oq-ai-assist__note" role="status">
+          {text.unavailable}
+        </p>
+      )}
+      {available === true && !prepared && !result && (
         <button
           ref={triggerRef}
           type="button"
@@ -394,7 +444,7 @@ export function AiAssist({
           {text.prepare}
         </button>
       )}
-      {prepared && !result && (
+      {available === true && prepared && !result && (
         <div
           ref={previewRef}
           className="oq-ai-assist__preview"

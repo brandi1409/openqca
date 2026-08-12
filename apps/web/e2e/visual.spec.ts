@@ -44,6 +44,13 @@ for (const colorScheme of SCHEMES) {
       });
 
       test("A3.6 AI-Freigabe bleibt innerhalb der Seitenbreite", async ({ page }) => {
+        await page.route("**/api/ai/status", async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ version: "v2", available: true }),
+          });
+        });
         await loadDemo(page);
         await openDestination(page, "research");
         const brief = page.getByRole("region", { name: "Forschungsdesign klären" });

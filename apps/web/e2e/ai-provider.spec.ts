@@ -22,6 +22,8 @@ const originalEnv = {
   AI_PROVIDER: process.env.AI_PROVIDER,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   GEMINI_AI_MODEL: process.env.GEMINI_AI_MODEL,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_AI_MODEL: process.env.OPENAI_AI_MODEL,
 };
 
 function restoreEnv(name: keyof typeof originalEnv): void {
@@ -36,6 +38,8 @@ test.afterEach(() => {
   restoreEnv("AI_PROVIDER");
   restoreEnv("GEMINI_API_KEY");
   restoreEnv("GEMINI_AI_MODEL");
+  restoreEnv("OPENAI_API_KEY");
+  restoreEnv("OPENAI_AI_MODEL");
 });
 
 test("Gemini provider sends the reviewed payload through the closed structured-output contract", async () => {
@@ -119,16 +123,78 @@ test("Gemini provider sends the reviewed payload through the closed structured-o
   ]);
 });
 
+test("OpenAI provider sends the same reviewed payload through Responses structured output", async () => {
+  process.env.AI_ENABLED = "true";
+  process.env.AI_PROVIDER = "openai";
+  process.env.OPENAI_API_KEY = "test-openai-key";
+  process.env.OPENAI_AI_MODEL = "gpt-test-model";
+
+  let url = "";
+  let init: RequestInit | undefined;
+  globalThis.fetch = async (input, requestInit) => {
+    url = String(input);
+    init = requestInit;
+    return new Response(JSON.stringify({
+      status: "completed",
+      output: [{
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            task: "brief_clarify",
+            status: "ok",
+            review: "Die Frage ist klar abgegrenzt und fachlich prüfbar.",
+            suggested: {
+              question: "Wie unterscheiden sich Bedingungen für kommunale Resilienz?",
+            },
+            uncertainty: [],
+            evidenceNeeds: [],
+            limitations: [],
+          }),
+        }],
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  await expect(completeAi(request)).resolves.toMatchObject({
+    model: "gpt-test-model",
+    provider: "openai",
+    review: {
+      task: "brief_clarify",
+      status: "ok",
+      suggested: {
+        question: "Wie unterscheiden sich Bedingungen für kommunale Resilienz?",
+      },
+    },
+  });
+  expect(url).toBe("https://api.openai.com/v1/responses");
+  const headers = new Headers(init?.headers);
+  expect(headers.get("Authorization")).toBe("Bearer test-openai-key");
+  const body = JSON.parse(String(init?.body));
+  expect(body).toMatchObject({
+    model: "gpt-test-model",
+    store: false,
+    tools: [],
+    text: {
+      format: {
+        type: "json_schema",
+        strict: true,
+        schema: { type: "object", additionalProperties: false },
+      },
+    },
+  });
+  expect(body.input).toContain(JSON.stringify(request.payload));
+});
+
 test("decision review prompt scopes value-restatement rules to QCA values", async () => {
   process.env.AI_ENABLED = "true";
   process.env.AI_PROVIDER = "gemini";
   process.env.GEMINI_API_KEY = "test-gemini-key";
 
-  let providerBody: {
-    contents?: Array<{ parts?: Array<{ text?: string }> }>;
-  } | null = null;
+  const providerCapture: {
+    body: { contents?: Array<{ parts?: Array<{ text?: string }> }> } | null;
+  } = { body: null };
   globalThis.fetch = async (_input, requestInit) => {
-    providerBody = JSON.parse(String(requestInit?.body));
+    providerCapture.body = JSON.parse(String(requestInit?.body));
     return new Response(JSON.stringify({
       candidates: [{
         finishReason: "STOP",
@@ -163,7 +229,7 @@ test("decision review prompt scopes value-restatement rules to QCA values", asyn
     },
   });
 
-  const userText = providerBody?.contents?.[0]?.parts?.[0]?.text ?? "";
+  const userText = providerCapture.body?.contents?.[0]?.parts?.[0]?.text ?? "";
   expect(userText).toContain("never place a digit or number word next to a QCA decision term");
   expect(userText).toContain("Preserve unrelated dates, case-universe counts");
   expect(userText).toContain('Refer to the decision itself only as "the selected decision"');

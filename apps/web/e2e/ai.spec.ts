@@ -23,6 +23,25 @@ test("AI route rejects legacy and forbidden-data payloads before provider access
   });
   expect(confidentialRows.status()).toBe(400);
 
+  const rowInFreeText = await request.post("/api/ai/assist", {
+    data: {
+      ...briefPayload,
+      payload: { ...briefPayload.payload, question: "participant-17,1,0" },
+    },
+  });
+  expect(rowInFreeText.status()).toBe(400);
+
+  const identifierInFreeText = await request.post("/api/ai/assist", {
+    data: {
+      ...briefPayload,
+      payload: {
+        ...briefPayload.payload,
+        caseUniverse: "Contact research@example.test for the compared municipalities",
+      },
+    },
+  });
+  expect(identifierInFreeText.status()).toBe(400);
+
   const numericGate = await request.post("/api/ai/assist", {
     data: { version: "v2", task: "decision_rationale_review", locale: "en", payload: { decision: "frequencyCutoff", rationale: "Theory", cutoff: 2 } },
   });

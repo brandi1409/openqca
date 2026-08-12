@@ -3,6 +3,7 @@ import type { Solution, TruthTableResult } from "@openqca/engine";
 import {
   buildAiWritingProvenanceEntry,
   verifyAiWritingProvenance,
+  sha256Text,
 } from "../src/lib/ai-reviewed-summary";
 import {
   EMPTY_ANALYSIS_DECISIONS,
@@ -80,8 +81,42 @@ test("AI writing provenance stores bounded metadata and hashes, never source tex
   expect(rows[0].previousTextHash).not.toBe(rows[0].adoptedTextHash);
   expect(JSON.stringify(rows)).not.toContain("Original private research text");
   expect(JSON.stringify(rows)).not.toContain("Adopted private research text");
+  expect(provenance.brief_clarify.question?.hashSalt).toMatch(/^[a-f0-9]{32}$/);
+  expect(rows[0]).not.toHaveProperty("hashSalt");
+  expect(rows[0].adoptedTextHash).not.toBe(
+    await sha256Text("Adopted private research text"),
+  );
 });
 
+test("exported calibration provenance uses a generic target and omits its private salt", async () => {
+  const entry = await buildAiWritingProvenanceEntry(
+    {
+      provider: "mock",
+      model: "test-model",
+      generatedAt: "2026-08-11T10:00:00.000Z",
+    },
+    "Previous definition",
+    "Adopted definition",
+  );
+  const rows = listAiWritingProvenance({
+    brief_clarify: {},
+    calibration_evidence_gaps: { "participant-email@example.test": entry },
+    decision_rationale_review: {},
+  });
+  expect(rows).toEqual([
+    {
+      task: "calibration_evidence_gaps",
+      target: "calibrationDefinition.1",
+      provider: "mock",
+      model: "test-model",
+      generatedAt: "2026-08-11T10:00:00.000Z",
+      previousTextHash: entry.previousTextHash,
+      adoptedTextHash: entry.adoptedTextHash,
+    },
+  ]);
+  expect(JSON.stringify(rows)).not.toContain("participant-email@example.test");
+  expect(JSON.stringify(rows)).not.toContain(entry.hashSalt);
+});
 test("saved-state normalization preserves valid provenance and drops malformed entries", async () => {
   const provenance = await provenanceFixture();
   const baseState = {

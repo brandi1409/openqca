@@ -83,6 +83,67 @@ export type AiReviewResponse =
   | DecisionRationaleReview;
 
 const MAX_TEXT = 2_000;
+export type AiRequestPrivacyCode =
+  | "raw-row"
+  | "direct-identifier"
+  | "case-identifier";
+
+const EMAIL_ADDRESS = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/iu;
+const LABELED_CONTACT = /\b(?:tel(?:ephone)?|phone|mobile|mobil|handy)\s*[:=]?\s*\+?[\d()\s.-]{7,}/iu;
+const LABELED_IDENTIFIER = /\b(?:ssn|social security|passport|personalausweis|patient(?:en)?[- ]?id|participant[- ]?id|teilnehmer[- ]?id|matrikelnummer)\s*[:=#-]?\s*[A-Z0-9-]{3,}\b/iu;
+const GENERIC_CASE_IDENTIFIER = /\b(?:case|fall|participant|teilnehmer|patient)[ _-]*\p{N}+\b/iu;
+const RAW_FILE_REFERENCE = /\.(?:csv|tsv|xlsx?|sav|dta|txt)\b/iu;
+const JSON_ROW = /\{\s*["'][^"']+["']\s*:/u;
+const NUMERIC_CELL = /^[-+]?(?:\p{N}+(?:[.,]\p{N}+)?|[01])$/u;
+
+function looksLikeDelimitedRow(value: string): boolean {
+  if (value.includes("\t")) return true;
+  return value.split(/\r?\n/u).some((line) =>
+    [",", ";"].some((delimiter) => {
+      const cells = line.split(delimiter).map((cell) => cell.trim());
+      return cells.length >= 3 && cells.slice(1).filter((cell) => NUMERIC_CELL.test(cell)).length >= 2;
+    }),
+  );
+}
+
+function containsSensitiveValue(textValue: string, sensitiveValues: readonly string[]): boolean {
+  const normalized = textValue.normalize("NFKC");
+  return sensitiveValues.some((candidate) => {
+    const token = candidate.normalize("NFKC").trim();
+    if (!token) return false;
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    return new RegExp(
+      `(?:^|[^\\p{L}\\p{N}_])${escaped}(?=$|[^\\p{L}\\p{N}_])`,
+      "iu",
+    ).test(normalized);
+  });
+}
+
+/** Client and server privacy boundary for the exact payload shown before send. */
+export function aiRequestPrivacyIssues(
+  request: AiAssistRequest,
+  sensitiveValues: readonly string[] = [],
+): AiRequestPrivacyCode[] {
+  const issues = new Set<AiRequestPrivacyCode>();
+  for (const value of Object.values(request.payload)) {
+    if (typeof value !== "string") continue;
+    if (looksLikeDelimitedRow(value) || RAW_FILE_REFERENCE.test(value) || JSON_ROW.test(value)) {
+      issues.add("raw-row");
+    }
+    if (EMAIL_ADDRESS.test(value) || LABELED_CONTACT.test(value) || LABELED_IDENTIFIER.test(value)) {
+      issues.add("direct-identifier");
+    }
+    if (GENERIC_CASE_IDENTIFIER.test(value) || containsSensitiveValue(value, sensitiveValues)) {
+      issues.add("case-identifier");
+    }
+  }
+  return [...issues].sort();
+}
+
+function privacySafe<T extends AiAssistRequest>(request: T): T | null {
+  return aiRequestPrivacyIssues(request).length === 0 ? request : null;
+}
+
 
 function text(value: unknown, required = true): string | null {
   if (typeof value !== "string") return null;
@@ -135,7 +196,7 @@ export function parseAiAssistRequest(value: unknown): AiAssistRequest | null {
       timePeriod &&
       outcomeConcept &&
       conditionSelectionRationale
-      ? {
+      ? privacySafe({
           version: AI_CONTRACT_VERSION,
           task: "brief_clarify",
           locale: value.locale,
@@ -146,7 +207,7 @@ export function parseAiAssistRequest(value: unknown): AiAssistRequest | null {
             outcomeConcept,
             conditionSelectionRationale,
           },
-        }
+        })
       : null;
   }
   if (value.task === "calibration_evidence_gaps") {
@@ -158,12 +219,12 @@ export function parseAiAssistRequest(value: unknown): AiAssistRequest | null {
     const definition = text(payload.definition);
     const rationale = text(payload.rationale);
     return variable && setLabel && definition && rationale
-      ? {
+      ? privacySafe({
           version: AI_CONTRACT_VERSION,
           task: "calibration_evidence_gaps",
           locale: value.locale,
           payload: { variable, setLabel, definition, rationale },
-        }
+        })
       : null;
   }
   if (!hasOnlyKeys(payload, ["decision", "rationale"])) return null;
@@ -173,12 +234,12 @@ export function parseAiAssistRequest(value: unknown): AiAssistRequest | null {
     decision === "consistencyCutoff" ||
     decision === "directionalExpectations") &&
     rationale
-    ? {
+    ? privacySafe({
         version: AI_CONTRACT_VERSION,
         task: "decision_rationale_review",
         locale: value.locale,
         payload: { decision, rationale },
-      }
+      })
     : null;
 }
 

@@ -68,6 +68,7 @@ const policyRequest: BriefClarifyRequest = {
 
 const violations: Array<{ code: AiPolicyCode; de: string; en: string }> = [
   { code: "numeric-qca", de: "Empfohlener Anker ist 7.", en: "Recommended anchor is 7." },
+  { code: "role-selection", de: "Wähle Outcome als Rolle.", en: "Choose outcome as the role." },
   { code: "citation-or-source", de: "Laut Studie ist dies belegt.", en: "According to a study this is established." },
   { code: "causal-claim", de: "Dies verursacht das Ergebnis.", en: "This causes the outcome." },
   { code: "raw-or-case-data", de: "Fall-7 enthält Rohwerte.", en: "Case-7 contains raw values." },
@@ -223,6 +224,13 @@ test("policy gate blocks paraphrases and permits bounded explanations", () => {
     ["numeric-qca", "Der optimale Wert ist sieben."],
     ["numeric-qca", "I cannot recommend an anchor, but the optimal value is seven."],
     ["numeric-qca", "Ich kann keinen Anker empfehlen, aber der optimale Wert ist sieben."],
+    ["numeric-qca", "Use 0.75."],
+    ["numeric-qca", "Setze 0,75."],
+    ["role-selection", "Choose this variable as the outcome."],
+    ["role-selection", "Wähle diese Variable als Bedingung."],
+    ["citation-or-source", "Smith (2024) supports this definition."],
+    ["citation-or-source", "Müller 2024 stützt diese Definition."],
+    ["citation-or-source", "Oxford University Press documents this claim."],
     ["causal-claim", "This configuration determines the outcome."],
     ["causal-claim", "Diese Konfiguration bestimmt das Ergebnis."],
     ["defense-assertion", "The project is ready for defense."],

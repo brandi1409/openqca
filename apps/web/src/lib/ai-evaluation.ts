@@ -8,6 +8,7 @@ export type AiPolicyCode =
   | "invalid-summary"
   | "status-shape"
   | "numeric-qca"
+  | "role-selection"
   | "citation-or-source"
   | "causal-claim"
   | "raw-or-case-data"
@@ -28,6 +29,36 @@ const NEGATION = /\b(?:no|kein|cannot|can't|do not|don't|will not|won't|must not
 const NUMBER_WORD = /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|null|eins?|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|dreizehn|vierzehn|fünfzehn|sechzehn|siebzehn|achtzehn|neunzehn|zwanzig)\b/iu;
 const QCA_VALUE = /\b(?:wert|value|anker|anchor|cutoff|threshold|schwelle|membership|zugehörigkeit|konsistenzwert|consistency value|häufigkeitswert|frequency value|qca[- ]?wert|qca value)\b/iu;
 const RECOMMENDATION = /\b(?:recommend\w*|optimal\w*|choose|select|set|use|empfehl\w*|optimal\w*|wähl\w*|setz\w*|nimm)\b/iu;
+const ROLE_TERM = /\b(?:role|condition|outcome|ignore|rolle|bedingung|ergebnis|ignorieren)\b/iu;
+const NUMERIC_DIRECTIVE = new RegExp(
+  `(?:^\\s*(?:please\\s+|bitte\\s+)?(?:choose|select|set|use|assign|wähl\\w*|setz\\w*|nimm|weis\\w*)|\\b(?:should|must|sollte|muss)\\s+(?:choose|select|set|use|assign|wähl\\w*|setz\\w*|nimm|weis\\w*)).{0,32}(?:\\p{N}|${NUMBER_WORD.source})`,
+  "iu",
+);
+const AUTHOR_YEAR = /\b(\p{Lu}[\p{Ll}’'-]{2,})(?:\s+(?:and|und|&)\s+\p{Lu}[\p{Ll}’'-]{2,})?\s*(?:\(\s*(?:19|20)\p{N}{2}\s*\)|,\s*(?:19|20)\p{N}{2}\b|\s+(?:19|20)\p{N}{2}\b)/gu;
+const AUTHOR_YEAR_STOP_WORDS = new Set([
+  "study",
+  "period",
+  "research",
+  "project",
+  "preregistration",
+  "universe",
+  "comparison",
+  "studie",
+  "zeitraum",
+  "untersuchungszeitraum",
+  "forschung",
+  "projekt",
+  "präregistrierung",
+  "universum",
+  "vergleich",
+]);
+
+function hasLikelyAuthorYearCitation(original: string): boolean {
+  return [...original.matchAll(AUTHOR_YEAR)].some(
+    (match) => !AUTHOR_YEAR_STOP_WORDS.has((match[1] ?? "").toLocaleLowerCase("und")),
+  );
+}
+
 
 const POST_NEGATION = /^(?:.{0,24}(?:(?:cannot|can't|kann nicht|darf nicht)\s+(?:be\s+|werden\s+)?(?:provided|discussed|stated|recommended|confirmed|geliefert|besprochen|angegeben|empfohlen|bestätigt)|\b(?:nicht|not)\b.{0,24}\b(?:besprechen|discuss|liefern|provide|angeben|state|empfehlen|recommend|bestätigen|confirm|behaupten|claim)\b))/iu;
 
@@ -71,13 +102,22 @@ const POLICY_RULES: readonly PolicyRule[] = [
   {
     code: "numeric-qca",
     violates: (text) => nonNegatedMatch(text, new RegExp(
-      `(?:${RECOMMENDATION.source}.{0,48}${QCA_VALUE.source}|${QCA_VALUE.source}.{0,32}(?:\\p{N}|${NUMBER_WORD.source})|(?:\\p{N}|${NUMBER_WORD.source}).{0,32}${QCA_VALUE.source})`,
+      `(?:${RECOMMENDATION.source}.{0,48}${QCA_VALUE.source}|${QCA_VALUE.source}.{0,32}(?:\\p{N}|${NUMBER_WORD.source})|(?:\\p{N}|${NUMBER_WORD.source}).{0,32}${QCA_VALUE.source}|${NUMERIC_DIRECTIVE.source})`,
+      "iu",
+    )),
+  },
+  {
+    code: "role-selection",
+    violates: (text) => nonNegatedMatch(text, new RegExp(
+      `(?:${RECOMMENDATION.source}.{0,40}${ROLE_TERM.source}|${ROLE_TERM.source}.{0,32}${RECOMMENDATION.source})`,
       "iu",
     )),
   },
   {
     code: "citation-or-source",
-    violates: (text) => nonNegatedMatch(text, /https?:|\bwww\.|\bdoi\b|\bet\s+al\b|\([a-zäöüß-]+(?:\s+(?:and|und|&)\s+[a-zäöüß-]+)?,?\s+\p{N}{4}\)/iu)
+    violates: (text, original) => nonNegatedMatch(text, /https?:|\bwww\.|\bdoi\b|\bet\s+al\b|\([a-zäöüß-]+(?:\s+(?:and|und|&)\s+[a-zäöüß-]+)?,?\s+\p{N}{4}\)/iu)
+      || hasLikelyAuthorYearCitation(original)
+      || nonNegatedMatch(text, /\b(?:university press|verlag|isbn|issn|journal of|zeitschrift für)\b/iu)
       || nonNegatedMatch(text, /\b(?:according to|laut)\b|\b(?:study|studie|source|quelle)\b.{0,24}\b(?:shows?|proves?|finds?|belegt|zeigt|beweist)\b/iu),
   },
   {

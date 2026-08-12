@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import * as XLSX from "xlsx";
 import { dismissConsent, loadDemo, openDestination } from "./helpers";
 
 async function clearProject(page: Page) {
@@ -6,6 +7,16 @@ async function clearProject(page: Page) {
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
   await dismissConsent(page);
+}
+
+async function enableAiCoach(page: Page) {
+  await page.route("**/api/ai/status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ version: "v2", available: true }),
+    });
+  });
 }
 
 test("workspace starts with five destinations and exactly three explicit entry paths", async ({ page }) => {
@@ -58,6 +69,34 @@ test("import preflight preserves the active project until explicit commit", asyn
   await expect(page.getByRole("button", { name: "Vorläufige Antwort öffnen" })).toBeVisible();
 });
 
+test("XLSX import reaches a provisional answer after explicit commit", async ({ page }) => {
+  await clearProject(page);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ["Case", "A", "Y"],
+      ["one", 1, 1],
+      ["two", 0, 0],
+      ["three", 1, 1],
+    ]),
+    "Cases",
+  );
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  await page.getByLabel("Datei auswählen").setInputFiles({
+    name: "own-data.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer,
+  });
+  await expect(page.getByText("own-data.xlsx")).toBeVisible();
+  await page.getByRole("button", { name: "Import übernehmen" }).click();
+  await expect(page.getByText("Import übernommen")).toBeVisible();
+  await openDestination(page, "answer");
+  await expect(page.getByText("Vorläufig", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("solution-formula-intermediate")).toBeVisible();
+});
+
 test("decision controls expose methodological explanations", async ({ page }) => {
   await loadDemo(page);
   await openDestination(page, "decisions");
@@ -67,6 +106,7 @@ test("decision controls expose methodological explanations", async ({ page }) =>
 });
 
 test("AI review stays local until required fields are complete", async ({ page }) => {
+  await enableAiCoach(page);
   let requests = 0;
   await page.route("**/api/ai/assist", async (route) => {
     requests += 1;
@@ -87,6 +127,7 @@ test("AI review stays local until required fields are complete", async ({ page }
 });
 
 test("all three AI jobs expose only reviewed payloads and adopt into their exact fields", async ({ page }) => {
+  await enableAiCoach(page);
   const requests: Array<Record<string, unknown>> = [];
   await page.route("**/api/ai/assist", async (route) => {
     const sent = route.request().postDataJSON() as Record<string, unknown>;
@@ -232,7 +273,30 @@ test("all three AI jobs expose only reviewed payloads and adopt into their exact
   await expect(page.locator("#calibration-set-definition-wohlstand")).toBeFocused();
 });
 
+test("AI preview blocks current case identifiers before any network request", async ({ page }) => {
+  await enableAiCoach(page);
+  let requests = 0;
+  await page.route("**/api/ai/assist", async (route) => {
+    requests += 1;
+    await route.abort();
+  });
+  await loadDemo(page);
+  await openDestination(page, "research");
+  await page.getByLabel("Forschungsfrage").fill(
+    "Welche Bedingungen unterscheiden Belgien von den übrigen Lehrfällen?",
+  );
+  const brief = page.getByRole("region", { name: "Forschungsdesign klären" });
+  await brief.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
+  await expect(brief.getByRole("status")).toContainText(
+    "Entfernen Sie Datensatzzeilen, Kontaktdaten und Fallkennungen",
+  );
+  await expect(brief.getByRole("button", { name: "An KI-Coach senden" })).toHaveCount(0);
+  await expect(brief.getByText("Anfragevorschau")).toHaveCount(0);
+  expect(requests).toBe(0);
+});
+
 test("stale AI responses cannot overwrite a field edited while the request is in flight", async ({ page }) => {
+  await enableAiCoach(page);
   let releaseResponse: (() => void) | undefined;
   let markRequestSeen: (() => void) | undefined;
   const requestSeen = new Promise<void>((resolve) => {
@@ -494,6 +558,56 @@ test("answer distinguishes no-solution and equivalent-model states", async ({ pa
   await page.getByRole("button", { name: "Import übernehmen" }).click();
   await openDestination(page, "answer");
   await expect(page.getByText(/gleichwertige intermediäre Modelle liegen vor/)).toBeVisible();
+});
+
+test("answer names the engine limit when more than twelve conditions are active", async ({ page }) => {
+  await clearProject(page);
+  const conditions = Array.from({ length: 13 }, (_, index) => `C${index + 1}`);
+  const row = (label: string, value: number) =>
+    [label, ...conditions.map(() => String(value)), String(value)].join(",");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "thirteen-conditions.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from([
+      ["Fall", ...conditions, "Y"].join(","),
+      row("c1", 0),
+      row("c2", 1),
+    ].join("\n")),
+  });
+  await page.getByRole("button", { name: "Import übernehmen" }).click();
+  await openDestination(page, "answer");
+  await expect(page.getByText(
+    "Mit 13 Bedingungen ist die Suffizienzanalyse auf höchstens 12 Bedingungen begrenzt.",
+  )).toBeVisible();
+});
+
+test("answer surfaces exact crossover cases from engine diagnostics", async ({ page }) => {
+  await clearProject(page);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "crossover.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Fall,A,Y\nc1,0,0\nc2,0.5,1\nc3,1,1\n"),
+  });
+  await page.getByRole("button", { name: "Import übernehmen" }).click();
+  await openDestination(page, "answer");
+  const summary = page.getByTestId("answer-case-summary");
+  await expect(summary).toContainText("Grenzfälle bei 0,5");
+  await expect(summary).toContainText("c2");
+});
+
+test("research and answer expose cases excluded by missing-value policy", async ({ page }) => {
+  await clearProject(page);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "missing-cases.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Fall,A,Y\nc1,1,1\nc2,,0\nc3,0,\n"),
+  });
+  await page.getByRole("button", { name: "Import übernehmen" }).click();
+  await expect(page.getByText(
+    "missing-cases.csv: 3 Rohfälle, 1 analysierte Fälle, 2 ausgeschlossen oder ungeklärt",
+  )).toBeVisible();
+  await openDestination(page, "answer");
+  await expect(page.getByText(/2 Fall\/Fälle .* ausgeschlossen/)).toBeVisible();
 });
 for (const viewport of [
   { name: "desktop", width: 1280, height: 900 },
