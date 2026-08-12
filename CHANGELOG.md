@@ -37,6 +37,10 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
 - **Explizites Fortsetzen statt Autoload.** Autosave bleibt bestehen, aber kompatible lokale
   V1-/V2-Projekte werden beim Einstieg nur als Resume-Kandidat mit Speicherzeitpunkt angeboten.
   `?demo=1` bleibt ein direkter Lehrmodus.
+- **Import als Preflight.** CSV- und XLSX-Dateien werden vor dem Projektwechsel geprüft und
+  erst nach ausdrücklicher Übernahme aktiv. Ausgeschlossene Fälle, exakte 0,5-Grenzfälle,
+  äquivalente Modelle, leere Lösungen und die Grenze von zwölf Bedingungen erscheinen als
+  benannte Analysezustände statt als implizite Fehler.
 
 ### Korrigiert
 - **Reichweite der ESA-Abweichung erstmals gemessen.** Über 13.216 Konstellationen
@@ -92,7 +96,7 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   das tatsächliche Validierungsergebnis geprüft.
 - `@openqca/engine` ist als eigenständiges npm-Paket installierbar (gebautes `dist`,
   Typdeklarationen, eigenes README).
-- **Zitierhinweis in App und Bericht.** Eine Karte am Ende von Schritt 6 und ein eigener
+- **Zitierhinweis in App und Bericht.** Eine Karte im Prüfpaket und ein eigener
   Abschnitt im Bericht nennen Autor, Titel, Version und — sobald vorhanden — den DOI, dazu
   ein BibTeX-Eintrag zum Kopieren. Solange kein DOI existiert, sagt die App das ausdrücklich
   und verweist auf die Repository-Adresse; ein Platzhalter-DOI würde zitierfähig aussehen
@@ -121,29 +125,18 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   SUIN-Kombinationen nach RoN sortiert und hinter einem Aufklapper (eine RoN-Schwelle wird
   bewusst nicht behauptet — die Literatur nennt keine), und über den drei Lösungen die
   Konvention, dass die intermediäre berichtet wird. Sind komplexe und intermediäre Lösung
-  identisch, sagt die App das ausdrücklich, statt zwei gleiche Formeln kommentarlos
-  nebeneinanderzustellen. Modell-Mehrdeutigkeit steht nicht mehr als 12-px-Grauzeile neben
-  28-px-Kennzahlen, sondern als eigener Hinweis.
-- **Häkchen nur, wenn es stimmt.** Die Schritte 3–5 trugen ein grünes „erledigt", während
-  darunter „0 von 5 Sets dokumentiert" stand. Solange die Kalibrierung nicht begründet ist,
-  bleibt die Ziffer stehen und der Schritt trägt „rechnet — vorläufig"; die
-  Vorläufig-Marke nennt jetzt Grund und Weg statt nur eines Warnzeichens.
-- **Schritt 3 als Akkordeon.** Fünf ausgeklappte Set-Karten waren gut vier Bildschirmhöhen
-  lang; bei sechs bis acht Bedingungen war der Schritt nicht mehr bedienbar. Ein Set ist
-  offen, die übrigen stehen als Zeile mit Rolle, Status, Herkunft und den gesetzten Ankern.
-  Die deskriptive Statistik steht jetzt unter den Sets und eingeklappt — sie beschreibt die
-  kalibrierten Werte und stand damit vor ihrer eigenen Ursache.
-- **Ankergriffe auf Touch bedienbar.** Die Trefferfläche steckte im viewBox und schrumpfte
-  auf 390px auf 12 CSS-Pixel. Jeder Griff reicht jetzt bis zur Mitte zum Nachbarn (≥ 44px,
-  maschinell geprüft), Ziehen ist relativ zum Griff statt springend, und vertikales
-  Scrollen über der Grafik bleibt möglich. Die Export-Buttons lagen auf schmalen Breiten
-  auf der Plotfläche und stehen jetzt darunter; die drei Anker brechen nicht mehr 2+1 um.
-- **Flow umgekehrt: Ergebnisse sofort.** Notwendigkeit, Truth Table und Lösungen rechnen,
-  sobald die Kalibrierung berechenbar ist — nicht erst, wenn sie vollständig dokumentiert
-  ist. Die vollständige Dokumentation schaltet weiterhin die Replikationsartefakte frei
-  (Protokoll-JSON, Rohdaten-CSV, Methoden-Markdown, R-Skript) und macht den Bericht
-  publikationsreif. Schritt 3 startet in einer Schnell-Ansicht; die Kalibrier-Werkbank
-  bleibt als zweite Ansicht erhalten.
+  identisch, sagt die App das ausdrücklich. Modell-Mehrdeutigkeit steht als eigener Hinweis.
+- **Status nur, wenn er stimmt.** Berechenbare, aber noch nicht verteidigungsreife Ergebnisse
+  tragen „vorläufig"; der sichtbare Grund führt direkt zu den offenen Entscheidungen.
+- **Kalibrierung nach Bedarf vertieft.** Kompakte Set-Karten bleiben für den Überblick erhalten;
+  die vollständige Definition, Evidenz, Fallprüfung und Sensitivität liegen als progressive
+  Dokumentationsansicht in „Entscheidungen".
+- **Ankergriffe auf Touch bedienbar.** Jeder Griff besitzt eine Trefferfläche von mindestens
+  44 px, Ziehen ist relativ zum Griff und vertikales Scrollen über der Grafik bleibt möglich.
+  Die Export-Buttons stehen auf schmalen Breiten unter der Plotfläche.
+- **Ergebnisse sofort, Defense kontrolliert.** Notwendigkeit, Truth Table und Lösungen rechnen,
+  sobald alle aktiven Sets berechenbar sind. Erst die bestätigten Forschungs-,
+  Kalibrierungs- und Analyseentscheidungen schalten das gemeinsame Prüfpaket frei.
 - **Bericht immer erzeugbar**, mit Banner „Vorläufig" bzw. „Synthetische Lehrdaten — nicht
   zitierfähig" statt einer Sperre.
 - Rollen-Heuristik ohne stille Deckelung: Jede numerische Nicht-Outcome-Spalte wird
@@ -158,14 +151,9 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   (Konsistenz 0,972 gegen 0,809). Ursache war die stille Rollen-Deckelung; ein E2E-Test
   vergleicht beide Formeln jetzt bei jedem Lauf.
 - `TOOL_VERSION = "0.0.0"` in jedem exportierten Protokoll und R-Skript.
-- Ankerbeschriftungen nannten 0,05/0,95, während die Engine Ragins ±3-Logit-Fixpunkte
-  ≈0,047/≈0,953 rechnet — in Bericht und Oberfläche korrigiert.
-- Lehrbeispiel und Import-Platzhalter waren fest auf Englisch verdrahtet und erschienen so
-  in der deutschen Oberfläche.
-- Fall-Diagnostik: Legende, Erklärtext und Grenzfall-Hinweis erschienen bis zu sechsmal
-  untereinander, weil sie je Lösungsmodell gerendert wurden und die sparsame Lösung
-  mehrdeutig sein kann. Sie stehen jetzt einmal je Schritt; gleichwertige Modelle sind
-  einklappbar, das erste ist offen.
+- Fall-Diagnostik: Legende, Erklärtext und Grenzfall-Hinweis erschienen mehrfach.
+  Sie stehen jetzt einmal in der fallbasierten Antwort; gleichwertige Modelle liegen progressiv
+  in der Evidenzkette.
 - Kopfzeile der App lief auf schmalen Viewports über (nur auf Linux-Schriftmetrik sichtbar).
 - MIT-Lizenz ohne eingetragenen Rechteinhaber; Platzhalter-Kontakte in `SECURITY.md` und
   `CODE_OF_CONDUCT.md`.

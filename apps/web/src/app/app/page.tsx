@@ -885,6 +885,15 @@ export default function Home() {
     [ds, varMeta, calibSpecs],
   );
   const cases = evaluation.cases;
+  const caseIdentifiers = useMemo(
+    () =>
+      ds
+        ? ds.rows
+            .map((row) => String(row[ds.caseCol] ?? "").trim())
+            .filter((label) => label.length > 0)
+        : [],
+    [ds],
+  );
   const excludedMissingCount = new Set([
     ...evaluation.excludedCaseLabels,
     ...evaluation.unresolvedCaseLabels,
@@ -1140,6 +1149,7 @@ export default function Home() {
                     },
                   })}
                   sourceRevision={() => currentAiTargetRevision("brief_clarify", "question")}
+                  sensitiveValues={caseIdentifiers}
                   focusTargetId="brief-question"
                   onAdopt={adoptBriefQuestion}
                 />
@@ -1285,6 +1295,7 @@ export default function Home() {
                   ) : (
                     <CalibrationWorkbench
                       ds={ds}
+                      sensitiveValues={caseIdentifiers}
                       varMeta={varMeta}
                       setVarMeta={changeVarMeta}
                       calibSpecs={calibSpecs}
@@ -1312,6 +1323,7 @@ export default function Home() {
                   consCut={consCut}
                   expectations={expectations}
                   conditions={selectedConditions}
+                  sensitiveValues={caseIdentifiers}
                   decisions={analysisDecisions}
                   tt={tt}
                   sol={sol}
@@ -2006,6 +2018,7 @@ function AnalysisDecisionEditor({
   consCut,
   expectations,
   conditions,
+  sensitiveValues,
   decisions,
   tt,
   sol,
@@ -2020,6 +2033,7 @@ function AnalysisDecisionEditor({
   consCut: number;
   expectations: Record<string, Expectation>;
   conditions: string[];
+  sensitiveValues: readonly string[];
   decisions: AnalysisDecisionState;
   tt: TruthTableResult | null;
   sol: SolBundle | null;
@@ -2061,6 +2075,7 @@ function AnalysisDecisionEditor({
             payload: { decision, rationale: decisions[decision].rationale },
           })}
           sourceRevision={() => aiSourceRevision(decision)}
+          sensitiveValues={sensitiveValues}
           focusTargetId={`decision-rationale-${decision}`}
           onAdopt={onAiAdopt}
         />
@@ -2695,7 +2710,7 @@ function DefenseChecklist({
 /**
  * Wie zitiert man dieses Werkzeug? Bisher fand ein Nutzer die Antwort nirgends
  * in der App — die einzigen Zitat-Treffer waren Negativ-Banner („nicht
- * zitierfähig"). Steht am Ende von Schritt 6, wo der Bericht entsteht.
+ * zitierfähig"). Steht im Prüfpaket, wo der Bericht entsteht.
  */
 function CitationCard() {
   const [locale] = useLocale();
@@ -3949,7 +3964,7 @@ function Kpi({ v, l }: { v: string; l: React.ReactNode }) {
   return <UiKpi value={v} label={l} />;
 }
 /**
- * „Vorläufig"-Marke an den ERGEBNIS-Karten (Schritte 4-6).
+ * „Vorläufig"-Marke an den berechneten Ergebnisflächen.
  *
  * Der Hinweis an der Bericht-Karte allein genügt nicht: Screenshots entstehen an
  * der Lösung, nicht am Export. Solange die Kalibrierung nicht dokumentiert ist,

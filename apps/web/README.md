@@ -29,6 +29,11 @@ Berichtsvorschau und Antwort bleiben zugänglich; die vier Replikationsartefakte
 gemeinsam freigeschaltet, wenn Forschungsbrief, aktive Set-Kalibrierungen und die drei
 wertgebundenen Analyseentscheidungen bestätigt sind. Demo-Daten sind nie zitier- oder exportfähig.
 
+Die Importe akzeptieren CSV und XLSX. Eine Datei wird zunächst nur als Preflight-Kandidat
+geparst; erst „Import übernehmen“ ersetzt das aktive Projekt. Fälle mit fehlenden aktiven
+Set-Werten bleiben als ausgeschlossen oder ungeklärt sichtbar. Mehr als zwölf aktive
+Bedingungen überschreiten bewusst die Engine-Grenze und erzeugen keine still gekürzte Analyse.
+
 ## KI-Review-Vertrag
 
 Der optionale KI-Coach arbeitet ausschließlich mit drei geschlossenen Schreibaufgaben:

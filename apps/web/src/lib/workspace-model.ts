@@ -46,6 +46,8 @@ export interface AiWritingProvenanceEntry {
   generatedAt: string;
   previousTextHash: string;
   adoptedTextHash: string;
+  /** Per-adoption random salt; retained in project state and never exported. */
+  hashSalt?: string;
 }
 
 export interface AiWritingProvenance {
@@ -56,7 +58,8 @@ export interface AiWritingProvenance {
   >;
 }
 
-export interface AiWritingProvenanceRow extends AiWritingProvenanceEntry {
+export interface AiWritingProvenanceRow
+  extends Omit<AiWritingProvenanceEntry, "hashSalt"> {
   task:
     | "brief_clarify"
     | "calibration_evidence_gaps"
@@ -213,6 +216,7 @@ function normalizeAiWritingEntry(raw: unknown): AiWritingProvenanceEntry | null 
           "generatedAt",
           "previousTextHash",
           "adoptedTextHash",
+          "hashSalt",
         ].includes(key),
     ) ||
     typeof raw.provider !== "string" ||
@@ -226,7 +230,9 @@ function normalizeAiWritingEntry(raw: unknown): AiWritingProvenanceEntry | null 
     typeof raw.previousTextHash !== "string" ||
     !/^[a-f0-9]{64}$/u.test(raw.previousTextHash) ||
     typeof raw.adoptedTextHash !== "string" ||
-    !/^[a-f0-9]{64}$/u.test(raw.adoptedTextHash)
+    !/^[a-f0-9]{64}$/u.test(raw.adoptedTextHash) ||
+    (raw.hashSalt !== undefined &&
+      (typeof raw.hashSalt !== "string" || !/^[a-f0-9]{32}$/u.test(raw.hashSalt)))
   ) {
     return null;
   }
@@ -236,6 +242,7 @@ function normalizeAiWritingEntry(raw: unknown): AiWritingProvenanceEntry | null 
     generatedAt: new Date(raw.generatedAt).toISOString(),
     previousTextHash: raw.previousTextHash,
     adoptedTextHash: raw.adoptedTextHash,
+    ...(typeof raw.hashSalt === "string" ? { hashSalt: raw.hashSalt } : {}),
   };
 }
 
@@ -272,6 +279,18 @@ function normalizeAiWritingProvenance(
   }
   return normalized;
 }
+function publicAiWritingEntry(
+  entry: AiWritingProvenanceEntry,
+): Omit<AiWritingProvenanceEntry, "hashSalt"> {
+  return {
+    provider: entry.provider,
+    model: entry.model,
+    generatedAt: entry.generatedAt,
+    previousTextHash: entry.previousTextHash,
+    adoptedTextHash: entry.adoptedTextHash,
+  };
+}
+
 
 export function listAiWritingProvenance(
   provenance: AiWritingProvenance,
@@ -282,7 +301,7 @@ export function listAiWritingProvenance(
     rows.push({
       task: "brief_clarify",
       target: "researchBrief.question",
-      ...question,
+      ...publicAiWritingEntry(question),
     });
   }
   for (const decision of [
@@ -295,17 +314,17 @@ export function listAiWritingProvenance(
       rows.push({
         task: "decision_rationale_review",
         target: `analysisDecisions.${decision}.rationale`,
-        ...entry,
+        ...publicAiWritingEntry(entry),
       });
     }
   }
-  for (const column of Object.keys(provenance.calibration_evidence_gaps).sort()) {
+  Object.keys(provenance.calibration_evidence_gaps).sort().forEach((column, index) => {
     rows.push({
       task: "calibration_evidence_gaps",
-      target: `calibSpecs[${JSON.stringify(column)}].set.definition`,
-      ...provenance.calibration_evidence_gaps[column],
+      target: `calibrationDefinition.${index + 1}`,
+      ...publicAiWritingEntry(provenance.calibration_evidence_gaps[column]),
     });
-  }
+  });
   return rows;
 }
 

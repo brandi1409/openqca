@@ -44,14 +44,23 @@ export interface AiAdoptionMetadata {
   generatedAt: string;
 }
 
-export async function sha256Text(text: string): Promise<string> {
+export async function sha256Text(text: string, hashSalt = ""): Promise<string> {
   if (!globalThis.crypto?.subtle) throw new Error("AI_PROVENANCE_HASH_UNAVAILABLE");
+  const material = hashSalt ? `${hashSalt}\0${text}` : text;
   const digest = await globalThis.crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(text),
+    new TextEncoder().encode(material),
   );
   let hex = "";
   for (const byte of new Uint8Array(digest)) hex += byte.toString(16).padStart(2, "0");
+  return hex;
+}
+
+function provenanceHashSalt(): string {
+  if (!globalThis.crypto?.getRandomValues) throw new Error("AI_PROVENANCE_HASH_UNAVAILABLE");
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  let hex = "";
+  for (const byte of bytes) hex += byte.toString(16).padStart(2, "0");
   return hex;
 }
 
@@ -60,7 +69,7 @@ export async function aiWritingProvenanceMatches(
   currentText: string,
 ): Promise<boolean> {
   try {
-    return entry.adoptedTextHash === await sha256Text(currentText);
+    return entry.adoptedTextHash === await sha256Text(currentText, entry.hashSalt);
   } catch {
     return false;
   }
@@ -125,9 +134,10 @@ export async function buildAiWritingProvenanceEntry(
   if (!provider || !model || Number.isNaN(generatedAt.getTime())) {
     throw new Error("AI_PROVENANCE_METADATA_INVALID");
   }
+  const hashSalt = provenanceHashSalt();
   const [previousTextHash, adoptedTextHash] = await Promise.all([
-    sha256Text(previousText),
-    sha256Text(adoptedText),
+    sha256Text(previousText, hashSalt),
+    sha256Text(adoptedText, hashSalt),
   ]);
   return {
     provider,
@@ -135,5 +145,6 @@ export async function buildAiWritingProvenanceEntry(
     generatedAt: generatedAt.toISOString(),
     previousTextHash,
     adoptedTextHash,
+    hashSalt,
   };
 }

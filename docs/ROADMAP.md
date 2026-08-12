@@ -9,7 +9,12 @@ Dieses Dokument beschreibt die priorisierten nächsten Schritte für openQCA. Es
 - Lösungslogik und Notwendigkeitsanalyse sind in 25 Szenarien gegen das R-Paket `QCA` kreuzvalidiert: `node scripts/cross-validate.mjs` (23 von 25 Szenarien PASS, zwei dokumentierte Abweichungen derselben ESA-Ursache — siehe `VALIDATION.md`). Davon prüfen sechs Szenarien die Notwendigkeit von Konjunktionen und Disjunktionen (SUIN) samt RoN gegen `superSubset`.
 - Crisp-, direkte Ragin- und lineare Fuzzy-Kalibrierung sind gegen `QCA` geprüft. Die direkte Methode nutzt Ragins ±3-Logit-Fixpunkte; `QCA` verwendet abweichende dokumentierte Zielwerte um 0,05/0,95. Die Restabweichung ist kein Beleg für substantielle Kalibrierungsgültigkeit.
 - `calibrateLinear` stimmt auf einem unabhängigen `QCA::calibrate(logistic = FALSE)`-Prüfgitter überein; `calibrateFourValue` bleibt im Rechenkern vorhanden, aber noch nicht extern validiert.
-- Die Web-App besitzt Rohdatenimport, Rollenwahl, Set-Spezifikationen, Evidenzfelder, Fallprüfung, Anker-Sensitivität und Protokoll-Export. Der erste Rohdaten-zu-Kalibrierungs-Vertikalschnitt ist für Crisp-, direkte und lineare Fuzzy-Sets implementiert; die lokale Implementierung ist durch Engine-, R-Oracle- und E2E-Prüfungen belegt. Die inhaltliche Gültigkeit konkreter Nutzeranker bleibt eine Forschungsentscheidung.
+- Die Web-App ist ein fünfteiliger Forschungsarbeitsraum: Antwort, Forschungsdesign, Entscheidungen,
+  Evidenz und Prüfpaket. CSV/XLSX-Import, explizites Resume, Research Brief, priorisierter Decision
+  Ledger, fallbasierte Antwort, progressive Engine-Evidenz und ein gemeinsames Defense-Gate sind
+  implementiert und E2E-geprüft. Der Rohdaten-zu-Kalibrierungs-Vertikalschnitt unterstützt Crisp-,
+  direkte und lineare Fuzzy-Sets; die inhaltliche Gültigkeit konkreter Nutzeranker bleibt eine
+  Forschungsentscheidung.
 
 ## P0: Raw-data-to-defensible-calibration
 

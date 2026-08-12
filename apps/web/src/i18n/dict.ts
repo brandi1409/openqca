@@ -734,7 +734,7 @@ const de = {
   "report.desc": "Öffnet einen druckfähigen Bericht (PDF über den Druckdialog).",
   "result.provisional.chip": "vorläufig",
   "result.provisional.reason": "Die Anker sind noch nicht inhaltlich begründet.",
-  "result.provisional.link": "Zu Schritt 3",
+  "result.provisional.link": "Zu Entscheidungen",
   "result.provisional.title":
     "Die Berechnung ist exakt, aber die Kalibrierung ist noch nicht inhaltlich dokumentiert. Für zitierfähige Ergebnisse die Anker begründen (Ansicht „Dokumentation“).",
   "report.demoNotice":
@@ -769,7 +769,7 @@ const de = {
   "ex.rohwerte.title": "Rohwerte Demokratie",
   "ex.rohwerte.badge": "Rohwerte",
   "ex.rohwerte.desc":
-    "16 erfundene Länder mit Rohwerten (Prozente und Indizes) – Rohwerte, die zuerst kalibriert werden müssen (Schritt 3).",
+    "16 erfundene Länder mit Rohwerten (Prozente und Indizes) – Rohwerte, die vor der Analyse kalibriert werden müssen.",
   "ex.fuzzy.title": "Fuzzy-Sets Beispiel",
   "ex.fuzzy.badge": "Fuzzy [0,1]",
   "ex.fuzzy.desc":
@@ -1890,7 +1890,7 @@ const en: Record<DictKey, string> = {
   "report.desc": "Opens a print-ready report (PDF via the print dialog).",
   "result.provisional.chip": "provisional",
   "result.provisional.reason": "The anchors have not been justified substantively yet.",
-  "result.provisional.link": "Go to step 3",
+  "result.provisional.link": "Go to decisions",
   "result.provisional.title":
     "The calculation is exact, but the calibration is not yet substantively documented. For citable results, justify the anchors (view \u201cDocumentation\u201d).",
   "report.demoNotice":
@@ -1925,7 +1925,7 @@ const en: Record<DictKey, string> = {
   "ex.rohwerte.title": "Raw values democracy",
   "ex.rohwerte.badge": "Raw values",
   "ex.rohwerte.desc":
-    "16 fictional countries with raw values (percentages and indices) – raw values that must be calibrated first (step 3).",
+    "16 fictional countries with raw values (percentages and indices) – raw values that must be calibrated before analysis.",
   "ex.fuzzy.title": "Fuzzy-sets example",
   "ex.fuzzy.badge": "Fuzzy [0,1]",
   "ex.fuzzy.desc":

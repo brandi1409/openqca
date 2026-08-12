@@ -323,6 +323,7 @@ function SubstepHeading({
 
 export function CalibrationWorkbench({
   ds,
+  sensitiveValues,
   varMeta,
   setVarMeta,
   calibSpecs,
@@ -342,6 +343,7 @@ export function CalibrationWorkbench({
   onAiAdopt,
 }: {
   ds: RawDataset;
+  sensitiveValues: readonly string[];
   varMeta: Record<string, VarMeta>;
   setVarMeta: (m: Record<string, VarMeta>) => void;
   calibSpecs: CalibSpecs;
@@ -781,9 +783,6 @@ export function CalibrationWorkbench({
   };
 
   return (
-    // Kein id="kalibrierung" hier: Der umgebende Schritt-Abschnitt in app/page.tsx
-    // trägt den Anker für Schritt-Navigation, Scroll-Spy und Tour. Eine zweite
-    // gleichnamige id wäre ungültiges HTML und würde die Sprungziele doppeln.
     <Card>
       <SectionHeading>{t(locale, "calib.title")}</SectionHeading>
       <p style={{ color: "var(--ink-2)", maxWidth: "70ch", marginTop: 0 }}>
@@ -2017,6 +2016,7 @@ export function CalibrationWorkbench({
               },
             })}
             sourceRevision={() => aiSourceRevision(v)}
+            sensitiveValues={sensitiveValues}
             focusTargetId={`calibration-set-definition-${v}`}
             onAdopt={adoptAiDefinition}
           />
