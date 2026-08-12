@@ -51,8 +51,10 @@ npm run verify                  # vollständige Prüfkette (siehe unten)
 npm run dev --workspace web     # Web-App auf http://localhost:3000
 ```
 
-`npm run verify` führt nacheinander aus: Engine-Tests, Referenz-Suite, beide R-Kreuzvalidierungen,
-Lint und den Produktions-Build — dieselben Gates, die auch in CI laufen.
+`npm run verify` führt Engine-Tests, Referenz-Suite, beide R-Kreuzvalidierungen,
+den installierbaren Engine-Paketcheck, Deployment- und Research-Protocol-Verträge,
+Lint, Produktions-Build und die vollständige Playwright-Suite aus — dieselben Gates
+wie CI.
 
 ## Ordnerstruktur
 
@@ -83,7 +85,8 @@ openqca/
   dokumentiert um < 0,01 von den R-Zielwerten ab. **Welche Zahl extern validiert und welche eine
   interne Regression ist, steht präzise in [`VALIDATION.md`](VALIDATION.md).**
 - **Web-App:** fünf kontrollierte Analyseziele — Antwort, Forschungsdesign, Entscheidungen,
-  Evidenz und Prüfpaket. CSV/XLSX-Import, Variablenrollen, Kalibrier-Workbench
+  **vorab geprüfter** CSV/XLSX-Import (aktive Projekte werden erst nach Bestätigung ersetzt),
+  Variablenrollen mit mindestens einer Bedingung und genau einem Outcome, Kalibrier-Workbench
   (Set-Definition, Methodenwahl, Anker, Evidenz, Fallprüfung, Anker-Sensitivität), Notwendigkeit,
   Truth Table mit allen drei Lösungstypen, Robustheit und Analyse des negierten Outcomes (~Y).
   Exporte: Protokoll (JSON), Markdown, äquivalentes **R-Skript**, Rohdaten und druckfähiger Bericht.

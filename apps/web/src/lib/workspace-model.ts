@@ -383,13 +383,12 @@ export function normalizeSavedState(raw: unknown): SavedState | null {
   const varMeta = normalizeVarMeta(dataset, input.varMeta);
   const columns = numericColumns(dataset);
   const conditions = columns.filter((column) => varMeta[column]?.role === "condition");
-  const calibSpecs = migrateSpecsFromAnchors(
-    columns,
-    anchors,
-    typeof input.calibSpecs === "object" && input.calibSpecs !== null
-      ? input.calibSpecs
-      : undefined,
-  );
+  const outcomes = columns.filter((column) => varMeta[column]?.role === "outcome");
+  const calibSpecs = migrateSpecsFromAnchors(columns, anchors, input.calibSpecs);
+  const researchBrief = normalizeResearchBrief(input.researchBrief);
+  if (conditions.length < 1 || outcomes.length !== 1) {
+    researchBrief.confirmed = false;
+  }
   return {
     dataset,
     anchors,
@@ -399,7 +398,7 @@ export function normalizeSavedState(raw: unknown): SavedState | null {
     freqCut: typeof input.freqCut === "number" && Number.isFinite(input.freqCut) ? input.freqCut : 1,
     consCut: typeof input.consCut === "number" && Number.isFinite(input.consCut) ? input.consCut : 0.8,
     expectations: normalizeExpectations(conditions, input.expectations),
-    researchBrief: normalizeResearchBrief(input.researchBrief),
+    researchBrief,
     analysisDecisions: normalizeAnalysisDecisions(input.analysisDecisions),
     aiWritingProvenance: normalizeAiWritingProvenance(
       input.aiWritingProvenance,
@@ -416,7 +415,7 @@ export interface ReadinessResult {
 export function researchBriefReadiness(
   brief: ResearchBrief,
   conditions: string[],
-  outcome: string,
+  outcomes: string[],
 ): ReadinessResult {
   const missing: string[] = ([
     "question",
@@ -426,7 +425,7 @@ export function researchBriefReadiness(
     "conditionSelectionRationale",
   ] as const).filter((field) => !brief[field].trim());
   if (conditions.length < 1) missing.push("conditions");
-  if (!outcome) missing.push("outcome");
+  if (outcomes.length !== 1) missing.push("outcome");
   if (!brief.confirmed) missing.push("confirmation");
   return { ready: missing.length === 0, missing };
 }
@@ -504,13 +503,13 @@ export function deriveDecisionIssues(args: {
   researchBrief: ResearchBrief;
   analysisDecisions: AnalysisDecisionState;
   conditions: string[];
-  outcome: string;
+  outcomes: string[];
   activeColumns: string[];
   varMeta: Record<string, VarMeta>;
   calibSpecs: CalibSpecs;
 }): DecisionIssue[] {
   const issues: Array<DecisionIssue & { rank: number; order: number; missingCount: number }> = [];
-  const brief = researchBriefReadiness(args.researchBrief, args.conditions, args.outcome);
+  const brief = researchBriefReadiness(args.researchBrief, args.conditions, args.outcomes);
   if (!brief.ready) {
     issues.push({
       id: "research-brief",

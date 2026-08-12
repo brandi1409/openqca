@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import type { Solution, TruthTableResult } from "@openqca/engine";
+import type {
+  NecessityEntry,
+  NecessityExpressionEntry,
+  Solution,
+  TruthTableResult,
+} from "@openqca/engine";
 import {
   buildAiWritingProvenanceEntry,
   verifyAiWritingProvenance,
@@ -8,8 +13,10 @@ import {
 import {
   EMPTY_ANALYSIS_DECISIONS,
   EMPTY_RESEARCH_BRIEF,
+  calibrationDefenseReadiness,
   listAiWritingProvenance,
   normalizeSavedState,
+  researchBriefReadiness,
   type AiWritingProvenance,
   type VarMeta,
 } from "../src/lib/workspace-model";
@@ -19,6 +26,7 @@ import {
   CALIBRATION_PROTOCOL_SCHEMA_VERSION,
   buildCalibrationNarrative,
   buildCalibrationProtocolJson,
+  buildRScript,
 } from "../src/lib/protocol-export";
 import { generateReportHtml } from "../src/lib/report";
 
@@ -216,6 +224,65 @@ test("saved-state normalization preserves valid provenance and drops malformed e
   expect(malformed?.aiWritingProvenance.brief_clarify).toEqual({});
 });
 
+test("saved-state normalization makes malformed calibration records safe and unresolved", () => {
+  const normalized = normalizeSavedState({
+    dataset,
+    anchors: {},
+    varMeta,
+    calibSpecs: {
+      A: {
+        set: null,
+        evidence: [{ citation: null }],
+        missing: { kind: "assign", membership: 0.5 },
+      },
+    },
+    demoMode: false,
+    freqCut: 1,
+    consCut: 0.8,
+    expectations: { A: "present" },
+    researchBrief: brief,
+    analysisDecisions: decisions,
+  });
+  expect(normalized).not.toBeNull();
+  expect(normalized?.calibSpecs.A.set).toMatchObject({
+    setLabel: "",
+    definition: "",
+    highIsMembership: true,
+  });
+  expect(normalized?.calibSpecs.A.evidence).toEqual([]);
+  expect(normalized?.calibSpecs.A.missing).toEqual({ kind: "exclude_case" });
+  expect(() =>
+    calibrationDefenseReadiness(
+      ["A", "Y"],
+      normalized!.varMeta,
+      normalized!.calibSpecs,
+    ),
+  ).not.toThrow();
+  expect(
+    calibrationDefenseReadiness(
+      ["A", "Y"],
+      normalized!.varMeta,
+      normalized!.calibSpecs,
+    ).ready,
+  ).toBe(false);
+});
+
+test("research brief requires exactly one selected outcome", () => {
+  const completeBrief = {
+    question: "Which configurations explain Y?",
+    caseUniverse: "Compared cases",
+    timePeriod: "2020–2024",
+    outcomeConcept: "Membership in Y",
+    conditionSelectionRationale: "A follows the comparison design.",
+    confirmed: true,
+  };
+  expect(researchBriefReadiness(completeBrief, ["A"], ["Y"]).ready).toBe(true);
+  expect(researchBriefReadiness(completeBrief, ["A"], ["Y", "Z"])).toMatchObject({
+    ready: false,
+    missing: ["outcome"],
+  });
+});
+
 test("loaded provenance survives only while its adopted hash matches the target field", async () => {
   const mismatched = await provenanceFixture();
   const baseState = normalizeSavedState({
@@ -257,6 +324,24 @@ test("loaded provenance survives only while its adopted hash matches the target 
 
 test("JSON, Markdown, and report exports disclose adopted AI writing provenance", async () => {
   const aiWritingProvenance = await provenanceFixture();
+  const complex: Solution = { type: "complex", models: [] };
+  const intermediate: Solution = { type: "intermediate", models: [] };
+  const parsimonious: Solution = { type: "parsimonious", models: [] };
+  const protocolNecessity: NecessityEntry[] = [{
+    condition: "A",
+    consistency: 1,
+    coverage: 1,
+    relevance: 1,
+    isCandidate: true,
+  }];
+  const protocolNecessitySupersets: NecessityExpressionEntry[] = [{
+    kind: "conjunction",
+    literals: ["A"],
+    expression: "A",
+    consistency: 1,
+    coverage: 1,
+    relevance: 1,
+  }];
   const commonProtocol = {
     ds: dataset,
     calibSpecs: {},
@@ -269,6 +354,9 @@ test("JSON, Markdown, and report exports disclose adopted AI writing provenance"
     analysisDecisions: decisions,
     expectations: { A: "present" as const },
     aiWritingProvenance,
+    solutions: { complex, intermediate, parsimonious },
+    necessity: protocolNecessity,
+    necessitySupersets: protocolNecessitySupersets,
   };
   const protocol = buildCalibrationProtocolJson(commonProtocol);
   const protocolJson = JSON.stringify(protocol);
@@ -283,6 +371,20 @@ test("JSON, Markdown, and report exports disclose adopted AI writing provenance"
       },
     ],
   });
+  expect(CALIBRATION_PROTOCOL_SCHEMA_VERSION).toBe(3);
+  expect(protocol).toMatchObject({
+    analysis: {
+      results: {
+        solutions: {
+          complex: { status: "no_solution", models: [] },
+          intermediate: { status: "no_solution", models: [] },
+          parsimonious: { status: "no_solution", models: [] },
+        },
+        necessity: [{ condition: "A", isCandidate: true }],
+        necessitySupersets: [{ expression: "A", kind: "conjunction" }],
+      },
+    },
+  });
   expect(protocolJson).not.toContain("Original private research text");
   expect(protocolJson).not.toContain("Adopted private research text");
 
@@ -292,6 +394,125 @@ test("JSON, Markdown, and report exports disclose adopted AI writing provenance"
   expect(markdown).toContain(
     listAiWritingProvenance(aiWritingProvenance, varMeta)[0].adoptedTextHash,
   );
+  expect(markdown).toContain("## Analysis results");
+  expect(markdown).toContain("No sufficient solution under the current cutoffs.");
+  expect(markdown).toContain("### Necessity checks");
+  expect(markdown).toContain("| A | 1.000 | 1.000 | 1.000 | yes |");
+
+  const rScript = buildRScript(commonProtocol);
+  expect(rScript).toContain("Adopted AI writing provenance:");
+  expect(rScript).toContain("mock / test-model");
+  expect(rScript).toContain(
+    listAiWritingProvenance(aiWritingProvenance, varMeta)[0].adoptedTextHash,
+  );
+  expect(rScript).not.toContain("Original private research text");
+  expect(rScript).not.toContain("Adopted private research text");
+  expect(rScript).toContain("minimize_if_positive <- function(tt, label, ...)");
+  expect(rScript).toContain(
+    'pof(necessity_memberships[[necessity_label]], outcome = analysis_qca[["qca_outcome"]], relation = "necessity")',
+  );
+  expect(rScript).toContain(
+    'superSubset(analysis_qca, outcome = "qca_outcome", conditions = c("qca_condition_1"), relation = "necessity", incl.cut = 0.9, cov.cut = 0.5, depth = 1',
+  );
+  expect(rScript).toContain('df[["A"]] <- parse_openqca_number(df[["A"]])');
+  expect(rScript).toContain('df[["Y"]] <- parse_openqca_number(df[["Y"]])');
+  const alreadyCalibratedSpec = (column: string) => ({
+    column,
+    set: {
+      setLabel: column,
+      definition: "Recorded membership",
+      unit: "membership",
+      scopePopulation: "fixture",
+      timePeriod: "2020",
+      highIsMembership: false,
+      notes: "",
+    },
+    alreadyCalibratedProvenance: "Imported membership scores",
+    missing: { kind: "exclude_case" as const },
+    evidence: [],
+    status: "provisional" as const,
+    methodConfirmed: true,
+    caseReviewConfirmed: true,
+    exceptionalCases: [],
+    sensitivity: { alternatives: [], notes: "", reviewed: true },
+  });
+  const invertedNumericStringScript = buildRScript({
+    ...commonProtocol,
+    ds: {
+      name: "numeric-strings.csv",
+      caseCol: "Case",
+      columns: ["Case", "A", "Y"],
+      anchors: {},
+      rows: [
+        { Case: "one", A: "0,7", Y: "0,8" },
+        { Case: "two", A: "0,2", Y: "0,1" },
+      ],
+    },
+    calibSpecs: {
+      A: alreadyCalibratedSpec("A"),
+      Y: alreadyCalibratedSpec("Y"),
+    },
+    varMeta: {
+      A: { type: "fuzzy", role: "condition" },
+      Y: { type: "fuzzy", role: "outcome" },
+    },
+  });
+  expect(invertedNumericStringScript.indexOf('df[["A"]] <- parse_openqca_number'))
+    .toBeLessThan(invertedNumericStringScript.indexOf('df[["A"]] <- 1 - df[["A"]]'));
+  const spacedScript = buildRScript({
+    ...commonProtocol,
+    ds: {
+      name: "spaced-columns",
+      caseCol: "Case label",
+      columns: ["Case label", "Economic Development", "Outcome Result"],
+      anchors: {},
+      rows: [
+        { "Case label": "one", "Economic Development": 1, "Outcome Result": 1 },
+        { "Case label": "two", "Economic Development": 0, "Outcome Result": 0 },
+      ],
+    },
+    varMeta: {
+      "Economic Development": { type: "fuzzy", role: "condition" },
+      "Outcome Result": { type: "fuzzy", role: "outcome" },
+    },
+    conditions: ["Economic Development"],
+    outcome: "Outcome Result",
+    expectations: { "Economic Development": "present" },
+  });
+  expect(spacedScript).toContain(
+    'df[["Economic Development"]] <- parse_openqca_number(df[["Economic Development"]])',
+  );
+  expect(spacedScript).toContain(
+    'df[["Outcome Result"]] <- parse_openqca_number(df[["Outcome Result"]])',
+  );
+  expect(spacedScript).toContain("# QCA-safe alias: qca_condition_1 = Economic Development");
+  expect(spacedScript).toContain("# QCA-safe alias: qca_outcome = Outcome Result");
+  expect(spacedScript).toContain(
+    'necessity_memberships[["~Economic Development"]] <- 1 - analysis_qca[["qca_condition_1"]]',
+  );
+  expect(spacedScript).toContain(
+    'outcome = analysis_qca[["qca_outcome"]], relation = "necessity"',
+  );
+  expect(spacedScript).not.toContain("pof(necessity_expression");
+
+  const invalidRScript = buildRScript({
+    ...commonProtocol,
+    varMeta: {
+      A: { type: "raw", role: "condition" },
+      Y: { type: "raw", role: "outcome" },
+    },
+    robustness: {
+      totalCells: 0,
+      baseline: { scenarioId: "base", freqCut: 1, consCut: 0.8, priCut: null },
+      cells: [],
+      solutionStability: [],
+      caseStability: [],
+    },
+  });
+  expect(invalidRScript).toContain(
+    "Robustness rerun omitted because the base analysis frame is unavailable.",
+  );
+  expect(invalidRScript).not.toContain("tt_robust <-");
 
   const truthTable: TruthTableResult = {
     conditions: ["A"],
@@ -311,9 +532,7 @@ test("JSON, Markdown, and report exports disclose adopted AI writing provenance"
     assignedCaseCount: 1,
     totalCaseCount: 2,
   };
-  const complex: Solution = { type: "complex", models: [] };
-  const intermediate: Solution = { type: "intermediate", models: [] };
-  const parsimonious: Solution = { type: "parsimonious", models: [] };
+
   const report = generateReportHtml({
     datasetName: dataset.name,
     caseCount: 2,

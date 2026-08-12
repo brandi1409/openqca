@@ -13,13 +13,23 @@ import { defineConfig, devices } from "@playwright/test";
  * bedient die statisch vorgerenderten Routen. Lokal wird ein bereits laufender
  * Server wiederverwendet (`reuseExistingServer`), in CI immer frisch gestartet.
  */
+const configuredPort = Number(process.env.PLAYWRIGHT_PORT ?? "3100");
+if (
+  !Number.isInteger(configuredPort) ||
+  configuredPort < 1024 ||
+  configuredPort > 65535
+) {
+  throw new Error(`PLAYWRIGHT_PORT must be an unprivileged TCP port; got ${process.env.PLAYWRIGHT_PORT ?? "3100"}`);
+}
+const baseURL = `http://localhost:${configuredPort}`;
+
 export default defineConfig({
   testDir: "./e2e",
   // 0 Wiederholungen lokal (deterministische Diagnose), 1 in CI (Flake-Puffer).
   retries: process.env.CI ? 1 : 0,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3100",
+    baseURL,
     locale: "de-DE",
     // Downloads (SVG/PNG-Export, A2.8) müssen akzeptiert werden.
     acceptDownloads: true,
@@ -31,8 +41,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "next start -p 3100",
-    url: "http://localhost:3100",
+    command: `next start -p ${configuredPort}`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

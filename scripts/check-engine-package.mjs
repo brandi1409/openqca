@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const enginePath = join(repoRoot, "packages", "engine");
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 function run(cmd, args, cwd) {
   return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -26,9 +27,16 @@ function run(cmd, args, cwd) {
 let workdir;
 try {
   console.log("→ Engine bauen und packen");
-  run("npm", ["run", "build"], enginePath);
-  const packOut = run("npm", ["pack", "--json"], enginePath);
-  const tarballName = JSON.parse(packOut)[0].filename;
+  run(npmCommand, ["run", "build"], enginePath);
+  const packOut = run(npmCommand, ["pack", "--json"], enginePath);
+  const packResult = JSON.parse(packOut);
+  const packEntry = Array.isArray(packResult)
+    ? packResult[0]
+    : Object.values(packResult)[0];
+  if (!packEntry || typeof packEntry !== "object" || typeof packEntry.filename !== "string") {
+    throw new Error("npm pack --json returned no package filename.");
+  }
+  const tarballName = packEntry.filename;
   const tarball = join(enginePath, tarballName);
 
   workdir = mkdtempSync(join(tmpdir(), "openqca-engine-check-"));
@@ -38,7 +46,7 @@ try {
   );
 
   console.log(`→ ${tarballName} in einem leeren Projekt installieren`);
-  run("npm", ["install", tarball, "--no-audit", "--no-fund"], workdir);
+  run(npmCommand, ["install", tarball, "--no-audit", "--no-fund"], workdir);
 
   // Der eigentliche Beweis: importieren und rechnen, ohne Type-Stripping.
   writeFileSync(

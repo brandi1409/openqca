@@ -158,14 +158,22 @@ test("complete research, calibration, and analysis decisions unlock one shared d
     analysis: {
       decisions: Record<string, { rationale: string; confirmed: boolean }>;
       expectations: Record<string, string>;
+      results: {
+        solutions: Record<string, { status: "solution" | "no_solution"; models: unknown[] }>;
+        necessity: unknown[];
+        necessitySupersets: unknown[];
+      };
     };
     robustness: { totalCells: number } | null;
     aiWritingProvenance: unknown[];
   };
-  expect(payload.protocolSchemaVersion).toBe(2);
+  expect(payload.protocolSchemaVersion).toBe(3);
   expect(payload.researchBrief.confirmed).toBe(true);
   expect(Object.values(payload.analysis.decisions).every((decision) => decision.confirmed)).toBe(true);
   expect(Object.keys(payload.analysis.expectations).length).toBeGreaterThan(0);
+  expect(payload.analysis.results.solutions.intermediate.status).toMatch(/^(solution|no_solution)$/);
+  expect(payload.analysis.results.necessity.length).toBeGreaterThan(0);
+  expect(Array.isArray(payload.analysis.results.necessitySupersets)).toBe(true);
   expect(payload.robustness?.totalCells).toBeGreaterThan(0);
   expect(payload.aiWritingProvenance).toEqual([]);
 

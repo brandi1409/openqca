@@ -23,6 +23,46 @@ members of the product team, anyone who has already completed the session, and
 any session in which the participant opens or supplies real research data.
 Do not collect names or demographics in the observation file.
 
+## Channel-ready recruitment notice
+
+Post only after the consent wording has been reviewed and the staging preflight
+requirements above are met. Prefer institutional methods or graduate-research
+networks, then the [COMPASSS community channels](https://compasss.org/community/).
+Use the disciplinary lists only where their audience matches the intended
+sample. Do not recruit through a channel that requires collecting demographic
+profiles for this study.
+
+German:
+
+> **Teilnehmende für einen 60-minütigen openQCA-Usability-Test gesucht.**
+> Teilnehmen können volljährige Personen, die empirische Forschung durchführen,
+> unterstützen, lehren oder studieren, R nicht für QCA verwenden und nicht an
+> openQCA mitgearbeitet haben. Die Sitzung ist auf Deutsch oder Englisch möglich
+> und findet am Desktop-Browser statt. Verwendet werden ausschließlich
+> bereitgestellte synthetische Lehrdaten; eigene Forschungsdaten und
+> Forschungsfragen werden weder benötigt noch angenommen. Es gibt keine
+> Bildschirm- oder Tonaufnahme. Die Teilnahme ist freiwillig und kann jederzeit
+> beendet werden. Weitere Datenschutz- und Einwilligungsinformationen erhalten
+> Interessierte vor der Terminvereinbarung.
+
+English:
+
+> **Participants wanted for a 60-minute openQCA usability session.** Adults may
+> take part if they conduct, support, teach, or study empirical research, do not
+> use R for QCA, and have not contributed to openQCA. The session can be
+> completed in German or English in a desktop browser. It uses supplied
+> synthetic teaching data only; personal research data and research questions
+> are neither needed nor accepted. There is no screen or audio recording.
+> Participation is voluntary and may be stopped at any time. Prospective
+> participants receive the full privacy and consent information before
+> scheduling.
+
+Before scheduling, ask only whether the candidate meets each inclusion criterion
+on lines 13–19, whether they have completed this session before, and which locale
+they prefer. Keep contact and scheduling records outside the observation
+pipeline. Do not copy screening answers, contact details, or correspondence into
+the session row, aggregate, repository, or product.
+
 ## Invitation — German
 
 > Wir testen die Verständlichkeit einer browserbasierten QCA-Arbeitsumgebung für

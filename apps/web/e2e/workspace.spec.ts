@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import * as XLSX from "xlsx";
-import { dismissConsent, loadDemo, openDestination } from "./helpers";
+import { dismissConsent, loadDemo, loadRawRohwerte, openDestination } from "./helpers";
+import { inspectImport } from "../src/lib/import-preflight";
 
 async function clearProject(page: Page) {
   await page.goto("/app#answer");
@@ -18,6 +19,62 @@ async function enableAiCoach(page: Page) {
     });
   });
 }
+
+test("import preflight matches analysis numeric eligibility", () => {
+  const mixed = inspectImport({
+    name: "mixed.csv",
+    caseCol: "Case",
+    columns: ["Case", "A", "Y"],
+    anchors: {},
+    rows: [
+      { Case: "c1", A: 1, Y: 1 },
+      { Case: "c2", A: "oops", Y: 0 },
+    ],
+  }, "mixed.csv");
+  expect(mixed.numericColumns).toEqual(["Y"]);
+  expect(mixed.detectedTypes.A).toBe("text");
+  expect(mixed.blockingIssues).toContain("At least two numeric analysis columns are required.");
+
+  const numericText = inspectImport({
+    name: "numeric-text.xlsx",
+    caseCol: "Case",
+    anchors: {},
+    columns: ["Case", "A", "Y"],
+    rows: [
+      { Case: "c1", A: "1", Y: "1" },
+      { Case: "c2", A: "0", Y: "0" },
+    ],
+  }, "numeric-text.xlsx");
+  expect(numericText.numericColumns).toEqual(["A", "Y"]);
+  expect(numericText.detectedTypes).toMatchObject({ A: "crisp", Y: "crisp" });
+  expect(numericText.blockingIssues).toEqual([]);
+});
+
+test("import preflight rejects blank and duplicate case identifiers", () => {
+  const blankCases = inspectImport({
+    name: "blank-cases.csv",
+    caseCol: "Case",
+    columns: ["Case", "A", "Y"],
+    anchors: {},
+    rows: [
+      { Case: "one", A: 1, Y: 1 },
+      { Case: " ", A: 0, Y: 0 },
+    ],
+  }, "blank-cases.csv");
+  expect(blankCases.blockingIssues).toContain("Case identifiers must not be blank.");
+
+  const duplicateCases = inspectImport({
+    name: "duplicate-cases.csv",
+    caseCol: "Case",
+    columns: ["Case", "A", "Y"],
+    anchors: {},
+    rows: [
+      { Case: "one", A: 1, Y: 1 },
+      { Case: " one ", A: 0, Y: 0 },
+    ],
+  }, "duplicate-cases.csv");
+  expect(duplicateCases.blockingIssues).toContain("Case identifiers must be unique.");
+});
 
 test("workspace starts with five destinations and exactly three explicit entry paths", async ({ page }) => {
   await clearProject(page);
@@ -67,6 +124,41 @@ test("import preflight preserves the active project until explicit commit", asyn
   await page.getByRole("button", { name: "Import übernehmen" }).click();
   await expect(page.getByText("Import übernommen")).toBeVisible();
   await expect(page.getByRole("button", { name: "Vorläufige Antwort öffnen" })).toBeVisible();
+});
+
+test("import preflight blocks a dataset without both a condition and outcome", async ({ page }) => {
+  await loadDemo(page);
+  await page.getByLabel("Datei auswählen").setInputFiles({
+    name: "outcome-only.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Case,Y\none,1\ntwo,0\n"),
+  });
+  await expect(page.getByText(
+    "Mindestens zwei numerische Analysespalten sind erforderlich: eine Bedingung und ein Outcome.",
+  )).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import übernehmen" })).toBeDisabled();
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByTestId("solution-formula-intermediate")).toContainText(/WOHLSTAND/);
+});
+
+test("import commit stays disabled for blank or duplicate case identifiers", async ({ page }) => {
+  await clearProject(page);
+  await page.getByLabel("Datei auswählen").setInputFiles({
+    name: "blank-case.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Case,A,Y\none,1,1\n,0,0\n"),
+  });
+  await expect(page.getByText("Fall-IDs dürfen nicht leer sein.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import übernehmen" })).toBeDisabled();
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+
+  await page.getByLabel("Datei auswählen").setInputFiles({
+    name: "duplicate-case.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Case,A,Y\none,1,1\none,0,0\n"),
+  });
+  await expect(page.getByText("Fall-IDs müssen eindeutig sein.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import übernehmen" })).toBeDisabled();
 });
 
 test("XLSX import reaches a provisional answer after explicit commit", async ({ page }) => {
@@ -486,6 +578,90 @@ test("V2 restore preserves saved analysis decisions after provenance verificatio
   );
 });
 
+test("restored projects with multiple outcomes cannot compute an arbitrary first outcome", async ({ page }) => {
+  await page.goto("/app#answer");
+  await page.evaluate(() => {
+    window.localStorage.setItem("openqca_local_project", JSON.stringify({
+      schema: "openqca-local-project",
+      version: 2,
+      savedAt: "2026-08-11T10:00:00.000Z",
+      state: {
+        dataset: {
+          name: "invalid-roles.csv",
+          caseCol: "Case",
+          columns: ["Case", "A", "Y", "Z"],
+          rows: [
+            { Case: "c1", A: 1, Y: 1, Z: 0 },
+            { Case: "c2", A: 0, Y: 0, Z: 1 },
+          ],
+        },
+        anchors: {},
+        varMeta: {
+          A: { type: "raw", role: "condition" },
+          Y: { type: "crisp", role: "outcome" },
+          Z: { type: "crisp", role: "outcome" },
+        },
+        calibSpecs: {
+          A: {
+            column: "A",
+            set: { highIsMembership: true },
+            method: "direct",
+            direct: { fullOut: 0, crossover: 0.5, fullIn: 1 },
+            missing: { kind: "exclude_case" },
+            sensitivity: {
+              alternatives: [{
+                id: "a-shift",
+                label: "A crossover shift",
+                delta: 0.1,
+                rationale: "Recorded alternative",
+              }],
+            },
+          },
+        },
+        demoMode: false,
+        freqCut: 1,
+        consCut: 0.8,
+        expectations: { A: "present" },
+        researchBrief: {
+          question: "Which configurations explain the outcome?",
+          caseUniverse: "Two saved cases",
+          timePeriod: "2020",
+          outcomeConcept: "Outcome membership",
+          conditionSelectionRationale: "A follows the comparison design.",
+          confirmed: true,
+        },
+        analysisDecisions: {
+          frequencyCutoff: { rationale: "Saved rationale", confirmed: true },
+          consistencyCutoff: { rationale: "Saved rationale", confirmed: true },
+          directionalExpectations: { rationale: "Saved rationale", confirmed: true },
+        },
+        aiWritingProvenance: {
+          brief_clarify: {},
+          calibration_evidence_gaps: {},
+          decision_rationale_review: {},
+        },
+      },
+    }));
+  });
+  await page.reload();
+  await dismissConsent(page);
+  await page.getByRole("button", { name: "Gespeichertes Projekt laden" }).click();
+  await expect(page.getByText(
+    "Mindestens eine aktive Bedingung und genau ein aktives Outcome sind erforderlich.",
+  )).toBeVisible();
+  await expect(page.locator('[data-testid^="solution-formula-"]')).toHaveCount(0);
+  await openDestination(page, "decisions");
+  await page.getByTestId("calibration-view-doc").click();
+  await expect(page.getByTestId("calibration-sensitivity-fit")).toHaveCount(0);
+  await openDestination(page, "evidence");
+  await expect(page.getByTestId("necessity-finding")).toHaveCount(0);
+  await expect(page.locator("#xyplot")).toHaveCount(0);
+  await openDestination(page, "research");
+  await expect(page.getByText(
+    "Vor der Bestätigung müssen mindestens eine Bedingung und genau ein Outcome gewählt sein.",
+  )).toBeVisible();
+});
+
 test("demo deep link wins over resume and removes the query parameter", async ({ page }) => {
   await page.goto("/app?demo=1#defense");
   await dismissConsent(page);
@@ -501,6 +677,16 @@ test("answer decision action opens the affected calibration record", async ({ pa
   await expect(page).toHaveURL(/#decisions$/);
   await expect(page.getByTestId("calibration-view-doc")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("calibration-substepper")).toBeVisible();
+});
+
+test("provisional evidence action preserves workspace focus semantics", async ({ page }) => {
+  await loadRawRohwerte(page);
+  await openDestination(page, "evidence");
+  await page.getByRole("button", { name: "Zu Entscheidungen" }).click();
+  await expect(page).toHaveURL(/#decisions$/);
+  await expect.poll(() =>
+    page.evaluate(() => document.activeElement?.id ?? ""),
+  ).toBe("workspace-decisions-heading");
 });
 
 test("calibration subnavigation stays below workspace navigation", async ({ page }) => {
@@ -531,6 +717,21 @@ test("calibration subnavigation stays below workspace navigation", async ({ page
     positions!.horizontallySeparated ||
       positions!.calibrationTop >= positions!.workspaceBottom - 1,
   ).toBe(true);
+});
+
+test("answer identifies incomplete active calibrations", async ({ page }) => {
+  await loadDemo(page);
+  await openDestination(page, "research");
+  await page.getByLabel("urban: Rolle").selectOption("ignore");
+  await page.getByLabel("bildung: Rolle").selectOption("ignore");
+  await page.getByLabel("stabil: Rolle").selectOption("ignore");
+  await openDestination(page, "decisions");
+  await page.getByTestId("calibration-view-doc").click();
+  await page.locator("#calibration-set-definition-wohlstand").fill("");
+  await openDestination(page, "answer");
+  await expect(page.getByText(
+    "Aktive Kalibrierungen sind unvollständig: wohlstand. Ergänzen Sie die fehlenden Angaben unter Entscheidungen.",
+  )).toBeVisible();
 });
 
 test("answer distinguishes no-solution and equivalent-model states", async ({ page }) => {

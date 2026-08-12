@@ -86,7 +86,13 @@ export function AccountButton() {
 }
 
 /** Projekt in der Cloud speichern/laden (nur angemeldet + Cloud aktiv). */
-export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; onLoad: (data: unknown) => void }) {
+export function CloudSaveLoad({
+  getState,
+  onLoad,
+}: {
+  getState: () => unknown;
+  onLoad: (data: unknown) => boolean | Promise<boolean>;
+}) {
   const [locale] = useLocale();
   const user = useUser();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
@@ -131,8 +137,8 @@ export function CloudSaveLoad({ getState, onLoad }: { getState: () => unknown; o
     if (!sb) return;
     const { data } = await sb.from("projects").select("data,name").eq("id", id).single();
     if (data?.data) {
-      onLoad(data.data);
-      setLoaded({ id, name: (data.name as string) ?? "" });
+      const accepted = await onLoad(data.data);
+      if (accepted) setLoaded({ id, name: (data.name as string) ?? "" });
     }
   }
   async function overwrite() {

@@ -526,7 +526,7 @@ export default function Home() {
   }
 
   function commitImport() {
-    if (!pendingImport) return;
+    if (!pendingImport || pendingImport.blockingIssues.length > 0) return;
     const receipt = pendingImport;
     applyDataset(receipt.dataset, { demo: false });
     setImportReceipt(receipt);
@@ -862,7 +862,8 @@ export default function Home() {
     () => activeAnalysisCols.filter((column) => varMeta[column]?.role === "outcome"),
     [activeAnalysisCols, varMeta],
   );
-  const selectedOutcome = selectedOutcomes[0] ?? "";
+  const selectedRoleContractReady =
+    selectedConditions.length >= 1 && selectedOutcomes.length === 1;
   const evaluation: CalibrationEvaluation = useMemo(
     () =>
       ds
@@ -903,18 +904,29 @@ export default function Home() {
     [setCols, varMeta],
   );
   const outcome = useMemo(
-    () => setCols.find((column) => varMeta[column]?.role === "outcome") ?? "",
-    [setCols, varMeta],
+    () =>
+      selectedOutcomes.length === 1 && setCols.includes(selectedOutcomes[0])
+        ? selectedOutcomes[0]
+        : "",
+    [selectedOutcomes, setCols],
   );
   const computedRoleContractReady =
-    selectedConditions.length >= 1 &&
-    selectedOutcomes.length === 1 &&
+    selectedRoleContractReady &&
     activeAnalysisCols.length === setCols.length &&
     activeAnalysisCols.every((column) => setCols.includes(column)) &&
     conditions.length === selectedConditions.length &&
     outcome === selectedOutcomes[0];
+  const incompleteCalibrationColumns = useMemo(
+    () => activeAnalysisCols.filter((column) => !setCols.includes(column)),
+    [activeAnalysisCols, setCols],
+  );
   const tt: TruthTableResult | null = useMemo(() => {
-    if (!ds || cases.length === 0 || conditions.length < 1 || conditions.length > 12 || !outcome) {
+    if (
+      !ds ||
+      !computedRoleContractReady ||
+      cases.length === 0 ||
+      conditions.length > 12
+    ) {
       return null;
     }
     try {
@@ -922,9 +934,11 @@ export default function Home() {
     } catch {
       return null;
     }
-  }, [cases, conditions, ds, outcome, freqCut, consCut]);
+  }, [cases, computedRoleContractReady, conditions, ds, outcome, freqCut, consCut]);
   const sensitivity: SensitivityBundle = useMemo(() => {
-    if (!ds || conditions.length > 12) return { resultsByColumn: {}, variantsByColumn: {} };
+    if (!ds || !computedRoleContractReady || conditions.length > 12) {
+      return { resultsByColumn: {}, variantsByColumn: {} };
+    }
     return buildSensitivityBundle({
       ds,
       varMeta,
@@ -934,9 +948,17 @@ export default function Home() {
       freqCut,
       consCut,
     });
-  }, [ds, varMeta, calibSpecs, conditions, outcome, freqCut, consCut]);
+  }, [ds, varMeta, calibSpecs, conditions, outcome, freqCut, consCut, computedRoleContractReady]);
   const robustnessScenarios: RobustnessScenario[] = useMemo(() => {
-    if (!ds || conditions.length > 12 || conditions.length < 1 || !outcome) return [];
+    if (
+      !ds ||
+      !computedRoleContractReady ||
+      conditions.length > 12 ||
+      conditions.length < 1 ||
+      !outcome
+    ) {
+      return [];
+    }
     try {
       const scenarios = buildRobustnessScenarios({
         ds,
@@ -953,9 +975,16 @@ export default function Home() {
     } catch {
       return cases.length ? [{ id: "base", label: "Basis-Kalibrierung", cases }] : [];
     }
-  }, [ds, conditions, outcome, varMeta, calibSpecs, cases]);
+  }, [ds, computedRoleContractReady, conditions, outcome, varMeta, calibSpecs, cases]);
   const robustnessResult: CombinedRobustnessResult | null = useMemo(() => {
-    if (!robustnessScenarios.length || conditions.length < 1 || !outcome) return null;
+    if (
+      !computedRoleContractReady ||
+      !robustnessScenarios.length ||
+      conditions.length < 1 ||
+      !outcome
+    ) {
+      return null;
+    }
     try {
       return runCombinedRobustnessGrid({
         scenarios: robustnessScenarios,
@@ -972,17 +1001,39 @@ export default function Home() {
     } catch {
       return null;
     }
-  }, [conditions, consCut, expectations, freqCut, outcome, robustnessScenarios]);
+  }, [
+    computedRoleContractReady,
+    conditions,
+    consCut,
+    expectations,
+    freqCut,
+    outcome,
+    robustnessScenarios,
+  ]);
   const necessity: ReturnType<typeof necessityAnalysis> | null = useMemo(() => {
-    if (cases.length === 0 || conditions.length === 0 || !outcome) return null;
+    if (
+      !computedRoleContractReady ||
+      cases.length === 0 ||
+      conditions.length === 0 ||
+      !outcome
+    ) {
+      return null;
+    }
     try {
       return necessityAnalysis(conditions, outcome, cases);
     } catch {
       return null;
     }
-  }, [conditions, outcome, cases]);
+  }, [computedRoleContractReady, conditions, outcome, cases]);
   const suin: NecessityExpressionEntry[] | null = useMemo(() => {
-    if (cases.length === 0 || conditions.length === 0 || !outcome) return null;
+    if (
+      !computedRoleContractReady ||
+      cases.length === 0 ||
+      conditions.length === 0 ||
+      !outcome
+    ) {
+      return null;
+    }
     try {
       return necessarySupersets(conditions, outcome, cases, {
         inclCut: 0.9,
@@ -992,7 +1043,7 @@ export default function Home() {
     } catch {
       return null;
     }
-  }, [conditions, outcome, cases]);
+  }, [computedRoleContractReady, conditions, outcome, cases]);
   const sol: SolBundle | null = useMemo(() => {
     if (!tt) return null;
     const currentExpectations = normalizeExpectations(conditions, expectations);
@@ -1014,7 +1065,7 @@ export default function Home() {
   const briefReadiness = researchBriefReadiness(
     researchBrief,
     selectedConditions,
-    selectedOutcome,
+    selectedOutcomes,
   );
   const decisionReadiness = analysisDecisionReadiness(analysisDecisions);
   const calibrationReadiness = calibrationDefenseReadiness(
@@ -1026,12 +1077,12 @@ export default function Home() {
     researchBrief,
     analysisDecisions,
     conditions: selectedConditions,
-    outcome: selectedOutcome,
+    outcomes: selectedOutcomes,
     activeColumns: activeAnalysisCols,
     varMeta,
     calibSpecs,
   });
-  const resultsReady = tt !== null && sol !== null && necessity !== null;
+  const resultsReady = tt !== null && sol !== null && necessity !== null && suin !== null;
   const defenseResultsReady = resultsReady && computedRoleContractReady;
   const defenseReady =
     !demoMode &&
@@ -1098,6 +1149,8 @@ export default function Home() {
                 locale={locale}
                 brief={researchBrief}
                 conditions={conditions}
+                incompleteCalibrationColumns={incompleteCalibrationColumns}
+                roleSelectionReady={selectedRoleContractReady}
                 outcome={outcome}
                 calibSpecs={calibSpecs}
                 cases={cases}
@@ -1185,9 +1238,7 @@ export default function Home() {
                         <Button onClick={restoreLocalProject}>{t(locale, "data.loadLocal")}</Button>
                         <CloudSaveLoad
                           getState={currentState}
-                          onLoad={(raw) => {
-                            void loadState(raw);
-                          }}
+                          onLoad={loadState}
                         />
                       </div>
                       {localProjectStatus && <p className="hint">{localProjectStatus}</p>}
@@ -1360,7 +1411,9 @@ export default function Home() {
                   onResearch={() => selectDestination("research")}
                   onDecisions={() => selectDestination("decisions")}
                 />
-                {!defenseReady && !demoMode && <ProvisionalMark />}
+                {!defenseReady && !demoMode && (
+                  <ProvisionalMark onDecisions={() => selectDestination("decisions")} />
+                )}
                 {necessity && <NecessitySection necessity={necessity} suin={suin} />}
                 <Card className="oq-plane--disclosure">
                   <details>
@@ -1383,9 +1436,9 @@ export default function Home() {
                 <div>
                   <h2 className="oq-workspace-subheading">{t(locale, "workspace.evidence.diagnostics")}</h2>
                   <XyEvidence
-                    cases={cases}
-                    conditions={conditions}
-                    outcome={outcome}
+                    cases={computedRoleContractReady ? cases : []}
+                    conditions={computedRoleContractReady ? conditions : []}
+                    outcome={computedRoleContractReady ? outcome : ""}
                     sol={sol}
                     xySource={xySource}
                     onXySource={setXySource}
@@ -1396,19 +1449,19 @@ export default function Home() {
                     <summary>{t(locale, "workspace.evidence.robustness")}</summary>
                     <div style={{ marginTop: 12 }}>
                       <RobustnessPanel
-                        cases={cases}
+                        cases={computedRoleContractReady ? cases : []}
                         robustness={robustnessResult}
                         scenarios={robustnessScenarios}
-                        conditions={conditions}
-                        outcome={outcome}
+                        conditions={computedRoleContractReady ? conditions : []}
+                        outcome={computedRoleContractReady ? outcome : ""}
                         freqCut={freqCut}
                         currentConsCut={consCut}
                         expectations={normalizeExpectations(conditions, expectations)}
                       />
                       <NegatedOutcomePanel
-                        cases={cases}
-                        conditions={conditions}
-                        outcome={outcome}
+                        cases={computedRoleContractReady ? cases : []}
+                        conditions={computedRoleContractReady ? conditions : []}
+                        outcome={computedRoleContractReady ? outcome : ""}
                         freqCut={freqCut}
                         consCut={consCut}
                       />
@@ -1481,6 +1534,7 @@ export default function Home() {
                               robustness: robustnessResult,
                               researchBrief,
                               analysisDecisions,
+                              aiWritingProvenance,
                               expectations: normalizeExpectations(conditions, expectations),
                             })
                           : "",
@@ -1499,6 +1553,9 @@ export default function Home() {
                   evaluation={evaluation}
                   sensitivity={sensitivity}
                   robustness={robustnessResult}
+                  solutions={sol}
+                  necessity={necessity}
+                  necessitySupersets={suin}
                   defenseReady={defenseReady}
                   researchBrief={researchBrief}
                   analysisDecisions={analysisDecisions}
@@ -1615,8 +1672,15 @@ function ImportPreflightPanel({
       </dl>
       <p className="hint">{de ? "Vorlage: eine Fall-ID-Spalte und eine Zeile pro Fall; numerische Bedingungen und ein Outcome anschließend im Forschungsdesign prüfen." : "Template: one case-ID column and one row per case; then review numeric conditions and one outcome in Research design."}</p>
       {Object.entries(preflight.detectedTypes).map(([column, type]) => <span className="oq-status-chip" key={column}>{column}: {type}</span>)}
-      {preflight.warnings.map((warning) => <Diag key={warning} kind="warn">{de ? ({ "No case identifier column was detected.": "Keine Fall-ID-Spalte erkannt.", "No numeric columns were detected.": "Keine numerischen Spalten erkannt.", "The file contains no data rows.": "Die Datei enthält keine Datenzeilen." }[warning] ?? warning) : warning}</Diag>)}
-      <div className="oq-action-row"><button type="button" className="oq-btn oq-btn--primary" onClick={onCommit}>{de ? "Import übernehmen" : "Commit import"}</button><button type="button" className="oq-btn" onClick={onCancel}>{de ? "Abbrechen" : "Cancel"}</button></div>
+      {preflight.warnings.map((warning) => <Diag key={warning} kind="warn">{de ? ({ "No case identifier column was detected.": "Keine Fall-ID-Spalte erkannt." }[warning] ?? warning) : warning}</Diag>)}
+      {preflight.blockingIssues.map((issue) => <Diag key={issue} kind="bad">{de ? ({
+        "A case identifier column is required.": "Eine Fall-ID-Spalte ist erforderlich.",
+        "Case identifiers must not be blank.": "Fall-IDs dürfen nicht leer sein.",
+        "Case identifiers must be unique.": "Fall-IDs müssen eindeutig sein.",
+        "The file contains no data rows.": "Die Datei enthält keine Datenzeilen.",
+        "At least two numeric analysis columns are required.": "Mindestens zwei numerische Analysespalten sind erforderlich: eine Bedingung und ein Outcome.",
+      }[issue] ?? issue) : issue}</Diag>)}
+      <div className="oq-action-row"><button type="button" className="oq-btn oq-btn--primary" disabled={preflight.blockingIssues.length > 0} onClick={onCommit}>{de ? "Import übernehmen" : "Commit import"}</button><button type="button" className="oq-btn" onClick={onCancel}>{de ? "Abbrechen" : "Cancel"}</button></div>
     </section>
   );
 }
@@ -2280,6 +2344,8 @@ function AnswerWorkspace({
   locale,
   brief,
   conditions,
+  incompleteCalibrationColumns,
+  roleSelectionReady,
   outcome,
   calibSpecs,
   cases,
@@ -2296,6 +2362,8 @@ function AnswerWorkspace({
   locale: Locale;
   brief: ResearchBrief;
   conditions: string[];
+  incompleteCalibrationColumns: string[];
+  roleSelectionReady: boolean;
   outcome: string;
   calibSpecs: CalibSpecs;
   cases: QcaCase[];
@@ -2361,12 +2429,18 @@ function AnswerWorkspace({
     (item) => item.type === "intermediate" && item.expression === model?.paths.map((path) => path.expression).join("+"),
   ) ?? robustness?.solutionStability.find((item) => item.type === "intermediate");
   let limitation = "";
-  if (!conditions.length || !outcome) limitation = t(locale, "workspace.answer.noRoles");
-  else if (cases.length === 0) limitation = t(locale, "workspace.answer.noCases");
+  if (roleSelectionReady && incompleteCalibrationColumns.length) {
+    limitation = t(locale, "workspace.answer.incompleteCalibration", {
+      columns: incompleteCalibrationColumns.map(setLabel).join(", "),
+    });
+  } else if (!roleSelectionReady || !conditions.length || !outcome) {
+    limitation = t(locale, "workspace.answer.noRoles");
+  } else if (cases.length === 0) limitation = t(locale, "workspace.answer.noCases");
   else if (conditions.length > 12) {
     limitation = t(locale, "workspace.answer.tooMany", { n: conditions.length });
   } else if (tt && positiveRows === 0) limitation = t(locale, "workspace.answer.noPositive");
   else if (tt && !model) limitation = t(locale, "workspace.answer.noModel");
+  else if (!tt) limitation = t(locale, "workspace.answer.calculationFailed");
 
   return (
     <div className="oq-answer">
@@ -3718,6 +3792,9 @@ function ProtocolSection({
   evaluation,
   sensitivity,
   robustness,
+  solutions,
+  necessity,
+  necessitySupersets,
   defenseReady,
   researchBrief,
   analysisDecisions,
@@ -3735,6 +3812,9 @@ function ProtocolSection({
   evaluation: CalibrationEvaluation;
   sensitivity: SensitivityBundle;
   robustness: CombinedRobustnessResult | null;
+  solutions: SolBundle | null;
+  necessity: ReturnType<typeof necessityAnalysis> | null;
+  necessitySupersets: NecessityExpressionEntry[] | null;
   defenseReady: boolean;
   researchBrief: ResearchBrief;
   analysisDecisions: AnalysisDecisionState;
@@ -3758,11 +3838,13 @@ function ProtocolSection({
             robustness,
             researchBrief,
             analysisDecisions,
+            aiWritingProvenance,
             expectations,
           })
         : "",
     [
       analysisDecisions,
+      aiWritingProvenance,
       calibSpecs,
       conditions,
       consCut,
@@ -3779,7 +3861,7 @@ function ProtocolSection({
   );
 
   function downloadJson() {
-    if (!defenseReady) return;
+    if (!defenseReady || !solutions || !necessity || !necessitySupersets) return;
     const payload = buildCalibrationProtocolJson({
       ds,
       calibSpecs,
@@ -3795,6 +3877,9 @@ function ProtocolSection({
       analysisDecisions,
       aiWritingProvenance,
       expectations,
+      solutions,
+      necessity,
+      necessitySupersets,
     });
     downloadText(
       "openqca-calibration-protocol.json",
@@ -3813,7 +3898,7 @@ function ProtocolSection({
   }
 
   function downloadMd() {
-    if (!defenseReady) return;
+    if (!defenseReady || !solutions || !necessity || !necessitySupersets) return;
     const md = buildCalibrationNarrative({
       ds,
       calibSpecs,
@@ -3830,6 +3915,9 @@ function ProtocolSection({
       analysisDecisions,
       aiWritingProvenance,
       expectations,
+      solutions,
+      necessity,
+      necessitySupersets,
     });
     downloadText("openqca-calibration-protocol.md", md, "text/markdown;charset=utf-8");
   }
@@ -3975,7 +4063,7 @@ function Kpi({ v, l }: { v: string; l: React.ReactNode }) {
  * und ohne Ausweg; der Grund lag nur im title-Attribut, also unsichtbar auf
  * Touch. Chip, Grund und der Weg dorthin stehen jetzt in einer Zeile.
  */
-function ProvisionalMark() {
+function ProvisionalMark({ onDecisions }: { onDecisions: () => void }) {
   const [locale] = useLocale();
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -4000,9 +4088,9 @@ function ProvisionalMark() {
       </span>
       <span style={{ fontSize: 12, color: "var(--ink-2)" }}>
         {t(locale, "result.provisional.reason")}{" "}
-        <a href="#decisions" style={{ color: "var(--accent-deep)" }}>
+        <button type="button" className="oq-link-button" onClick={onDecisions}>
           {t(locale, "result.provisional.link")}
-        </a>
+        </button>
       </span>
     </div>
   );

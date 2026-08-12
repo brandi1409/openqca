@@ -28,8 +28,11 @@ jobs:
       - name: Engine — R-Kreuzvalidierung (QUALITY-SPEC A1.3)
         run: node scripts/cross-validate.mjs
 
-      - name: Engine — R-Kalibrierungs-Kreuzvalidierung (QUALITY-SPEC A1.5)
+      - name: Engine — R-Kalibrierungs-Kreuzvalidierung (QUALITY-SPEC A1.4)
         run: node scripts/calibrate-cross-validate.mjs
+
+      - name: Engine — installable package contract
+        run: npm run check:engine-package
 
       - name: Deployment — Compose contracts
         run: npm run check:deployment

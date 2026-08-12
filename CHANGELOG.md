@@ -41,6 +41,10 @@ validiert beschrieben.** Der genaue Stand steht in [`VALIDATION.md`](VALIDATION.
   erst nach ausdrücklicher Übernahme aktiv. Ausgeschlossene Fälle, exakte 0,5-Grenzfälle,
   äquivalente Modelle, leere Lösungen und die Grenze von zwölf Bedingungen erscheinen als
   benannte Analysezustände statt als implizite Fehler.
+- **Protokoll-Schema V3.** JSON und Markdown enthalten nun den expliziten Lösungs- oder
+  No-solution-Status aller drei Minimierungen sowie Einzel- und Obermengenprüfungen der
+  Notwendigkeit. Das R-Skript übersetzt beliebige Spaltennamen in QCA-sichere Aliase und
+  setzt nach leeren Truth Tables mit den verbleibenden Prüfungen und `sessionInfo()` fort.
 
 ### Korrigiert
 - **Reichweite der ESA-Abweichung erstmals gemessen.** Über 13.216 Konstellationen

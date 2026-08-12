@@ -460,6 +460,269 @@ type LegacyCalibrationSpec = Omit<Partial<CalibrationSpec>, "sensitivity"> & {
   };
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function finiteValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizedMethod(value: unknown): RawCalibrationMethod | undefined {
+  switch (value) {
+    case "direct":
+    case "linear":
+    case "crisp":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function normalizedStatus(value: unknown): CalibrationDecisionStatus | undefined {
+  switch (value) {
+    case "unresolved":
+    case "provisional":
+    case "sourced":
+    case "externally_checked":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function normalizedSet(value: unknown): SetDefinition {
+  const base = emptySet();
+  if (!isRecord(value)) return base;
+  return {
+    setLabel: stringValue(value.setLabel),
+    definition: stringValue(value.definition),
+    unit: stringValue(value.unit),
+    scopePopulation: stringValue(value.scopePopulation),
+    timePeriod: stringValue(value.timePeriod),
+    highIsMembership:
+      typeof value.highIsMembership === "boolean"
+        ? value.highIsMembership
+        : base.highIsMembership,
+    notes: stringValue(value.notes),
+  };
+}
+
+function normalizedDirectAnchors(value: unknown): DirectAnchors | undefined {
+  if (!isRecord(value)) return undefined;
+  const fullOut = finiteValue(value.fullOut);
+  const crossover = finiteValue(value.crossover);
+  const fullIn = finiteValue(value.fullIn);
+  if (fullOut === undefined || crossover === undefined || fullIn === undefined) {
+    return undefined;
+  }
+  return {
+    fullOut,
+    crossover,
+    fullIn,
+    meaningFullOut: stringValue(value.meaningFullOut),
+    meaningCrossover: stringValue(value.meaningCrossover),
+    meaningFullIn: stringValue(value.meaningFullIn),
+  };
+}
+
+function normalizedCrispThreshold(value: unknown): CrispThreshold | undefined {
+  if (!isRecord(value)) return undefined;
+  const threshold = finiteValue(value.threshold);
+  if (threshold === undefined) return undefined;
+  return {
+    threshold,
+    meaningInclusion: stringValue(value.meaningInclusion),
+  };
+}
+
+function normalizedMissingPolicy(value: unknown): MissingPolicy {
+  if (!isRecord(value)) return { kind: "exclude_case" };
+  if (value.kind === "leave_unresolved") return { kind: "leave_unresolved" };
+  if (
+    value.kind === "assign" &&
+    (value.membership === 0 || value.membership === 1)
+  ) {
+    return { kind: "assign", membership: value.membership };
+  }
+  return { kind: "exclude_case" };
+}
+
+function normalizedEvidenceType(value: unknown): EvidenceType | undefined {
+  switch (value) {
+    case "literature":
+    case "theory":
+    case "standard":
+    case "domain_expertise":
+    case "case_knowledge":
+    case "empirical_diagnostic":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function normalizedEvidenceTarget(
+  value: unknown,
+): EvidenceItem["supports"] | undefined {
+  switch (value) {
+    case "set":
+    case "fullOut":
+    case "crossover":
+    case "fullIn":
+    case "threshold":
+    case "method":
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function normalizedEvidence(value: unknown): EvidenceItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((candidate): EvidenceItem[] => {
+    if (!isRecord(candidate) || !isRecord(candidate.citation)) return [];
+    const type = normalizedEvidenceType(candidate.type);
+    const supports = normalizedEvidenceTarget(candidate.supports);
+    if (
+      typeof candidate.id !== "string" ||
+      !type ||
+      !supports ||
+      typeof candidate.note !== "string" ||
+      typeof candidate.isSubstantive !== "boolean"
+    ) {
+      return [];
+    }
+    const citation = candidate.citation;
+    return [{
+      id: candidate.id,
+      type,
+      supports,
+      citation: {
+        authors: typeof citation.authors === "string" ? citation.authors : undefined,
+        year: typeof citation.year === "string" ? citation.year : undefined,
+        title: typeof citation.title === "string" ? citation.title : undefined,
+        doiOrUrl: typeof citation.doiOrUrl === "string" ? citation.doiOrUrl : undefined,
+        pages: typeof citation.pages === "string" ? citation.pages : undefined,
+      },
+      note: candidate.note,
+      isSubstantive: candidate.isSubstantive,
+    }];
+  });
+}
+
+function normalizedExternalReview(
+  value: unknown,
+): ExternalReviewAttestation | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.reviewer !== "string" ||
+    typeof value.date !== "string" ||
+    typeof value.note !== "string"
+  ) {
+    return undefined;
+  }
+  return {
+    reviewer: value.reviewer,
+    date: value.date,
+    note: value.note,
+  };
+}
+
+function normalizedExceptionalCases(value: unknown): ExceptionalCase[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((candidate): ExceptionalCase[] => {
+    if (
+      !isRecord(candidate) ||
+      typeof candidate.caseLabel !== "string" ||
+      typeof candidate.note !== "string"
+    ) {
+      return [];
+    }
+    const rowIndex =
+      typeof candidate.rowIndex === "number" &&
+      Number.isInteger(candidate.rowIndex) &&
+      candidate.rowIndex >= 0
+        ? candidate.rowIndex
+        : undefined;
+    return [{
+      caseLabel: candidate.caseLabel,
+      note: candidate.note,
+      ...(rowIndex === undefined ? {} : { rowIndex }),
+    }];
+  });
+}
+
+function normalizedSensitivity(
+  value: unknown,
+): LegacyCalibrationSpec["sensitivity"] {
+  if (!isRecord(value)) return undefined;
+  const alternatives = Array.isArray(value.alternatives)
+    ? value.alternatives.flatMap((candidate): SensitivityAlternative[] => {
+        if (
+          !isRecord(candidate) ||
+          typeof candidate.id !== "string" ||
+          typeof candidate.label !== "string" ||
+          typeof candidate.rationale !== "string"
+        ) {
+          return [];
+        }
+        const delta = finiteValue(candidate.delta);
+        return delta === undefined
+          ? []
+          : [{
+              id: candidate.id,
+              label: candidate.label,
+              delta,
+              rationale: candidate.rationale,
+            }];
+      })
+    : undefined;
+  const crossoverOrThresholdDeltas = Array.isArray(value.crossoverOrThresholdDeltas)
+    ? value.crossoverOrThresholdDeltas.flatMap((candidate) => {
+        const delta = finiteValue(candidate);
+        return delta === undefined ? [] : [delta];
+      })
+    : undefined;
+  return {
+    ...(alternatives === undefined ? {} : { alternatives }),
+    ...(crossoverOrThresholdDeltas === undefined
+      ? {}
+      : { crossoverOrThresholdDeltas }),
+    notes: stringValue(value.notes),
+    reviewed: value.reviewed === true,
+  };
+}
+
+function normalizedLegacySpec(value: unknown): LegacyCalibrationSpec | undefined {
+  if (!isRecord(value)) return undefined;
+  return {
+    set: normalizedSet(value.set),
+    method: normalizedMethod(value.method),
+    direct: normalizedDirectAnchors(value.direct),
+    linear: normalizedDirectAnchors(value.linear),
+    crisp: normalizedCrispThreshold(value.crisp),
+    alreadyCalibratedProvenance:
+      typeof value.alreadyCalibratedProvenance === "string"
+        ? value.alreadyCalibratedProvenance
+        : undefined,
+    missing: normalizedMissingPolicy(value.missing),
+    evidence: normalizedEvidence(value.evidence),
+    status: normalizedStatus(value.status),
+    provisionalDefaults: value.provisionalDefaults === true,
+    anchorsFromData: value.anchorsFromData === true,
+    methodConfirmed: value.methodConfirmed === true,
+    caseReviewConfirmed: value.caseReviewConfirmed === true,
+    externalReview: normalizedExternalReview(value.externalReview),
+    exceptionalCases: normalizedExceptionalCases(value.exceptionalCases),
+    sensitivity: normalizedSensitivity(value.sensitivity),
+  };
+}
+
 function normalizeSpec(column: string, input: LegacyCalibrationSpec | undefined): CalibrationSpec {
   const base = emptySpec(column);
   const rawSensitivity = input?.sensitivity;
@@ -490,11 +753,12 @@ function normalizeSpec(column: string, input: LegacyCalibrationSpec | undefined)
 export function migrateSpecsFromAnchors(
   columns: string[],
   anchors: Record<string, [number, number, number]>,
-  existing?: CalibSpecs,
+  existing?: unknown,
 ): CalibSpecs {
   const out: CalibSpecs = {};
+  const existingRecord = isRecord(existing) ? existing : undefined;
   for (const col of columns) {
-    const current = existing?.[col] as LegacyCalibrationSpec | undefined;
+    const current = normalizedLegacySpec(existingRecord?.[col]);
     out[col] = normalizeSpec(
       col,
       current ??

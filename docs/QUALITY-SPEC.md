@@ -23,7 +23,7 @@
 |---|---|---|
 | A2.1 | Einstieg zeigt genau drei Wege; Demo öffnet direkt, lokale V1/V2-Projekte werden nur als expliziter Resume-Kandidat angeboten | `workspace.spec.ts` |
 | A2.2 | Genau fünf Ziele — Antwort, Forschungsdesign, Entscheidungen, Evidenz, Prüfpaket — synchronisieren Hash, History und Fokus; unbekannte Hashes fallen auf Antwort zurück | `workspace.spec.ts` |
-| A2.3 | CSV- und XLSX-Import ersetzen das aktive Projekt erst nach „Import übernehmen"; Parsefehler lassen den bisherigen Stand unverändert | `workspace.spec.ts` |
+| A2.3 | CSV- und XLSX-Import zeigen Zeilen, erkannte Typen, vorgeschlagene Rollen und Warnungen vorab; blockierend sind leere Dateien, weniger als zwei numerische Analysespalten sowie fehlende, leere oder nach Whitespace-Normalisierung doppelte Fall-IDs. Das aktive Projekt wird erst nach „Import übernehmen" ersetzt; Parsefehler lassen den bisherigen Stand unverändert | `workspace.spec.ts` |
 | A2.4 | Berechenbare eigene Daten liefern sofort eine klar vorläufige Antwort; synthetische Daten bleiben nicht zitier- und nicht exportfähig | `flows.spec.ts`, `workspace.spec.ts` |
 | A2.5 | Research Brief bindet Frage, Falluniversum, Zeitraum, Outcome und Bedingungsauswahl an Rollen; Änderungen entwerten die Bestätigung | `workspace.spec.ts` |
 | A2.6 | Decision Ledger priorisiert offene Set- und Analyseentscheidungen; Frequency-, Consistency- und Richtungserwartungen werden im Ziel „Entscheidungen" erklärt und bestätigt | `workspace.spec.ts`, `flows.spec.ts` |
@@ -31,7 +31,7 @@
 | A2.8 | Evidenz ist progressiv aufklappbar und bewahrt Truth Table, Remainder, Necessity/SUIN/RoN, alle Lösungsmodelle, Falldiagnostik, XY-Plot, Robustheit und negiertes Outcome | `flows.spec.ts` |
 | A2.9 | Ein einziges Defense-Gate schaltet JSON, Rohdaten-CSV, Methoden-Markdown und R-Skript erst nach bestätigtem Brief, dokumentierten aktiven Sets und bestätigten Analyseentscheidungen frei | `flows.spec.ts` |
 | A2.10 | Bericht bleibt bei berechenbaren provisional/no-solution-Zuständen verfügbar und kennzeichnet den Zustand im Dokument | `flows.spec.ts`, `workspace.spec.ts` |
-| A2.11 | Protokoll-Schema V2 enthält Research Brief, rationale Entscheidungen, aktuellen Analysezustand, Fallzusammenfassung, Engine-/Datei-Metadaten, Robustheit und KI-Schreibprovenienz | `flows.spec.ts`, `ai-provenance.spec.ts` |
+| A2.11 | Protokoll-Schema V3 enthält Research Brief, rationale Entscheidungen, aktuellen Analysezustand, Lösungs-/No-solution-Status, Notwendigkeitsbefunde, Fallzusammenfassung, Engine-/Datei-Metadaten, Robustheit und KI-Schreibprovenienz | `flows.spec.ts`, `ai-provenance.spec.ts` |
 | A2.12 | Autosave bleibt aktiv, Autoload entfällt; V2-Restore erhält Research Brief, Entscheidungen, Kalibrierung und verifizierte KI-Provenienz | `workspace.spec.ts` |
 
 **Produktinvariante:** Rechnen darf früh, Verteidigen erst nach bestätigten Entscheidungen. Mehr als zwölf aktive Bedingungen werden nie still gekürzt. Fehlende aktive Set-Werte werden als ausgeschlossene oder ungeklärte Fälle ausgewiesen. Eine leere Lösung ist ein Ergebnis, kein Fehler.
@@ -45,7 +45,7 @@
 | A3.3 | Unsichere oder numerisch eingreifende Absichten, unstrukturierte Antworten und Providerfehler scheitern geschlossen und lokalisiert | `ai-provider.spec.ts` |
 | A3.4 | Eine angenommene Antwort schreibt genau ein Zielfeld, entwertet dessen Bestätigung und verliert bei paralleler Bearbeitung ihre Gültigkeit | `workspace.spec.ts` |
 | A3.5 | Provenienz speichert nur Provider, Modell, Zeitpunkt und Text-Hashes; manipulierte Einträge werden beim Restore verworfen | `ai-provenance.spec.ts`, `workspace.spec.ts` |
-| A3.6 | Deterministischer Goldkorpus umfasst 16 Fälle je Aufgabe und Sprache; Live-Goldtest ist ein bewusst separates Credential-Gate | `ai-gold.spec.ts`, `ai-gold-live.spec.ts` |
+| A3.6 | Deterministischer Goldkorpus umfasst 16 Fälle je Aufgabe, davon je 8 auf Deutsch und Englisch; Live-Goldtest ist ein bewusst separates Credential-Gate | `ai-gold.spec.ts`, `ai-gold-live.spec.ts` |
 
 ### A4 — Bedienbarkeit und visuelle Integrität
 
