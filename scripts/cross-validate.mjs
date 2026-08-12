@@ -461,6 +461,13 @@ async function main() {
     console.error(`${failed} Szenario(en) FAIL — Kreuzvalidierung fehlgeschlagen.`);
     process.exit(1);
   }
+  if (skipped > 0 && process.argv.includes("--require-complete")) {
+    console.error(
+      `Vollständige Kreuzvalidierung erforderlich, aber ${skipped} Lipset-Szenario(s) wurden übersprungen. ` +
+        "Installiere das R-Paket QCA und führe Rscript scripts/r-oracle/lipset-export.R aus.",
+    );
+    process.exit(1);
+  }
   // Die oeffentliche Behauptung bezieht sich auf den VOLLEN Umfang der
   // Kreuzvalidierung, nicht auf die Teilmenge, die in dieser Umgebung lief.
   // Wurden optionale Szenarien uebersprungen (z. B. Lipset ohne lokale Daten),

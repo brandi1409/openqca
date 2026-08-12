@@ -14,7 +14,7 @@
     "benchmark:performance": "node scripts/performance-benchmark.mjs",
     "test:engine": "npm test --workspace @openqca/engine",
     "check:reference": "node scripts/reference-check.mjs",
-    "check:r": "node scripts/cross-validate.mjs",
+    "check:r": "node scripts/cross-validate.mjs --require-complete",
     "check:r-calibration": "node scripts/calibrate-cross-validate.mjs",
     "check:engine-package": "node scripts/check-engine-package.mjs",
     "check:deployment": "node scripts/check-deployment.mjs",

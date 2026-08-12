@@ -56,6 +56,13 @@ den installierbaren Engine-Paketcheck, Deployment- und Research-Protocol-Verträ
 Lint, Produktions-Build und die vollständige Playwright-Suite aus — dieselben Gates
 wie CI.
 
+Die vollständige R-Prüfung benötigt das R-Paket `QCA` und die daraus lokal erzeugten,
+nicht eingecheckten Lipset-Daten. Einmalig vor `npm run verify` ausführen:
+
+```bash
+Rscript scripts/r-oracle/lipset-export.R
+```
+
 ## Ordnerstruktur
 
 ```
