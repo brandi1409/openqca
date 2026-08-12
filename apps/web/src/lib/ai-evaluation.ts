@@ -28,11 +28,15 @@ type PolicyRule = {
 const NEGATION = /\b(?:no|not|kein|cannot|can't|do not|don't|does not|doesn't|is not|isn't|are not|aren't|was not|wasn't|were not|weren't|will not|won't|must not|should not|shouldn't|could not|couldn't|refuse|decline|kann nicht|darf nicht|werde nicht|keine|keinen|nicht|lehne ab)\b/iu;
 const NUMBER_WORD = /\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|null|eins?|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|dreizehn|vierzehn|fünfzehn|sechzehn|siebzehn|achtzehn|neunzehn|zwanzig)\b/iu;
 const QCA_VALUE = /\b(?:wert|value|anker|anchor|cutoff|threshold|schwelle|membership|zugehörigkeit|konsistenzwert|consistency value|häufigkeitswert|frequency value|qca[- ]?wert|qca value)\b/iu;
-const RECOMMENDATION = /\b(?:recommend\w*|optimal\w*|choose|select|set|use|empfehl\w*|optimal\w*|wähl\w*|setz\w*|nimm)\b/iu;
+const RECOMMENDATION = /\b(?:recommend\w*|optimal\w*|choose|select|set(?!\s+(?:membership|zugehörigkeit)\b)|use(?!\s+of\b)|empfehl\w*|optimal\w*|wähl\w*|setz\w*|nimm)\b/iu;
 const ROLE_TERM = /\b(?:role|condition|outcome|ignore|rolle|bedingung|ergebnis|ignorieren)\b/iu;
 const ROLE_ASSIGNMENT = /\b(?:treat|classif\w*|label|regard|consider|assign|designat\w*|declare|behandel\w*|klassifizier\w*|kennzeichne\w*|betrachte\w*|weis\w*|zuordn\w*|deklarier\w*)\b.{0,48}\b(?:as|to be|als)\b.{0,24}\b(?:role|condition|outcome|ignore|rolle|bedingung|ergebnis|ignorieren)\b/iu;
 const NUMERIC_DIRECTIVE = new RegExp(
   `(?:^\\s*(?:please\\s+|bitte\\s+)?(?:choose|select|set|use|assign|wähl\\w*|setz\\w*|nimm|weis\\w*)|\\b(?:should|must|sollte|muss)\\s+(?:choose|select|set|use|assign|wähl\\w*|setz\\w*|nimm|weis\\w*)).{0,32}(?:\\p{N}|${NUMBER_WORD.source})`,
+  "iu",
+);
+const MEMBERSHIP_ASSIGNMENT = new RegExp(
+  `\\b(?:set|setz\\w*)\\s+(?:membership|zugehörigkeit)\\s+(?:to|at|auf|bei|=)\\s*(?:\\p{N}|${NUMBER_WORD.source})`,
   "iu",
 );
 const DECISION_REFERENCE = /\b(?:(?:the|this|our|your)\s+(?:(?:selected|current|chosen)\s+)?(?:decision|choice)|(?:die|diese|unsere|ihre)\s+(?:(?:gewählte|aktuelle)\s+)?(?:entscheidung|wahl))\b/iu;
@@ -192,7 +196,7 @@ const POLICY_RULES: readonly PolicyRule[] = [
     code: "numeric-qca",
     violates: (text, _original, request) =>
       nonNegatedMatch(text, new RegExp(
-        `(?:${RECOMMENDATION.source}.{0,48}${QCA_VALUE.source}|${QCA_VALUE.source}.{0,32}(?:\\p{N}|${NUMBER_WORD.source})|(?:\\p{N}|${NUMBER_WORD.source}).{0,32}${QCA_VALUE.source}|${NUMERIC_DIRECTIVE.source})`,
+        `(?:${RECOMMENDATION.source}.{0,48}${QCA_VALUE.source}|${QCA_VALUE.source}.{0,32}(?:\\p{N}|${NUMBER_WORD.source})|(?:\\p{N}|${NUMBER_WORD.source}).{0,32}${QCA_VALUE.source}|${NUMERIC_DIRECTIVE.source}|${MEMBERSHIP_ASSIGNMENT.source})`,
         "iu",
       )) ||
       (request.task === "decision_rationale_review" &&
