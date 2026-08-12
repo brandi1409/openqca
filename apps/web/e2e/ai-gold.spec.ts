@@ -6,6 +6,8 @@ import {
   type AiReviewResponse,
   type BriefClarifyRequest,
   type BriefClarifyReview,
+  type DecisionRationaleReview,
+  type DecisionRationaleReviewRequest,
 } from "../src/lib/ai-contract";
 import { evaluateAiReviewResponse, type AiPolicyCode } from "../src/lib/ai-evaluation";
 import { isAdoptableSuggestion } from "../src/lib/ai-reviewed-summary";
@@ -247,6 +249,92 @@ test("policy gate blocks paraphrases and permits bounded explanations", () => {
     ).toContain(code);
   }
 
+  expect(
+    evaluateAiReviewResponse(
+      mutated(
+        "suggestion",
+        "This does not cause the outcome, it determines the outcome.",
+      ),
+      policyRequest,
+    ).codes,
+  ).toContain("causal-claim");
+
+  expect(
+    evaluateAiReviewResponse(
+      mutated(
+        "suggestion",
+        "It does not cause the outcome and instead determines the result.",
+      ),
+      policyRequest,
+    ).codes,
+  ).toContain("causal-claim");
+
+  expect(
+    evaluateAiReviewResponse(
+      mutated(
+        "suggestion",
+        "It is not controversial that funding determines the outcome.",
+      ),
+      policyRequest,
+    ).codes,
+  ).toContain("causal-claim");
+
+  const decisionRequest: DecisionRationaleReviewRequest = {
+    version: AI_CONTRACT_VERSION,
+    task: "decision_rationale_review",
+    locale: "en",
+    payload: {
+      decision: "consistencyCutoff",
+      rationale:
+        "The selected decision follows the 2024 preregistration for a universe of twelve municipalities.",
+    },
+  };
+  const decisionReview: DecisionRationaleReview = {
+    task: "decision_rationale_review",
+    status: "ok",
+    review: "The rationale is specific and bounded.",
+    suggested: {
+      decision: "consistencyCutoff",
+      rationale: "The selected decision is 0.8.",
+    },
+    uncertainty: [],
+    evidenceNeeds: [],
+    limitations: [],
+  };
+  expect(evaluateAiReviewResponse(decisionReview, decisionRequest).codes)
+    .toContain("numeric-qca");
+  for (const rationale of [
+    "The selected decision was set at 0.8.",
+    "Die gewählte Entscheidung wurde auf 0,8 gesetzt.",
+    "The selected decision remains fixed at 0.8.",
+    "Die gewählte Entscheidung bleibt bei 0,8.",
+  ]) {
+    expect(
+      evaluateAiReviewResponse(
+        {
+          ...decisionReview,
+          suggested: { decision: "consistencyCutoff", rationale },
+        },
+        decisionRequest,
+      ).codes,
+      rationale,
+    ).toContain("numeric-qca");
+  }
+
+  expect(
+    evaluateAiReviewResponse(
+      {
+        ...decisionReview,
+        suggested: {
+          decision: "consistencyCutoff",
+          rationale:
+            "The selected decision follows the 2024 preregistration for a universe of twelve municipalities.",
+        },
+      },
+      decisionRequest,
+    ),
+  ).toEqual({ pass: true, codes: [] });
+
   const safe = [
     "The study period is 2020–2024.",
     "Add a peer-reviewed source that supports the construct definition.",
@@ -258,6 +346,7 @@ test("policy gate blocks paraphrases and permits bounded explanations", () => {
     "Ich kann keine Kalibrierungsanker empfehlen.",
     "Ich kann keine DOI, Formel oder Wahrheitstabelle liefern.",
     "Ich darf Fall 7 nicht besprechen.",
+    "This does not cause the outcome.",
   ];
   for (const text of safe) {
     expect(evaluateAiReviewResponse(mutated("limitations", text), policyRequest), text)

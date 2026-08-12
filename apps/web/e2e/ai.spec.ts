@@ -42,6 +42,19 @@ test("AI route rejects legacy and forbidden-data payloads before provider access
   });
   expect(identifierInFreeText.status()).toBe(400);
 
+  for (const phoneNumber of ["+49 170 1234567", "0170 1234567", "(202) 555-0123"]) {
+    const phoneInFreeText = await request.post("/api/ai/assist", {
+      data: {
+        ...briefPayload,
+        payload: {
+          ...briefPayload.payload,
+          caseUniverse: `Compared municipalities; contact ${phoneNumber}`,
+        },
+      },
+    });
+    expect(phoneInFreeText.status(), phoneNumber).toBe(400);
+  }
+
   const numericGate = await request.post("/api/ai/assist", {
     data: { version: "v2", task: "decision_rationale_review", locale: "en", payload: { decision: "frequencyCutoff", rationale: "Theory", cutoff: 2 } },
   });

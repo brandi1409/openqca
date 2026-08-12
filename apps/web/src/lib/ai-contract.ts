@@ -90,6 +90,7 @@ export type AiRequestPrivacyCode =
 
 const EMAIL_ADDRESS = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/iu;
 const LABELED_CONTACT = /\b(?:tel(?:ephone)?|phone|mobile|mobil|handy)\s*[:=]?\s*\+?[\d()\s.-]{7,}/iu;
+const PHONE_CANDIDATE = /(?<![\p{L}\p{N}])(?:\+\p{N}{9,15}|(?:\+\p{N}{1,3}[\s.-]?)?(?:\(\p{N}{2,5}\)|\p{N}{1,5})(?:[\s./-]\p{N}{2,10}){1,4})(?![\p{L}\p{N}])/gu;
 const LABELED_IDENTIFIER = /\b(?:ssn|social security|passport|personalausweis|patient(?:en)?[- ]?id|participant[- ]?id|teilnehmer[- ]?id|matrikelnummer)\s*[:=#-]?\s*[A-Z0-9-]{3,}\b/iu;
 const GENERIC_CASE_IDENTIFIER = /\b(?:case|fall|participant|teilnehmer|patient)[ _-]*\p{N}+\b/iu;
 const RAW_FILE_REFERENCE = /\.(?:csv|tsv|xlsx?|sav|dta|txt)\b/iu;
@@ -104,6 +105,20 @@ function looksLikeDelimitedRow(value: string): boolean {
       return cells.length >= 3 && cells.slice(1).filter((cell) => NUMERIC_CELL.test(cell)).length >= 2;
     }),
   );
+}
+
+function looksLikePhoneNumber(value: string): boolean {
+  return [...value.normalize("NFKC").matchAll(PHONE_CANDIDATE)].some((match) => {
+    const candidate = match[0];
+    const digits = candidate.replace(/[^\p{N}]/gu, "");
+    if (digits.length < 9 || digits.length > 15) return false;
+    const separators = candidate.match(/[\s./-]/gu)?.length ?? 0;
+    const groupingSeparators = candidate.match(/[\s-]/gu)?.length ?? 0;
+    return candidate.startsWith("+") ||
+      candidate.includes("(") ||
+      separators >= 2 ||
+      (candidate.startsWith("0") && groupingSeparators >= 1);
+  });
 }
 
 function containsSensitiveValue(textValue: string, sensitiveValues: readonly string[]): boolean {
@@ -130,7 +145,12 @@ export function aiRequestPrivacyIssues(
     if (looksLikeDelimitedRow(value) || RAW_FILE_REFERENCE.test(value) || JSON_ROW.test(value)) {
       issues.add("raw-row");
     }
-    if (EMAIL_ADDRESS.test(value) || LABELED_CONTACT.test(value) || LABELED_IDENTIFIER.test(value)) {
+    if (
+      EMAIL_ADDRESS.test(value) ||
+      LABELED_CONTACT.test(value) ||
+      looksLikePhoneNumber(value) ||
+      LABELED_IDENTIFIER.test(value)
+    ) {
       issues.add("direct-identifier");
     }
     if (GENERIC_CASE_IDENTIFIER.test(value) || containsSensitiveValue(value, sensitiveValues)) {
