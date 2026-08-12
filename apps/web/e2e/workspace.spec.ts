@@ -75,12 +75,12 @@ test("AI review stays local until required fields are complete", async ({ page }
   await loadDemo(page);
   await openDestination(page, "decisions");
   const rationale = page.getByRole("region", { name: "Begründung prüfen" }).first();
-  await rationale.getByRole("button", { name: "Begründung prüfen" }).click();
+  await rationale.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
   await expect(rationale.getByRole("status")).toHaveText(
     "Füllen Sie alle erforderlichen Felder aus und begrenzen Sie jeden Eintrag auf 2.000 Zeichen, bevor Sie eine KI-Prüfung vorbereiten.",
   );
-  await expect(rationale.getByText("Geprüfte Nutzlast", { exact: true })).toHaveCount(0);
-  await expect(rationale.getByRole("button", { name: "Geprüfte Nutzlast senden" })).toHaveCount(0);
+  await expect(rationale.getByText("Anfragevorschau", { exact: true })).toHaveCount(0);
+  await expect(rationale.getByRole("button", { name: "An KI-Coach senden" })).toHaveCount(0);
   expect(requests).toBe(0);
 });
 
@@ -103,8 +103,8 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
 
   await openDestination(page, "research");
   const brief = page.getByRole("region", { name: "Forschungsdesign klären" });
-  await brief.getByRole("button", { name: "Forschungsdesign klären" }).click();
-  await expect(brief.getByText("Geprüfte Nutzlast", { exact: true })).toBeVisible();
+  await brief.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
+  await expect(brief.getByText("Anfragevorschau", { exact: true })).toBeVisible();
   await expect(brief.locator("dt")).toHaveText([
     "Research question",
     "Case universe",
@@ -120,8 +120,8 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
     "Die Bedingungen wurden ausschließlich zur Demonstration des QCA-Rechenwegs konstruiert.",
   ]);
   expect(requests).toHaveLength(0);
-  await brief.getByRole("button", { name: "Geprüfte Nutzlast senden" }).click();
-  await expect(brief.getByText("Anbieter: mock · test-model")).toBeVisible();
+  await brief.getByRole("button", { name: "An KI-Coach senden" }).click();
+  await expect(brief.getByText("Erstellt mit: mock · test-model")).toBeVisible();
   expect(requests).toHaveLength(1);
   expect(requests[0]).toEqual({
     version: "v1",
@@ -140,12 +140,12 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
   const decisionText = "Die Entscheidung folgt der begrenzten Fallzahl und dem vorab festgelegten Vergleichsdesign.";
   await page.locator("textarea").first().fill(`  ${decisionText}  `);
   const rationale = page.getByRole("region", { name: "Begründung prüfen" }).first();
-  await rationale.getByRole("button", { name: "Begründung prüfen" }).click();
+  await rationale.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
   await expect(rationale.locator("dt")).toHaveText(["Decision", "Rationale"]);
   await expect(rationale.locator("dd")).toHaveText(["frequencyCutoff", decisionText]);
   expect(requests).toHaveLength(1);
-  await rationale.getByRole("button", { name: "Geprüfte Nutzlast senden" }).click();
-  await expect(rationale.getByText("Anbieter: mock · test-model")).toBeVisible();
+  await rationale.getByRole("button", { name: "An KI-Coach senden" }).click();
+  await expect(rationale.getByText("Erstellt mit: mock · test-model")).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[1]).toEqual({
     version: "v1",
@@ -157,7 +157,7 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
   await page.getByTestId("calibration-view-doc").click();
   const evidence = page.getByRole("region", { name: "Evidenzlücken prüfen" }).first();
   await evidence.scrollIntoViewIfNeeded();
-  await evidence.getByRole("button", { name: "Evidenzlücken prüfen" }).click();
+  await evidence.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
   await expect(evidence.locator("dt")).toHaveText([
     "Variable",
     "Set label",
@@ -172,8 +172,8 @@ test("all three AI jobs expose and send only their normalized reviewed payload",
   ]);
   expect((await evidence.locator("dt").allTextContents()).join(" ")).not.toMatch(/Fall|Case|Row|Datei|File/);
   expect(requests).toHaveLength(2);
-  await evidence.getByRole("button", { name: "Geprüfte Nutzlast senden" }).click();
-  await expect(evidence.getByText("Anbieter: mock · test-model")).toBeVisible();
+  await evidence.getByRole("button", { name: "An KI-Coach senden" }).click();
+  await expect(evidence.getByText("Erstellt mit: mock · test-model")).toBeVisible();
   expect(requests).toHaveLength(3);
   expect(requests[2]).toEqual({
     version: "v1",

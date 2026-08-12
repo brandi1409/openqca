@@ -1547,11 +1547,34 @@ input[type="number"] {
 
 .oq-ai-assist {
   display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--ai) 34%, var(--line));
+  border-radius: var(--radius-surface);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ai) 9%, transparent), transparent 42%),
+    var(--panel);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
-.oq-ai-assist__privacy,
+.oq-ai-assist__header,
+.oq-ai-assist__preview-head,
+.oq-ai-assist__result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.oq-ai-assist__header h3 {
+  margin: 3px 0 var(--space-1);
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.oq-ai-assist__header p,
+.oq-ai-assist__preview > p,
 .oq-ai-assist__note {
   max-width: 68ch;
   margin: 0;
@@ -1560,27 +1583,80 @@ input[type="number"] {
   line-height: 1.5;
 }
 
-.oq-ai-assist__trigger {
-  justify-self: start;
-  border-color: color-mix(in srgb, var(--ai) 30%, var(--line));
-  background: color-mix(in srgb, var(--ai) 8%, var(--panel));
+.oq-ai-assist__eyebrow {
+  color: var(--ai);
+  font-size: 11px;
+  letter-spacing: .08em;
+  font-weight: 700;
 }
 
+.oq-ai-assist__boundary,
+.oq-ai-assist__preview-head span {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--ai) 24%, var(--line));
+  border-radius: 999px;
+  color: var(--ink-2);
+  background: var(--panel-2);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.oq-ai-assist__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: ai-step;
+}
+
+.oq-ai-assist__steps li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--ink-2);
+  font-size: 12px;
+  counter-increment: ai-step;
+}
+
+.oq-ai-assist__steps li::before {
+  display: grid;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ai);
+  background: color-mix(in srgb, var(--ai) 12%, var(--panel));
+  content: counter(ai-step);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.oq-ai-assist__trigger {
+  justify-self: start;
+  border-color: color-mix(in srgb, var(--ai) 38%, var(--line));
+  background: color-mix(in srgb, var(--ai) 10%, var(--panel));
+}
+
+.oq-ai-assist__preview,
 .oq-ai-assist__result {
   display: grid;
   gap: var(--space-3);
-  margin-top: var(--space-2);
   padding: var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--ai) 28%, var(--line));
-  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--ai) 25%, var(--line));
+  border-radius: var(--radius-control);
   background: var(--panel-2);
 }
 
+.oq-ai-assist__preview dl {
+  overflow-wrap: anywhere;
+}
+
 .oq-ai-assist__result-head {
-  display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
 }
 
 .oq-ai-assist__result-head span,
@@ -1590,12 +1666,45 @@ input[type="number"] {
   font-size: 12px;
 }
 
+.oq-ai-assist__result > div:not(.oq-ai-assist__result-head):not(.oq-ai-assist__text) {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.oq-ai-assist__result ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--ink-2);
+}
+
 .oq-ai-assist__text {
   max-width: 72ch;
+  padding-left: var(--space-3);
+  border-left: 2px solid color-mix(in srgb, var(--ai) 45%, var(--line));
   color: var(--ink-2);
   font-size: 13.5px;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+@media (max-width: 620px) {
+  .oq-ai-assist {
+    padding: var(--space-3);
+  }
+
+  .oq-ai-assist__header,
+  .oq-ai-assist__preview-head {
+    display: grid;
+  }
+
+  .oq-ai-assist__boundary,
+  .oq-ai-assist__preview-head span {
+    justify-self: start;
+  }
+
+  .oq-ai-assist__steps {
+    grid-template-columns: 1fr;
+  }
 }
 
 body:has(> .oq-workspace-shell) {

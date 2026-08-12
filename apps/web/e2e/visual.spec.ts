@@ -47,8 +47,8 @@ for (const colorScheme of SCHEMES) {
         await loadDemo(page);
         await openDestination(page, "research");
         const brief = page.getByRole("region", { name: "Forschungsdesign klären" });
-        await brief.getByRole("button", { name: "Forschungsdesign klären" }).click();
-        await expect(brief.getByText("Geprüfte Nutzlast", { exact: true })).toBeVisible();
+        await brief.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
+        await expect(brief.getByText("Anfragevorschau", { exact: true })).toBeVisible();
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         );
