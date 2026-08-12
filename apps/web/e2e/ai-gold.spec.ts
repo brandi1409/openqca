@@ -352,6 +352,28 @@ test("policy gate blocks paraphrases and permits bounded explanations", () => {
     ),
   ).toEqual({ pass: true, codes: [] });
 
+  expect(
+    evaluateAiReviewResponse(
+      {
+        ...decisionReview,
+        status: "incomplete",
+        review:
+          "The provided rationale requires a more specific substantive basis for the selected decision. The current statement regarding the use of a published scale and its relation to set membership is too general to fully justify the selected decision.",
+        suggested: { decision: "consistencyCutoff", rationale: "" },
+        uncertainty: [
+          "The specific substantive basis for the selected decision is not clear.",
+        ],
+        evidenceNeeds: [
+          "A more detailed explanation of how the published scale informs the selected decision is needed.",
+        ],
+        limitations: [
+          "The rationale lacks concrete specificity regarding the substantive basis.",
+        ],
+      },
+      decisionRequest,
+    ),
+  ).toEqual({ pass: true, codes: [] });
+
   const safe = [
     "The study period is 2020–2024.",
     "The study period runs from May 2024 to June 2025.",
