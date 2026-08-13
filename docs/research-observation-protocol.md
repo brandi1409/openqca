@@ -2,11 +2,11 @@
 
 ## Zweck und Grenze
 
-Fünf formative Einzelsitzungen prüfen, ob Forschende ohne R von einem sicheren
-Import zu einer vorläufigen Antwort, bestätigten Entscheidungen und einem
-Defense-ready Replikationspaket gelangen. Die Untersuchung bewertet die
-Oberfläche, nicht die Forschung der Teilnehmenden. Die Schwellen sind
-Entscheidungshilfen für die nächste Produktiteration, keine Populationsschätzung
+Fünf formative **Erstnutzungs-Einzelsitzungen** prüfen, ob Forschende, die R
+nicht für QCA verwenden, von einem sicheren Import zu einer vorläufigen Antwort,
+bestätigten Entscheidungen und einem Defense-ready Replikationspaket gelangen.
+Die Untersuchung bewertet die Oberfläche, nicht die Forschung der Teilnehmenden.
+Die Schwellen sind Entscheidungshilfen für die nächste Produktiteration, keine Populationsschätzung
 und kein Nachweis einer kausalen Wirkung.
 
 Der ausführbare Sitzungsleitfaden, die zweisprachigen Einladungstexte, das
@@ -22,6 +22,8 @@ Schlüssel.
 
 - fünf Forschende, jeweils 60 Minuten;
 - mindestens zwei Sitzungen auf Deutsch und zwei auf Englisch;
+- keine vorherige Nutzung, Ansicht, Demonstration oder Mitwirkung an openQCA;
+- keine direkte Abhängigkeit vom Recruiter oder Moderator;
 - ausschließlich bereitgestellte synthetische, nicht identifizierende Daten und
   vorformulierte Forschungsinhalte;
 - keine Projekte, Dateien, Fallnamen, Rohdaten oder Texte der Teilnehmenden;
@@ -94,6 +96,7 @@ Zulässige Felder:
 - `provisional_interpretation`: `correct|partial|incorrect`
 - `defense_ready`: `complete|assisted|abandoned`
 - `gate_interpretation`: `correct|partial|incorrect`
+- `causal_interpretation`: `correct|partial|incorrect`
 - `defense_time`: `under_5m|5_to_10m|over_10m`
 - `defense_blocker`: `none|checklist|calibration_status|analysis_confirmation|navigation|other`
 
@@ -122,17 +125,28 @@ die AI-Prüfung sofort.
 
 ## Aggregation und Löschung
 
-Eine Beobachtungszeile enthält ausschließlich die oben definierten Kategorien.
-Sie wird nach jeder Sitzung einzeln in eindimensionale Kohortenzähler sowie die
-vorab definierten Stop-Gate-Zähler überführt und sofort gelöscht, spätestens
-jedoch innerhalb von 24 Stunden. Vor Abschluss der fünf Sitzungen existiert
-dieser Zwischenstand nur authentifiziert verschlüsselt unter einem getrennt
-geschützten, ausschließlich für diese Kohorte erzeugten Schlüssel. Erst die
-vollständige Kohorte wird als lesbare Summe ausgegeben; der Schlüssel wird dann
-gelöscht. Die lesbare Datei enthält keine Zeilen, vollständigen
-Merkmalskombinationen oder explorativen Kreuztabellen. Es gibt keine Namen,
-Konten, IP-Adressen, User-Agents, Geräte-, Sitzungs- oder Einwilligungs-IDs,
-Zeitstempel, URLs, Referrer oder Freitextfelder.
+Eine Beobachtungszeile der Schemaversion `v2` enthält ausschließlich die oben
+definierten Kategorien. Nur eine abgeschlossene Sitzung wird in
+eindimensionale Kohortenzähler sowie die vorab definierten Stop-Gate-Zähler
+überführt und danach sofort gelöscht, spätestens innerhalb von 24 Stunden. Bei
+Abbruch endet jede Erfassung; die Zeile wird gelöscht, nicht aggregiert und
+nicht zu den fünf Sitzungen gezählt. `abandoned` bezeichnet ausschließlich ein
+direkt beobachtetes Aufgabenergebnis, wenn die Person die Sitzung fortsetzt.
+Nach der irreversiblen, nicht verknüpfbaren Aggregation einer abgeschlossenen
+Sitzung kann ein Einzelbeitrag weder gefunden noch entfernt werden.
+
+Vor Abschluss der fünf Sitzungen existiert der Zwischenstand nur authentifiziert
+verschlüsselt unter einem getrennt geschützten, ausschließlich für diese Kohorte
+erzeugten Schlüssel. Erst die vollständige Kohorte wird als lesbare Summe
+ausgegeben; der Schlüssel wird dann gelöscht. Die lesbare Datei enthält keine
+Zeilen, vollständigen Merkmalskombinationen oder explorativen Kreuztabellen. Es
+gibt keine Namen, Konten, IP-Adressen, User-Agents, Geräte-, Sitzungs- oder
+Einwilligungs-IDs, Zeitstempel, URLs, Referrer oder Freitextfelder. Ein vor
+Rekrutierung freigegebener Autorisierungsnachweis bestimmt privaten Speicherort,
+Zugriffsrolle, Verschlüsselung im Ruhezustand, Backup-Verbot oder zulässige
+nicht-identifizierende Archivierung, Aufbewahrungsfrist, Löschzeitpunkt und
+verantwortliche Person für die lesbare Summe sowie die getrennten Kontakt-,
+Screening-, Termin- und Einwilligungsunterlagen.
 
 ## Produktmetriken ohne Forschungsinhalte
 
@@ -191,8 +205,8 @@ Abgeleitete Kennzahlen:
 - mindestens vier von fünf bestätigen alle Entscheidungen ohne Hilfe und
   erklären die Invalidierung korrekt;
 - mindestens vier von fünf erreichen Defense readiness ohne Hilfe;
-- alle fünf unterscheiden vorläufige Antwort, prüfbares Paket und kausale
-  Behauptung korrekt;
+- alle fünf klassifizieren Vorläufigkeit, Prüfbarkeit des Pakets und die Grenze
+  zu einer kausalen Behauptung jeweils korrekt;
 - je AI-Aufgabe mindestens drei von fünf hilfreiche und mindestens vier von fünf
   hilfreiche oder gemischte nutzbare Antworten;
 - null numerische Empfehlungen, erfundene Quellen, kausale Behauptungen,
@@ -201,3 +215,23 @@ Abgeleitete Kennzahlen:
 Jeder Verstoß gegen das letzte Gate blockiert die Ausweitung. Nach der Reparatur
 werden das vollständige DE/EN-Goldset und die betroffene Beobachtungsstufe erneut
 ausgeführt.
+
+## Beleggebundene Iterationsentscheidung
+
+Nach Sitzung fünf werden alle fehlgeschlagenen Gates samt Zähler in einem
+separaten, nicht personenbezogenen Entscheidungsnachweis aufgeführt. Genau eine
+kleinste behebbare Barriere wird in dieser festen Reihenfolge gewählt:
+
+1. verbotener AI-Output oder Datenschutz-/Sicherheitsfehler;
+2. fehlerhafte Grenze zwischen vorläufiger Antwort, prüfbarem Paket und
+   kausaler Behauptung;
+3. Import/Aktivierung, Entscheidungsabschluss oder Defense Readiness;
+4. verfehlte DE/EN-Verteilung;
+5. Zeit-, Blocker- und AI-Nützlichkeitsverteilungen nur als deskriptive
+   Tie-Breaker.
+
+Der Nachweis nennt Belegfelder, kleinsten Fix, verantwortliche Person,
+Akzeptanzprüfung und die erneut auszuführende Beobachtungsstufe. Er darf keine
+Motive, Prävalenz, Kausalwirkung oder nicht erhobene Teilnehmendenerklärungen
+behaupten. Bestehen alle Gates, wird ausdrücklich kein evidenzgestützter
+Produktfix ausgewählt.

@@ -43,6 +43,7 @@ const FIELD_ENUMS = {
   provisional_interpretation: ["correct", "partial", "incorrect"],
   defense_ready: ["complete", "assisted", "abandoned"],
   gate_interpretation: ["correct", "partial", "incorrect"],
+  causal_interpretation: ["correct", "partial", "incorrect"],
   defense_time: ["under_5m", "5_to_10m", "over_10m"],
   defense_blocker: ["none", "checklist", "calibration_status", "analysis_confirmation", "navigation", "other"],
 };
@@ -100,7 +101,7 @@ function increment(histogram, value) {
 
 function createEmptyAggregate() {
   return {
-    schemaVersion: "v1",
+    schemaVersion: "v2",
     cohortSize: 0,
     languageMix: { de: 0, en: 0, requirementMet: false },
     observations: Object.fromEntries(
@@ -223,7 +224,11 @@ function addSession(aggregate, session) {
     session.invalidation_understood === "yes";
   if (decisionsComplete) aggregate.decisions.completeWithoutAssistance += 1;
 
-  if (session.provisional_interpretation === "correct" && session.gate_interpretation === "correct") {
+  if (
+    session.provisional_interpretation === "correct" &&
+    session.gate_interpretation === "correct" &&
+    session.causal_interpretation === "correct"
+  ) {
     aggregate.conceptualBoundary.correct += 1;
   }
 
@@ -279,7 +284,7 @@ function validateAggregate(raw) {
     ],
     "aggregate",
   );
-  if (raw.schemaVersion !== "v1") throw new Error("aggregate.schemaVersion must be v1.");
+  if (raw.schemaVersion !== "v2") throw new Error("aggregate.schemaVersion must be v2.");
   validateCount(raw.cohortSize, 5, "aggregate.cohortSize");
   exactKeys(raw.languageMix, ["de", "en", "requirementMet"], "aggregate.languageMix");
   validateCount(raw.languageMix.de, raw.cohortSize, "aggregate.languageMix.de");
@@ -336,12 +341,14 @@ function validateAggregate(raw) {
   const conceptualMinimum = Math.max(
     0,
     raw.observations.provisional_interpretation.correct +
-      raw.observations.gate_interpretation.correct -
-      raw.cohortSize,
+      raw.observations.gate_interpretation.correct +
+      raw.observations.causal_interpretation.correct -
+      2 * raw.cohortSize,
   );
   const conceptualMaximum = Math.min(
     raw.observations.provisional_interpretation.correct,
     raw.observations.gate_interpretation.correct,
+    raw.observations.causal_interpretation.correct,
   );
   if (
     raw.conceptualBoundary.correct < conceptualMinimum ||
@@ -453,7 +460,7 @@ export function createObservationTemplate(locale) {
     ]),
   );
   return {
-    schemaVersion: "v1",
+    schemaVersion: "v2",
     sessions: [
       {
         locale,
@@ -478,6 +485,7 @@ export function createObservationTemplate(locale) {
         provisional_interpretation: "incorrect",
         defense_ready: "abandoned",
         gate_interpretation: "incorrect",
+        causal_interpretation: "incorrect",
         defense_time: "over_10m",
         defense_blocker: "other",
         ai,
@@ -488,8 +496,8 @@ export function createObservationTemplate(locale) {
 
 export function aggregateResearchObservations(input) {
   exactKeys(input, ["schemaVersion", "sessions"], "input");
-  if (input.schemaVersion !== "v1" || !Array.isArray(input.sessions)) {
-    throw new Error("Expected { schemaVersion: 'v1', sessions: [...] }.");
+  if (input.schemaVersion !== "v2" || !Array.isArray(input.sessions)) {
+    throw new Error("Expected { schemaVersion: 'v2', sessions: [...] }.");
   }
   if (input.sessions.length < 1 || input.sessions.length > 5) {
     throw new Error("One to five session rows are required.");
@@ -521,7 +529,7 @@ function encryptPartialAggregate(aggregate, key) {
     cipher.final(),
   ]);
   return {
-    schemaVersion: "v1",
+    schemaVersion: "v2",
     kind: PARTIAL_KIND,
     algorithm: PARTIAL_ALGORITHM,
     iv: iv.toString("base64"),
@@ -546,7 +554,7 @@ function decryptPartialAggregate(envelope, key) {
     "partial aggregate",
   );
   if (
-    envelope.schemaVersion !== "v1" ||
+    envelope.schemaVersion !== "v2" ||
     envelope.kind !== PARTIAL_KIND ||
     envelope.algorithm !== PARTIAL_ALGORITHM
   ) {

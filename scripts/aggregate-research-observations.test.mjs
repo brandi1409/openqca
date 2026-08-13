@@ -52,6 +52,7 @@ function session(locale) {
     provisional_interpretation: "correct",
     defense_ready: "complete",
     gate_interpretation: "correct",
+    causal_interpretation: "correct",
     defense_time: "under_5m",
     defense_blocker: "none",
     ai: {
@@ -64,7 +65,7 @@ function session(locale) {
 
 function passingInput() {
   return {
-    schemaVersion: "v1",
+    schemaVersion: "v2",
     sessions: [session("de"), session("de"), session("en"), session("en"), session("de")],
   };
 }
@@ -106,6 +107,7 @@ test("fails only the affected final gates without weakening other aggregates", (
   input.sessions[0].activation = "assisted";
   input.sessions[1].activation = "assisted";
   input.sessions[0].provisional_interpretation = "partial";
+  input.sessions[0].causal_interpretation = "incorrect";
   input.sessions[0].ai.brief_clarify.prohibited_output = "numeric_recommendation";
   const aggregate = aggregateResearchObservations(input);
   assert.equal(aggregate.stopGates.activationWithoutAssistance, false);
@@ -113,6 +115,24 @@ test("fails only the affected final gates without weakening other aggregates", (
   assert.equal(aggregate.stopGates.ai.brief_clarify, false);
   assert.equal(aggregate.stopGates.ai.calibration_evidence_gaps, true);
   assert.equal(aggregate.stopGates.allPassed, false);
+});
+
+test("causal interpretation independently gates the conceptual boundary", () => {
+  const input = passingInput();
+  input.sessions[0].causal_interpretation = "incorrect";
+  const aggregate = aggregateResearchObservations(input);
+  assert.equal(aggregate.observations.provisional_interpretation.correct, 5);
+  assert.equal(aggregate.observations.gate_interpretation.correct, 5);
+  assert.equal(aggregate.observations.causal_interpretation.incorrect, 1);
+  assert.equal(aggregate.conceptualBoundary.correct, 4);
+  assert.equal(aggregate.stopGates.conceptualBoundary, false);
+  assert.equal(aggregate.stopGates.allPassed, false);
+});
+
+test("rejects the pre-causal-boundary v1 schema", () => {
+  const input = passingInput();
+  input.schemaVersion = "v1";
+  assert.throws(() => aggregateResearchObservations(input), /schemaVersion: 'v2'/);
 });
 
 test("rejects identifiers, free text, missing tasks, and non-enum values", () => {
@@ -158,7 +178,7 @@ test("rejects impossible AI and decision cross-field combinations", () => {
 
 test("rejects a language sequence that can no longer satisfy two DE and two EN", () => {
   const impossibleMix = {
-    schemaVersion: "v1",
+    schemaVersion: "v2",
     sessions: [session("de"), session("de"), session("de"), session("de")],
   };
   assert.throws(
@@ -183,7 +203,7 @@ test("CLI rejects infeasible decision and AI marginals in prior aggregates", () 
     invalidDecisions.observations.frequency_confirmation["1"] = 0;
     invalidDecisions.observations.frequency_confirmation["0"] = 5;
     writeFileSync(output, JSON.stringify(invalidDecisions), { mode: 0o600 });
-    writeFileSync(source, JSON.stringify({ schemaVersion: "v1", sessions: [session("en")] }), {
+    writeFileSync(source, JSON.stringify({ schemaVersion: "v2", sessions: [session("en")] }), {
       mode: 0o600,
     });
     assert.throws(run, /required-decision histogram/);
@@ -242,7 +262,7 @@ test("CLI encrypts partial counts, then emits only the complete five-session agg
   try {
     for (const [index, locale] of ["de", "de", "en", "en", "de"].entries()) {
       const source = join(directory, `session-${index}.json`);
-      writeFileSync(source, JSON.stringify({ schemaVersion: "v1", sessions: [session(locale)] }), {
+      writeFileSync(source, JSON.stringify({ schemaVersion: "v2", sessions: [session(locale)] }), {
         mode: 0o600,
       });
       execFileSync(
@@ -288,7 +308,7 @@ test(
     try {
       for (const [index, locale] of ["de", "de", "en", "en"].entries()) {
         const source = join(directory, `accepted-${index}.json`);
-        writeFileSync(source, JSON.stringify({ schemaVersion: "v1", sessions: [session(locale)] }), {
+        writeFileSync(source, JSON.stringify({ schemaVersion: "v2", sessions: [session(locale)] }), {
           mode: 0o600,
         });
         execFileSync(
@@ -298,7 +318,7 @@ test(
       }
       lockedDirectory = mkdtempSync(join(directory, "locked-"));
       const source = join(lockedDirectory, "final.json");
-      writeFileSync(source, JSON.stringify({ schemaVersion: "v1", sessions: [session("de")] }), {
+      writeFileSync(source, JSON.stringify({ schemaVersion: "v2", sessions: [session("de")] }), {
         mode: 0o600,
       });
       chmodSync(lockedDirectory, 0o500);
@@ -328,7 +348,7 @@ test("CLI preserves source and encrypted partial aggregate when the next session
   try {
     for (let index = 0; index < 3; index += 1) {
       const source = join(directory, `accepted-${index}.json`);
-      writeFileSync(source, JSON.stringify({ schemaVersion: "v1", sessions: [session("de")] }), {
+      writeFileSync(source, JSON.stringify({ schemaVersion: "v2", sessions: [session("de")] }), {
         mode: 0o600,
       });
       execFileSync(
@@ -338,7 +358,7 @@ test("CLI preserves source and encrypted partial aggregate when the next session
     }
     const before = readFileSync(output, "utf8");
     const rejected = join(directory, "rejected.json");
-    writeFileSync(rejected, JSON.stringify({ schemaVersion: "v1", sessions: [session("de")] }), {
+    writeFileSync(rejected, JSON.stringify({ schemaVersion: "v2", sessions: [session("de")] }), {
       mode: 0o600,
     });
     assert.throws(() =>
@@ -363,7 +383,7 @@ test("CLI authenticates partial state before deleting the next session", () => {
   const next = join(directory, "next.json");
   const key = createResearchKey(directory);
   try {
-    writeFileSync(first, JSON.stringify({ schemaVersion: "v1", sessions: [session("de")] }), {
+    writeFileSync(first, JSON.stringify({ schemaVersion: "v2", sessions: [session("de")] }), {
       mode: 0o600,
     });
     execFileSync(
@@ -374,7 +394,7 @@ test("CLI authenticates partial state before deleting the next session", () => {
     tampered.unexpected = true;
     writeFileSync(output, JSON.stringify(tampered), { mode: 0o600 });
     const before = readFileSync(output, "utf8");
-    writeFileSync(next, JSON.stringify({ schemaVersion: "v1", sessions: [session("en")] }), {
+    writeFileSync(next, JSON.stringify({ schemaVersion: "v2", sessions: [session("en")] }), {
       mode: 0o600,
     });
     assert.throws(() =>
