@@ -58,11 +58,16 @@ export function InfoHint({ title, body, formula }: InfoHintProps) {
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
-    // capture: true, damit auch Scrollen INNERHALB von Tabellen-Containern schließt
-    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    // Der Öffnungsklick darf nicht von einem noch ausstehenden Scroll-Event
+    // des vorausgehenden scrollIntoView geschlossen werden. Ab dem nächsten
+    // Frame schließt jedes echte Weiterscrollen den festen Dialog weiterhin.
+    const scrollListenerFrame = window.requestAnimationFrame(() => {
+      window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    });
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.cancelAnimationFrame(scrollListenerFrame);
       window.removeEventListener("scroll", onScroll, { capture: true });
     };
   }, [open]);

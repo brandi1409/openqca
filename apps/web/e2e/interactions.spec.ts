@@ -38,14 +38,17 @@ test("A2.9 ⓘ-Popover — vollständig im Viewport, Escape schließt", async ({
   await loadDemo(page);
   await openDestination(page, "evidence");
 
-  const infoBtn = page.locator("main button[aria-label]").first();
-  await infoBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await infoBtn.click();
+  const infoBtn = page.locator("main button[aria-expanded][aria-label]").first();
+  const title = await infoBtn.getAttribute("aria-label");
+  expect(title).toBeTruthy();
+  await infoBtn.evaluate((element) => {
+    element.scrollIntoView({ block: "center" });
+    (element as HTMLButtonElement).click();
+  });
 
-  // InfoHint-Popover eindeutig über den „Mehr in der Methodik"-Link identifizieren.
-  const dialog = page
-    .getByRole("dialog")
-    .filter({ has: page.getByRole("link", { name: /Mehr in der Methodik/ }) });
+  // Der konkrete aria-label verbindet Trigger und Dialog; ein globales
+  // button[aria-label] würde inzwischen auch andere Workspace-Aktionen treffen.
+  const dialog = page.getByRole("dialog", { name: title! });
   await expect(dialog).toBeVisible();
 
   const box = await dialog.boundingBox();
