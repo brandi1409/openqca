@@ -16,6 +16,9 @@ import {
 } from "@/lib/calibration-model";
 import type { CalibrationEvaluation } from "@/lib/calibration-analysis";
 import { cellToNumber, numericColumns } from "@/lib/dataset-columns";
+import { AI_CONTRACT_VERSION, type AiAssistRequest, type AiReviewResponse } from "@/lib/ai-contract";
+import type { AiAdoptionMetadata } from "@/lib/ai-reviewed-summary";
+import { AiAssist } from "@/components/AiAssist";
 import { useLocale } from "@/i18n/locale";
 import { t, type DictKey } from "@/i18n/dict";
 import { SectionHeading } from "@/components/ui";
@@ -67,6 +70,9 @@ export function CalibrationQuick({
   anchors,
   setAnchors,
   evaluation,
+  sensitiveValues,
+  aiSourceRevision,
+  onAiAdopt,
   onDocument,
 }: {
   ds: RawDataset;
@@ -76,6 +82,16 @@ export function CalibrationQuick({
   anchors: Anchors;
   setAnchors: (a: Anchors) => void;
   evaluation: CalibrationEvaluation;
+  /** Fallkennungen — die lokale Datenschutzprüfung sperrt sie vor dem Versand. */
+  sensitiveValues: readonly string[];
+  /** Quellrevision des KI-Ziels — exakt dieselbe Verdrahtung wie in der Werkbank. */
+  aiSourceRevision: (column: string) => string;
+  /** Feldgenaue Übernahme der vorgeschlagenen Definition (setzt Bestätigungen zurück). */
+  onAiAdopt: (
+    review: AiReviewResponse,
+    metadata: AiAdoptionMetadata,
+    submittedRequest: AiAssistRequest,
+  ) => boolean | void | Promise<boolean | void>;
   /** Wechselt in die Dokumentations-Ansicht und fokussiert dort die Variable. */
   onDocument: (column: string) => void;
 }) {
@@ -265,6 +281,17 @@ export function CalibrationQuick({
         }
 
         const isOpen = openColumn === column;
+
+        async function adoptAiDefinition(
+          review: AiReviewResponse,
+          metadata: AiAdoptionMetadata,
+          submittedRequest: AiAssistRequest,
+        ): Promise<boolean | void> {
+          const adopted = await onAiAdopt(review, metadata, submittedRequest);
+          if (adopted === false) return false;
+          onDocument(column);
+          return adopted;
+        }
 
         return (
           <details
@@ -465,6 +492,34 @@ export function CalibrationQuick({
                   </p>
                 )}
               </>
+            )}
+
+            {/* KI-Coach nur für das aktuell geöffnete Set — so existiert nie mehr
+                als ein Coach gleichzeitig. Er steht direkt am Arbeitskontext
+                (Methode, Anker, Kurve), nicht am Kartenende. Nutzlast,
+                Quellrevision, Fallkennungen und Übernahme-Handler sind exakt
+                dieselben wie in der Werkbank; Vorschläge bleiben reine Prosa. */}
+            {isOpen && (
+              <div className="oq-calibration-quick__coach">
+                <AiAssist
+                  label={locale === "en" ? "Review evidence gaps" : "Evidenzlücken prüfen"}
+                  request={() => ({
+                    version: AI_CONTRACT_VERSION,
+                    task: "calibration_evidence_gaps",
+                    locale,
+                    payload: {
+                      variable: column,
+                      setLabel: spec.set.setLabel,
+                      definition: spec.set.definition,
+                      rationale: [spec.set.unit, spec.set.scopePopulation, spec.set.timePeriod].filter(Boolean).join("; ") || (locale === "en" ? "No rationale supplied." : "Keine Begründung angegeben."),
+                    },
+                  })}
+                  sourceRevision={() => aiSourceRevision(column)}
+                  sensitiveValues={sensitiveValues}
+                  focusTargetId={`calibration-set-definition-${column}`}
+                  onAdopt={adoptAiDefinition}
+                />
+              </div>
             )}
 
             {/* Verteilung links, der Weg zur Begründung rechts — beides gehört ans

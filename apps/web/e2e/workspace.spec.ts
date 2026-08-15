@@ -365,6 +365,85 @@ test("all three AI jobs expose only reviewed payloads and adopt into their exact
   await expect(page.locator("#calibration-set-definition-wohlstand")).toBeFocused();
 });
 
+test("quick calibration AI adoption opens the changed definition", async ({ page }) => {
+  await enableAiCoach(page);
+  await page.route("**/api/ai/assist", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        version: "v2",
+        review: {
+          task: "calibration_evidence_gaps",
+          status: "ok",
+          review: "Die Definition ist fachlich nachvollziehbar.",
+          suggested: {
+            variable: "wohlstand",
+            definition: "Das Set beschreibt hohe synthetische Anpassungsfähigkeit.",
+          },
+          uncertainty: [],
+          evidenceNeeds: [],
+          limitations: [],
+        },
+        model: "test-model",
+        provider: "mock",
+        generatedAt: "2026-08-11T10:00:00.000Z",
+      }),
+    });
+  });
+  await loadDemo(page);
+  await openDestination(page, "decisions");
+
+  const evidence = page.getByRole("region", { name: "Evidenzlücken prüfen" });
+  await evidence.getByRole("button", { name: "KI-Prüfung vorbereiten" }).click();
+  await evidence.getByRole("button", { name: "An KI-Coach senden" }).click();
+  await evidence.getByRole("button", { name: "Vorgeschlagene Definition verwenden" }).click();
+
+  await expect(page.getByTestId("calibration-view-doc")).toHaveAttribute("aria-pressed", "true");
+  const definition = page.locator("#calibration-set-definition-wohlstand");
+  await expect(definition).toHaveValue("Das Set beschreibt hohe synthetische Anpassungsfähigkeit.");
+  await expect(definition).toBeFocused();
+});
+
+test("journey evidence stage follows full calibration readiness", async ({ page }) => {
+  await loadDemo(page);
+  await openDestination(page, "decisions");
+  await page.getByTestId("calibration-view-doc").click();
+
+  const variables = page.locator('[data-testid^="calibration-variable-"]');
+  for (let index = 0; index < await variables.count(); index += 1) {
+    await variables.nth(index).click();
+    const caseReview = page.getByTestId("calibration-case-review");
+    if (!(await caseReview.isChecked())) await caseReview.check();
+  }
+
+  const reviewStage = page
+    .getByTestId("decision-journey")
+    .locator("li")
+    .filter({ hasText: "Fallprüfung & Evidenz" });
+  await expect(reviewStage).toHaveAttribute("data-state", "current");
+  await expect(reviewStage).toContainText("0 von 5 Sets belegt und fallgeprüft");
+  await expect(
+    page.getByText(
+      "Alle Stationen sind abgeschlossen — Evidenz und Prüfpaket rechnen mit diesen Entscheidungen.",
+    ),
+  ).toHaveCount(0);
+});
+
+test("calibration sidecar does not claim completion without active sets", async ({ page }) => {
+  await loadDemo(page);
+  await openDestination(page, "research");
+  for (const column of ["wohlstand", "urban", "bildung", "stabil", "demo_ueberleben"]) {
+    await page.getByLabel(`${column}: Rolle`).selectOption("ignore");
+  }
+  await openDestination(page, "decisions");
+
+  await expect(
+    page.getByText("Wählen Sie mindestens ein aktives Bedingungs- oder Outcome-Set."),
+  ).toBeVisible();
+  await expect(page.getByText("Alle Sets sind bestätigt und belegt.")).toHaveCount(0);
+});
+
 test("AI preview blocks current case identifiers before any network request", async ({ page }) => {
   await enableAiCoach(page);
   let requests = 0;

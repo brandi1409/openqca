@@ -1014,43 +1014,44 @@ export function CalibrationWorkbench({
         </div>
       </nav>
 
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 14,
-          padding: "4px 10px",
-          borderRadius: 999,
-          fontSize: 12,
-          fontWeight: 700,
-          background:
-            badge.kind === "bad"
-              ? "var(--bad-wash)"
-              : badge.kind === "warn"
-                ? "var(--warn-wash)"
-                : "var(--good-wash)",
-          color:
-            badge.kind === "bad"
-              ? "var(--bad)"
-              : badge.kind === "warn"
-                ? "var(--warn-text)"
-                : "var(--good-text)",
-        }}
-      >
-        {t(locale, badgeLabelKey(badge.labelKey))}
-        {ready ? ` · ${t(locale, "calib.ready.yes")}` : ` · ${t(locale, "calib.ready.no")}`}
-      </div>
-      <div
-        data-testid="calibration-protocol-status"
-        data-readiness={protocolReady ? "protocol-ready" : "protocol-incomplete"}
-        style={{ fontSize: 13.5, color: protocolReady ? "var(--good-text)" : "var(--muted)", marginBottom: 14 }}
-      >
-        {protocolReady
-          ? t(locale, "calib.protocol.ready")
-          : t(locale, "calib.protocol.incomplete", {
-              n: readiness.missingFields.length + readiness.missingEvidence.length,
-            })}
+      <div className="oq-workbench-status">
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "4px 10px",
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 700,
+            background:
+              badge.kind === "bad"
+                ? "var(--bad-wash)"
+                : badge.kind === "warn"
+                  ? "var(--warn-wash)"
+                  : "var(--good-wash)",
+            color:
+              badge.kind === "bad"
+                ? "var(--bad)"
+                : badge.kind === "warn"
+                  ? "var(--warn-text)"
+                  : "var(--good-text)",
+          }}
+        >
+          {t(locale, badgeLabelKey(badge.labelKey))}
+          {ready ? ` · ${t(locale, "calib.ready.yes")}` : ` · ${t(locale, "calib.ready.no")}`}
+        </div>
+        <div
+          data-testid="calibration-protocol-status"
+          data-readiness={protocolReady ? "protocol-ready" : "protocol-incomplete"}
+          style={{ fontSize: 13.5, color: protocolReady ? "var(--good-text)" : "var(--muted)" }}
+        >
+          {protocolReady
+            ? t(locale, "calib.protocol.ready")
+            : t(locale, "calib.protocol.incomplete", {
+                n: readiness.missingFields.length + readiness.missingEvidence.length,
+              })}
+        </div>
       </div>
 
       {/* 1. Set definition */}
@@ -1172,6 +1173,35 @@ export function CalibrationWorkbench({
           </>
         )}
       </section>
+
+      {/* KI-Coach zu Definition und Evidenz des aktiven Sets — unmittelbar am
+          Definitions-Abschnitt, aber bewusst AUSSERHALB seines einklappbaren
+          Teilbaums: Der Coach bleibt montiert, während „Definition" eingeklappt
+          ist, damit die Übernahme das Definitionsfeld wieder öffnet
+          (adoptAiDefinition) und fokussiert (focusTargetId). Nutzlast,
+          Quellrevision, Fallkennungen und Handler unverändert; Vorschläge sind
+          reine Prosa, nie Zahlen. */}
+      <div className="oq-workbench-coach">
+        <AiAssist
+          key={v}
+          label={locale === "en" ? "Review evidence gaps" : "Evidenzlücken prüfen"}
+          request={() => ({
+            version: AI_CONTRACT_VERSION,
+            task: "calibration_evidence_gaps",
+            locale,
+            payload: {
+              variable: v,
+              setLabel: spec.set.setLabel,
+              definition: spec.set.definition,
+              rationale: [spec.set.unit, spec.set.scopePopulation, spec.set.timePeriod].filter(Boolean).join("; ") || (locale === "en" ? "No rationale supplied." : "Keine Begründung angegeben."),
+            },
+          })}
+          sourceRevision={() => aiSourceRevision(v)}
+          sensitiveValues={sensitiveValues}
+          focusTargetId={`calibration-set-definition-${v}`}
+          onAdopt={adoptAiDefinition}
+        />
+      </div>
 
       {/* 2. Method / provenance */}
       <section id="calibration-substep-method" style={substepSectionStyle}>
@@ -1984,44 +2014,6 @@ export function CalibrationWorkbench({
           )}
         </section>
       ) : null}
-
-      <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line-soft)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-              color: "var(--ai)",
-            }}
-          >
-            {t(locale, "calib.ai.badge")}
-          </span>
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>{t(locale, "calib.ai.plan")}</span>
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          <AiAssist
-            key={v}
-            label={locale === "en" ? "Review evidence gaps" : "Evidenzlücken prüfen"}
-            request={() => ({
-              version: AI_CONTRACT_VERSION,
-              task: "calibration_evidence_gaps",
-              locale,
-              payload: {
-                variable: v,
-                setLabel: spec.set.setLabel,
-                definition: spec.set.definition,
-                rationale: [spec.set.unit, spec.set.scopePopulation, spec.set.timePeriod].filter(Boolean).join("; ") || (locale === "en" ? "No rationale supplied." : "Keine Begründung angegeben."),
-              },
-            })}
-            sourceRevision={() => aiSourceRevision(v)}
-            sensitiveValues={sensitiveValues}
-            focusTargetId={`calibration-set-definition-${v}`}
-            onAdopt={adoptAiDefinition}
-          />
-        </div>
-      </div>
     </Card>
   );
 }

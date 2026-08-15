@@ -470,6 +470,16 @@ export default function Home() {
       document.getElementById("decision-calibration")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 0);
   }
+  /** Sprung ans Kalibrierungsstudio selbst (Ansicht bleibt, wie sie ist). */
+  function scrollToCalibrationStudio() {
+    document
+      .getElementById("decision-calibration")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(
+      () => document.getElementById("calibration-studio-heading")?.focus({ preventScroll: true }),
+      0,
+    );
+  }
   function jumpToDecisionIssue(issue: DecisionIssue) {
     if (issue.kind === "researchBrief") {
       selectDestination("research");
@@ -1082,6 +1092,24 @@ export default function Home() {
     varMeta,
     calibSpecs,
   });
+  // Entscheidungsweg: alle Angaben sind aus den bereits berechneten Readiness-
+  // Werten abgeleitet — Anzeige, keine neue State-Quelle.
+  const computableColsCount = activeAnalysisCols.filter((column) =>
+    specIsComputable(calibSpecs[column], varMeta[column]?.type ?? "raw"),
+  ).length;
+  const caseReviewedCount = activeAnalysisCols.filter(
+    (column) => calibSpecs[column]?.caseReviewConfirmed === true,
+  ).length;
+  const decisionKeys = ["frequencyCutoff", "consistencyCutoff", "directionalExpectations"] as const;
+  const confirmedDecisionCount = decisionKeys.filter(
+    (key) => analysisDecisions[key].confirmed && analysisDecisions[key].rationale.trim(),
+  ).length;
+  const nextCalibrationIssue = decisionIssues.find((issue) => issue.kind === "calibration");
+  const nextThresholdKind = decisionKeys.find(
+    (key) => !(analysisDecisions[key].confirmed && analysisDecisions[key].rationale.trim()),
+  );
+  const evidenceReadyCount = activeAnalysisCols.length - calibrationReadiness.missing.length;
+  const nextEvidenceColumn = calibrationReadiness.missing[0];
   const resultsReady = tt !== null && sol !== null && necessity !== null && suin !== null;
   const defenseResultsReady = resultsReady && computedRoleContractReady;
   const defenseReady =
@@ -1104,6 +1132,19 @@ export default function Home() {
   const missingDefenseGroups = checklist
     .filter((item) => !item.ready)
     .map((item) => t(locale, item.key));
+  // Kontextschiene: Reifegrad je Ziel aus den bereits berechneten Readiness-
+  // Werten abgeleitet — Anzeige, keine neue State-Quelle.
+  const navStatus: Record<WorkspaceDestination, "ready" | "open" | "idle"> = {
+    answer: !ds ? "idle" : resultsReady ? "ready" : "open",
+    research: !ds ? "idle" : briefReadiness.ready ? "ready" : "open",
+    decisions: !ds
+      ? "idle"
+      : decisionReadiness.ready && calibrationReadiness.ready
+        ? "ready"
+        : "open",
+    evidence: !ds ? "idle" : defenseResultsReady ? "ready" : "open",
+    defense: !ds ? "idle" : defenseReady ? "ready" : "open",
+  };
 
   return (
     <div className="oq-workspace-shell">
@@ -1129,7 +1170,7 @@ export default function Home() {
           />
         )}
         <aside className="oq-workspace-sidebar">
-          <WorkspaceNav destination={destination} onSelect={selectDestination} />
+          <WorkspaceNav destination={destination} status={navStatus} onSelect={selectDestination} />
           {ds && <Glossary />}
         </aside>
         <main className="oq-workspace-main">
@@ -1288,6 +1329,76 @@ export default function Home() {
               <p className="hint">{t(locale, "workspace.noData")}</p>
             ) : (
               <>
+                <DecisionJourney
+                  stages={[
+                    {
+                      key: "design",
+                      label: t(locale, "workspace.journey.design"),
+                      detail: t(
+                        locale,
+                        briefReadiness.ready
+                          ? "workspace.journey.design.ready"
+                          : "workspace.journey.design.open",
+                      ),
+                      ready: briefReadiness.ready,
+                      actionLabel: t(locale, "workspace.answer.question.action"),
+                      onAction: () =>
+                        jumpToDecisionIssue({
+                          id: "research-brief",
+                          kind: "researchBrief",
+                          status: "unconfirmed",
+                          protocolReady: false,
+                          missingFields: [],
+                          missingEvidence: [],
+                        }),
+                    },
+                    {
+                      key: "calibration",
+                      label: t(locale, "workspace.journey.calibration"),
+                      detail: t(locale, "workspace.journey.calibration.detail", {
+                        done: computableColsCount,
+                        total: activeAnalysisCols.length,
+                      }),
+                      ready: computableCalibration,
+                      actionLabel: t(locale, "workspace.journey.action.calibration"),
+                      onAction: scrollToCalibrationStudio,
+                    },
+                    {
+                      key: "review",
+                      label: t(locale, "workspace.journey.review"),
+                      detail: t(locale, "workspace.journey.review.detail", {
+                        done: evidenceReadyCount,
+                        total: activeAnalysisCols.length,
+                      }),
+                      ready: calibrationReadiness.ready,
+                      actionLabel: t(locale, "workspace.journey.action.review"),
+                      onAction: nextEvidenceColumn
+                        ? () => documentVariable(nextEvidenceColumn)
+                        : scrollToCalibrationStudio,
+                    },
+                    {
+                      key: "thresholds",
+                      label: t(locale, "workspace.journey.thresholds"),
+                      detail: t(locale, "workspace.journey.thresholds.detail", {
+                        done: confirmedDecisionCount,
+                        total: decisionKeys.length,
+                      }),
+                      ready: decisionReadiness.ready,
+                      actionLabel: t(locale, "workspace.journey.action.thresholds"),
+                      onAction: nextThresholdKind
+                        ? () =>
+                            jumpToDecisionIssue({
+                              id: nextThresholdKind,
+                              kind: nextThresholdKind,
+                              status: "unconfirmed",
+                              protocolReady: false,
+                              missingFields: [],
+                              missingEvidence: [],
+                            })
+                        : undefined,
+                    },
+                  ]}
+                />
                 <DecisionLedger
                   issues={decisionIssues}
                   activeColumns={activeAnalysisCols}
@@ -1300,15 +1411,26 @@ export default function Home() {
                   decisions={analysisDecisions}
                   onJump={jumpToDecisionIssue}
                 />
-                <div id="decision-calibration" style={{ scrollMarginTop: 96 }}>
-                  <h2 className="oq-workspace-subheading">{t(locale, "workspace.calibration.title")}</h2>
-                  {demoMode && <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>}
-                  {calibMigrateBanner && <Diag kind="warn">{t(locale, "calib.migrate.banner")}</Diag>}
-                  <Card className="oq-plane--compact oq-calibration-switcher">
-                    <div className="oq-action-row">
+                <div id="decision-calibration" className="oq-studio">
+                  <header className="oq-studio__head">
+                    <div className="oq-studio__heading">
+                      <h2
+                        id="calibration-studio-heading"
+                        className="oq-workspace-subheading"
+                        tabIndex={-1}
+                      >
+                        {t(locale, "workspace.calibration.title")}
+                      </h2>
+                      <p className="oq-studio__lede">{t(locale, "workspace.calibration.lede")}</p>
+                    </div>
+                    <div
+                      className="oq-segment"
+                      role="group"
+                      aria-label={t(locale, "workspace.calibration.modeAria")}
+                    >
                       <button
                         type="button"
-                        className="oq-btn"
+                        className="oq-segment__btn"
                         aria-pressed={calibView === "quick"}
                         data-testid="calibration-view-quick"
                         onClick={() => chooseCalibView("quick")}
@@ -1317,7 +1439,7 @@ export default function Home() {
                       </button>
                       <button
                         type="button"
-                        className="oq-btn"
+                        className="oq-segment__btn"
                         aria-pressed={calibView === "doc"}
                         data-testid="calibration-view-doc"
                         onClick={() => chooseCalibView("doc")}
@@ -1325,50 +1447,121 @@ export default function Home() {
                         {t(locale, "workspace.calibration.documentation")}
                       </button>
                     </div>
-                    <DocumentationMeter
-                      columns={activeAnalysisCols}
-                      doneCount={documentedCols.length}
-                      documented={(column) => documentedCols.includes(column)}
-                      onDocument={documentVariable}
-                    />
-                  </Card>
-                  {calibView === "quick" ? (
-                    <CalibrationQuick
-                      ds={ds}
-                      varMeta={varMeta}
-                      calibSpecs={calibSpecs}
-                      setCalibSpecs={changeCalibSpecs}
-                      anchors={anchors}
-                      setAnchors={setAnchors}
-                      evaluation={evaluation}
-                      onDocument={documentVariable}
-                    />
-                  ) : (
-                    <CalibrationWorkbench
-                      ds={ds}
-                      sensitiveValues={caseIdentifiers}
-                      varMeta={varMeta}
-                      setVarMeta={changeVarMeta}
-                      calibSpecs={calibSpecs}
-                      setCalibSpecs={changeCalibSpecs}
-                      anchors={anchors}
-                      setAnchors={setAnchors}
-                      focusVar={focusVar}
-                      setFocusVar={setFocusVar}
-                      evaluation={evaluation}
-                      sensitivity={sensitivity}
-                      conditions={conditions}
-                      outcome={outcome}
-                      excludedMissingCount={excludedMissingCount}
-                      freqCut={freqCut}
-                      consCut={consCut}
-                      aiSourceRevision={(column) =>
-                        currentAiTargetRevision("calibration_evidence_gaps", column)
-                      }
-                      onAiAdopt={adoptCalibrationDefinition}
-                    />
-                  )}
+                  </header>
+                  {demoMode && <Diag kind="warn">{t(locale, "calib.demoNotice")}</Diag>}
+                  {calibMigrateBanner && <Diag kind="warn">{t(locale, "calib.migrate.banner")}</Diag>}
+                  <div className="oq-studio__body">
+                    <div className="oq-studio__main">
+                      {calibView === "quick" ? (
+                        <CalibrationQuick
+                          ds={ds}
+                          varMeta={varMeta}
+                          calibSpecs={calibSpecs}
+                          setCalibSpecs={changeCalibSpecs}
+                          anchors={anchors}
+                          setAnchors={setAnchors}
+                          evaluation={evaluation}
+                          sensitiveValues={caseIdentifiers}
+                          aiSourceRevision={(column) =>
+                            currentAiTargetRevision("calibration_evidence_gaps", column)
+                          }
+                          onAiAdopt={adoptCalibrationDefinition}
+                          onDocument={documentVariable}
+                        />
+                      ) : (
+                        <CalibrationWorkbench
+                          ds={ds}
+                          sensitiveValues={caseIdentifiers}
+                          varMeta={varMeta}
+                          setVarMeta={changeVarMeta}
+                          calibSpecs={calibSpecs}
+                          setCalibSpecs={changeCalibSpecs}
+                          anchors={anchors}
+                          setAnchors={setAnchors}
+                          focusVar={focusVar}
+                          setFocusVar={setFocusVar}
+                          evaluation={evaluation}
+                          sensitivity={sensitivity}
+                          conditions={conditions}
+                          outcome={outcome}
+                          excludedMissingCount={excludedMissingCount}
+                          freqCut={freqCut}
+                          consCut={consCut}
+                          aiSourceRevision={(column) =>
+                            currentAiTargetRevision("calibration_evidence_gaps", column)
+                          }
+                          onAiAdopt={adoptCalibrationDefinition}
+                        />
+                      )}
+                    </div>
+                    <aside
+                      className="oq-studio__side"
+                      aria-label={t(locale, "workspace.calibration.sideAria")}
+                    >
+                      <section className="oq-studio__panel">
+                        <DocumentationMeter
+                          columns={activeAnalysisCols}
+                          doneCount={documentedCols.length}
+                          documented={(column) => documentedCols.includes(column)}
+                          onDocument={documentVariable}
+                        />
+                      </section>
+                      <section className="oq-studio__panel">
+                        <h3 className="oq-studio__panel-title">
+                          {t(locale, "workspace.calibration.statusTitle")}
+                        </h3>
+                        <ul className="oq-studio__facts">
+                          <li data-done={computableCalibration ? "true" : "false"}>
+                            {t(locale, "workspace.calibration.computable", {
+                              done: computableColsCount,
+                              total: activeAnalysisCols.length,
+                            })}
+                          </li>
+                          <li
+                            data-done={
+                              activeAnalysisCols.length > 0 &&
+                              caseReviewedCount === activeAnalysisCols.length
+                                ? "true"
+                                : "false"
+                            }
+                          >
+                            {t(locale, "workspace.calibration.reviewed", {
+                              done: caseReviewedCount,
+                              total: activeAnalysisCols.length,
+                            })}
+                          </li>
+                        </ul>
+                        <div className="oq-studio__next">
+                          <span className="oq-studio__next-label">
+                            {t(locale, "workspace.calibration.nextTitle")}
+                          </span>
+                          {nextCalibrationIssue?.column ? (
+                            <button
+                              type="button"
+                              className="oq-btn oq-btn--secondary"
+                              onClick={() => jumpToDecisionIssue(nextCalibrationIssue)}
+                            >
+                              {t(locale, "workspace.calibration.nextSet", {
+                                column: nextCalibrationIssue.column,
+                              })}
+                            </button>
+                          ) : activeAnalysisCols.length > 0 ? (
+                            <p className="oq-studio__next-done">
+                              {t(locale, "workspace.calibration.allDone")}
+                            </p>
+                          ) : (
+                            <p className="oq-studio__next-empty">
+                              {t(locale, "workspace.calibration.noActiveSets")}
+                            </p>
+                          )}
+                        </div>
+                      </section>
+                    </aside>
+                  </div>
                 </div>
+                <h2 className="oq-workspace-subheading">
+                  {t(locale, "workspace.journey.thresholds")}
+                </h2>
                 <AnalysisDecisionEditor
                   freqCut={freqCut}
                   consCut={consCut}
@@ -1603,9 +1796,12 @@ const WORKSPACE_DESTINATIONS: Array<{ id: WorkspaceDestination; key: DictKey }> 
 
 function WorkspaceNav({
   destination,
+  status,
   onSelect,
 }: {
   destination: WorkspaceDestination;
+  /** Pro Bereich abgeleiteter Reifegrad — reine Anzeige, keine neue State-Quelle. */
+  status: Record<WorkspaceDestination, "ready" | "open" | "idle">;
   onSelect: (destination: WorkspaceDestination) => void;
 }) {
   const [locale] = useLocale();
@@ -1621,6 +1817,13 @@ function WorkspaceNav({
             onClick={() => onSelect(item.id)}
           >
             {t(locale, item.key)}
+            {/* Leerer, aria-versteckter Statuspunkt: Der zugängliche Name und
+                der sichtbare Text des Knopfs bleiben exakt das Ziel-Label. */}
+            <span
+              className="oq-workspace-nav__status"
+              data-status={status[item.id]}
+              aria-hidden="true"
+            />
           </button>
         ))}
       </div>
@@ -1671,7 +1874,9 @@ function ImportPreflightPanel({
         <div><dt>{de ? "Vorgeschlagenes Outcome" : "Proposed outcome"}</dt><dd>{preflight.proposedOutcome ?? "—"}</dd></div>
       </dl>
       <p className="hint">{de ? "Vorlage: eine Fall-ID-Spalte und eine Zeile pro Fall; numerische Bedingungen und ein Outcome anschließend im Forschungsdesign prüfen." : "Template: one case-ID column and one row per case; then review numeric conditions and one outcome in Research design."}</p>
-      {Object.entries(preflight.detectedTypes).map(([column, type]) => <span className="oq-status-chip" key={column}>{column}: {type}</span>)}
+      <div className="oq-import-preflight__chips">
+        {Object.entries(preflight.detectedTypes).map(([column, type]) => <span className="oq-status-chip" key={column}>{column}: {type}</span>)}
+      </div>
       {preflight.warnings.map((warning) => <Diag key={warning} kind="warn">{de ? ({ "No case identifier column was detected.": "Keine Fall-ID-Spalte erkannt." }[warning] ?? warning) : warning}</Diag>)}
       {preflight.blockingIssues.map((issue) => <Diag key={issue} kind="bad">{de ? ({
         "A case identifier column is required.": "Eine Fall-ID-Spalte ist erforderlich.",
@@ -1900,6 +2105,76 @@ function decisionMissingLabel(locale: Locale, item: string): string {
   return t(
     locale,
     DECISION_MISSING_LABELS[item] ?? "workspace.decision.missing.other",
+  );
+}
+
+type JourneyStage = {
+  key: "design" | "calibration" | "review" | "thresholds";
+  label: string;
+  detail: string;
+  ready: boolean;
+  actionLabel: string;
+  onAction?: () => void;
+};
+
+/**
+ * Entscheidungsweg über dem Register: vier Stationen (Design & Rollen →
+ * Kalibrierung → Fallprüfung & Evidenz → Analyse-Schwellen), jede mit Stand,
+ * Fortschritt und genau einer nächsten Aktion an der aktuellen Station. Alle
+ * Werte leitet der Aufrufer aus den vorhandenen Readiness-Größen ab — diese
+ * Komponente kennt keinen eigenen State.
+ */
+function DecisionJourney({ stages }: { stages: JourneyStage[] }) {
+  const [locale] = useLocale();
+  const currentIndex = stages.findIndex((stage) => !stage.ready);
+  const allDone = currentIndex === -1;
+  return (
+    <section
+      className="oq-journey"
+      aria-labelledby="decision-journey-heading"
+      data-testid="decision-journey"
+    >
+      <h2 id="decision-journey-heading" className="oq-journey__title">
+        {t(locale, "workspace.journey.title")}
+      </h2>
+      <ol className="oq-journey__list">
+        {stages.map((stage, index) => {
+          const state = stage.ready ? "done" : index === currentIndex ? "current" : "open";
+          return (
+            <li
+              key={stage.key}
+              className="oq-journey__stage"
+              data-state={state}
+              aria-current={state === "current" ? "step" : undefined}
+            >
+              <span className="oq-journey__marker" aria-hidden="true" />
+              <strong className="oq-journey__label">{stage.label}</strong>
+              <span className="oq-journey__state">
+                {t(
+                  locale,
+                  state === "done"
+                    ? "workspace.journey.done"
+                    : state === "current"
+                      ? "workspace.journey.current"
+                      : "workspace.journey.open",
+                )}
+              </span>
+              <span className="oq-journey__detail">{stage.detail}</span>
+              {state === "current" && stage.onAction && (
+                <button
+                  type="button"
+                  className="oq-btn oq-btn--secondary oq-journey__action"
+                  onClick={stage.onAction}
+                >
+                  {stage.actionLabel}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {allDone && <p className="oq-journey__done">{t(locale, "workspace.journey.allDone")}</p>}
+    </section>
   );
 }
 
