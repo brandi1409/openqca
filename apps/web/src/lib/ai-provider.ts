@@ -240,33 +240,51 @@ async function completeGemini(request: AiAssistRequest): Promise<AiCompletionRes
   if (refusal) return { review: refusal, model, provider: "gemini" };
   const prompt = promptFor(request);
   const schema = aiReviewResponseJsonSchema(request);
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: prompt.instructions }] },
-      contents: [{ role: "user", parts: [{ text: prompt.input }] }],
-      generationConfig: {
-        maxOutputTokens: 900,
-        temperature: 0,
-        responseMimeType: "application/json",
-        responseJsonSchema: schema.schema,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  const raw = await response.json().catch(() => null) as {
-    error?: { message?: string };
-    candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
-  } | null;
-  if (!response.ok) throw new Error(raw?.error?.message || `GEMINI_${response.status}`);
-  if (raw?.candidates?.[0]?.finishReason !== "STOP") throw new Error("AI_INCOMPLETE");
-  const jsonText = raw?.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === "string")?.text;
-  if (!jsonText) throw new Error("AI_UNSTRUCTURED");
-  let parsed: unknown;
-  try { parsed = JSON.parse(jsonText); } catch { throw new Error("AI_UNSTRUCTURED"); }
-  return { review: validatedResponse(parsed, request), model, provider: "gemini" };
+  const deadline = Date.now() + 30_000;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const correction = attempt === 0
+      ? ""
+      : "\nYour prior draft violated the safety contract. Rewrite it without causal predicates, numeric QCA guidance, role assignments, citations, case data, formulas, or readiness assertions. For an incomplete payload, use neutral scope language only.";
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: `${prompt.instructions}${correction}` }] },
+        contents: [{ role: "user", parts: [{ text: prompt.input }] }],
+        generationConfig: {
+          maxOutputTokens: 900,
+          temperature: 0,
+          responseMimeType: "application/json",
+          responseJsonSchema: schema.schema,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+      signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+    });
+    const raw = await response.json().catch(() => null) as {
+      error?: { message?: string };
+      candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
+    } | null;
+    if (!response.ok) throw new Error(raw?.error?.message || `GEMINI_${response.status}`);
+    if (raw?.candidates?.[0]?.finishReason !== "STOP") throw new Error("AI_INCOMPLETE");
+    const jsonText = raw?.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === "string")?.text;
+    if (!jsonText) throw new Error("AI_UNSTRUCTURED");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      throw new Error("AI_UNSTRUCTURED");
+    }
+    try {
+      return { review: validatedResponse(parsed, request), model, provider: "gemini" };
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== "AI_POLICY_VIOLATION" || attempt === 1) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("AI_POLICY_VIOLATION");
 }
 
 export async function completeAi(request: AiAssistRequest): Promise<AiCompletionResult> {

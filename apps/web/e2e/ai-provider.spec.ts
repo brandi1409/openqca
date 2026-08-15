@@ -123,6 +123,85 @@ test("Gemini provider sends the reviewed payload through the closed structured-o
   ]);
 });
 
+test("Gemini retries one policy-invalid draft with stricter safety instructions", async () => {
+  process.env.AI_ENABLED = "true";
+  process.env.AI_PROVIDER = "gemini";
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+  let calls = 0;
+  const drafts = [
+    {
+      task: "brief_clarify",
+      status: "ok",
+      review: "Die Frage ist klar.",
+      suggested: { question: "Welche Bedingungen verursachen kommunale Resilienz?" },
+      uncertainty: [],
+      evidenceNeeds: [],
+      limitations: [],
+    },
+    {
+      task: "brief_clarify",
+      status: "ok",
+      review: "Die Frage ist klar abgegrenzt.",
+      suggested: { question: "Welche Konfigurationen begleiten kommunale Resilienz?" },
+      uncertainty: [],
+      evidenceNeeds: [],
+      limitations: [],
+    },
+  ];
+  globalThis.fetch = async (_input, init) => {
+    const body = JSON.parse(String(init?.body));
+    if (calls === 1) {
+      expect(body.systemInstruction.parts[0].text).toContain("prior draft violated");
+    }
+    const draft = drafts[calls];
+    calls += 1;
+    return new Response(JSON.stringify({
+      candidates: [{
+        finishReason: "STOP",
+        content: { parts: [{ text: JSON.stringify(draft) }] },
+      }],
+    }), { status: 200 });
+  };
+
+  const result = await completeAi(request);
+  expect(calls).toBe(2);
+  expect(result).toMatchObject({
+    review: {
+      task: "brief_clarify",
+      suggested: {
+        question: "Welche Konfigurationen begleiten kommunale Resilienz?",
+      },
+    },
+  });
+});
+
+test("Gemini rejects after two policy-invalid drafts", async () => {
+  process.env.AI_ENABLED = "true";
+  process.env.AI_PROVIDER = "gemini";
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      candidates: [{
+        finishReason: "STOP",
+        content: { parts: [{ text: JSON.stringify({
+          task: "brief_clarify",
+          status: "ok",
+          review: "Die Frage ist klar.",
+          suggested: { question: "Welche Bedingungen verursachen kommunale Resilienz?" },
+          uncertainty: [],
+          evidenceNeeds: [],
+          limitations: [],
+        }) }] },
+      }],
+    }), { status: 200 });
+  };
+
+  await expect(completeAi(request)).rejects.toThrow("AI_POLICY_VIOLATION");
+  expect(calls).toBe(2);
+});
+
 test("OpenAI provider sends the same reviewed payload through Responses structured output", async () => {
   process.env.AI_ENABLED = "true";
   process.env.AI_PROVIDER = "openai";
@@ -364,18 +443,23 @@ test("Gemini accepts only successful STOP termination", async () => {
   process.env.AI_ENABLED = "true";
   process.env.AI_PROVIDER = "gemini";
   process.env.GEMINI_API_KEY = "test-gemini-key";
-  globalThis.fetch = async () => new Response(JSON.stringify({
-    candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: JSON.stringify({
-      task: "brief_clarify",
-      status: "ok",
-      review: "Schema-shaped but incomplete output.",
-      suggested: { question: "Bounded research question?" },
-      uncertainty: [],
-      evidenceNeeds: [],
-      limitations: [],
-    }) }] } }],
-  }), { status: 200 });
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: JSON.stringify({
+        task: "brief_clarify",
+        status: "ok",
+        review: "Schema-shaped but incomplete output.",
+        suggested: { question: "Bounded research question?" },
+        uncertainty: [],
+        evidenceNeeds: [],
+        limitations: [],
+      }) }] } }],
+    }), { status: 200 });
+  };
   await expect(completeAi(request)).rejects.toThrow("AI_INCOMPLETE");
+  expect(calls).toBe(1);
 });
 
 test("AI availability fails closed for unknown providers", () => {
